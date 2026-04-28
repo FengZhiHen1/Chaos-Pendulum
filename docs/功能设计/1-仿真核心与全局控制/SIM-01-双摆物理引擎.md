@@ -6,6 +6,7 @@
 > |------|------|--------|----------|
 > | v1.0 | 2026-04-28 15:30:00 | AI Assistant | 初始版本（错误：基于 Pyodide 主线程同步架构） |
 > | v2.0 | 2026-04-28 17:00:00 | AI Assistant | 完全重写：对齐技术栈设计文档 §1.3/§3/ADR-001，改为 JS Worker + Transferable 池 + 批量积分架构 |
+> | v2.1 | 2026-04-28 20:30:00 | AI Assistant | 修正 odeRhs 分母公式：`2*m1+m2-m2*cos(2δ)` → `m1+m2-m2*cos²(δ)`（与标准拉格朗日推导对齐，v2.0 公式多因子 2 导致能量爆炸 9×10¹¹） |
 
 > **冲突核查指引**：本版本已与技术栈设计文档 v1.2 全文对齐。若后续技术栈文档更新涉及 ODE 求解器或 Worker 通信方案变更，以时间戳更新的版本为准。
 
@@ -357,9 +358,10 @@ function consumeFrameToStore(buffer: Float64Array, frameIndex: number, store: Zu
     const sinD = Math.sin(delta);
     const cosD = Math.cos(delta);
 
-    let denom = 2 * m1 + m2 - m2 * Math.cos(2 * delta);
+    // 标准拉格朗日推导：denom = m1 + m2 - m2·cos²(δ)
+    const denom = m1 + m2 - m2 * cosD * cosD;
     // 防止分母过小：保留符号
-    if (Math.abs(denom) < 1e-12) denom = Math.sign(denom) * 1e-12;
+    const safeDenom = Math.abs(denom) < 1e-12 ? Math.sign(denom) * 1e-12 : denom;
 
     // 角加速度（无阻尼部分）
     const alpha1 = (
@@ -367,7 +369,7 @@ function consumeFrameToStore(buffer: Float64Array, frameIndex: number, store: Zu
       m2 * g * Math.sin(t2) * cosD +
       m2 * L2 * w2*w2 * sinD -
       (m1 + m2) * g * Math.sin(t1)
-    ) / (L1 * denom);
+    ) / (L1 * safeDenom);
 
     const alpha2 = (
       -m2 * L2 * w2*w2 * sinD * cosD +
@@ -376,7 +378,7 @@ function consumeFrameToStore(buffer: Float64Array, frameIndex: number, store: Zu
         L1 * w1*w1 * sinD -
         g * Math.sin(t2)
       )
-    ) / (L2 * denom);
+    ) / (L2 * safeDenom);
 
     // 返回 [ω₁, α₁ - b·ω₁, ω₂, α₂ - b·ω₂]
     return new Float64Array([w1, alpha1 - b * w1, w2, alpha2 - b * w2]);
@@ -780,6 +782,6 @@ Worker 内部状态机（精简，因为批量积分模式下状态变化比逐�
 6. **【禁止行为】** 禁止在主线程 JS 侧实现任何物理计算（包括小角度近似）。所有 ODE 求解必须在 Worker 中完成，确保仿真行为一致。
 7. **【禁止行为】** 禁止直接实例化第二个 Worker 而不先 terminate 前一个。蝴蝶效应分屏（EXP-04）的两个 Worker 实例必须通过独立的 `new Worker(...)` 创建，不能共享同一 Worker 实例。
 8. **【禁止行为】** 禁止在 `handleStep` 中动态 import 或 fetch 外部资源。Worker 代码必须在构建时完全自包含。
-9. **【易错点】** `odeRhs` 中分母 `denom = 2*m1 + m2 - m2*cos(2*delta)` 在 `delta → 0` 且 `m2 → 0` 时接近零。必须检查 `abs(denom) < 1e-12`，使用 `Math.sign(denom) * 1e-12` 保留符号（禁止直接 clamp 到正数）。
+9. **【易错点】** `odeRhs` 中分母 `denom = m1 + m2 - m2*cos²(delta)` 在 `delta → 0` 且 `m2 → m1 + m2`（即 `cos²δ → (m1+m2)/m2`）时接近零。当 `m1=m2=1` 时 `denom` 范围 [1, 2]，不会趋零；但在 `m2 ≫ m1` 且 `δ → 0` 时 `cos²δ → 1`，`denom → m1`，需检查 `abs(denom) < 1e-12`，使用 `Math.sign(denom) * 1e-12` 保留符号（禁止直接 clamp 到正数）。
 10. **【易错点】** Velocity Verlet 要求在 `reset` 和 `setDirection` 后重新计算初始 `alpha`。避免使用过期缓存值。
 11. **【偷懒红线】** 文档中 `odeRhs` 和积分器的代码可直接复制到 `ode-worker.ts` 中运行。禁止以"这是标准的物理公式"为由省略任何数学表达式。
