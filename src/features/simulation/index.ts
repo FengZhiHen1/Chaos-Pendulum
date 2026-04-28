@@ -1,6 +1,13 @@
-export { useSimulationStore } from "./store";
-export { rk4Step, rk4Integrate } from "./engine/rk4";
-export { rk45Step } from "./engine/rk45";
-export { createInitialState, computeEnergy } from "./engine/state-vector";
-export { derivatives } from "./engine/derivatives";
+// Store
+export { useSimulationStore, readFrameField, getFrameSlice } from "./store";
+export type { SimulationFrame } from "./store";
+
+// Engine
+export { odeRhs, angularAcceleration } from "./engine/derivatives";
+export { integratorStep } from "./engine/integrators";
+export { computeDerived, normalizeAngle, hasInvalidValue } from "./engine/state-vector";
+export type { DerivedValues } from "./engine/state-vector";
+
+// Worker
 export { Float64Pool } from "./worker/float64-pool";
+export { SimulationScheduler, getScheduler } from "./worker/scheduler";
