@@ -1,6 +1,6 @@
 import { useEffect, useCallback, type ReactNode } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import { ParamPanel } from "@/features/simulation";
+import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
 import { setupSimulationBridge } from "@/features/simulation";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import type { AppMode } from "@/shared/types";
@@ -9,7 +9,6 @@ import { GlobalNavBar } from "./GlobalNavBar";
 import { ModeErrorBoundary } from "./ModeErrorBoundary";
 
 interface AppShellProps {
-  /** 4 个模式根组件，按 explore / analyze / lab / story 顺序传入 */
   children?: ReactNode;
 }
 
@@ -26,18 +25,15 @@ export function AppShell({ children }: AppShellProps) {
   const setMode = useAppStore((s) => s.setMode);
   const isDesktop = deviceType === "desktop";
 
-  // 建立 Store → Worker bridge
   useEffect(() => {
     const cleanup = setupSimulationBridge();
     return cleanup;
   }, []);
 
-  // 键盘快捷键
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-
       const mode = SHORTCUT_MAP[e.key];
       if (mode) setMode(mode);
     },
@@ -49,7 +45,6 @@ export function AppShell({ children }: AppShellProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // 按索引映射 children 到模式
   const childrenArray = children != null ? Array.from({ length: 4 }, (_, i) => {
     if (Array.isArray(children)) return children[i];
     if (i === 0) return children;
@@ -66,7 +61,6 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="h-screen w-screen flex flex-col bg-lab-dark text-white">
-        {/* 桌面端：顶部导航 */}
         {isDesktop && (
           <nav className="h-12 flex items-center px-4 border-b border-lab-border bg-lab-panel shrink-0">
             <span className="text-sm font-mono tracking-wider text-lab-accent mr-6 shrink-0">
@@ -77,7 +71,6 @@ export function AppShell({ children }: AppShellProps) {
         )}
 
         <div className="flex-1 flex overflow-hidden">
-          {/* 主内容区 */}
           <main className="flex-1 relative overflow-hidden">
             <ModeErrorBoundary>
               {activeContent ?? (
@@ -88,15 +81,19 @@ export function AppShell({ children }: AppShellProps) {
             </ModeErrorBoundary>
           </main>
 
-          {/* 参数控制侧栏 — 桌面端固定 */}
           {isDesktop && (
-            <aside className="w-72 shrink-0">
-              <ParamPanel />
+            <aside className="w-72 shrink-0 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
+                <ParamPanel />
+              </div>
+              <div className="shrink-0">
+                <EnergyMonitorPanel />
+                <PhaseSpacePanel />
+              </div>
             </aside>
           )}
         </div>
 
-        {/* 移动端/平板：底部导航 */}
         {!isDesktop && (
           <nav className="h-12 flex items-center border-t border-lab-border bg-lab-panel shrink-0"
             style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}

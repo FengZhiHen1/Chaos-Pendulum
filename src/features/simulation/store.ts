@@ -226,6 +226,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       alpha2: buffer[offset + FrameField.ALPHA2]!,
       energyInitial: ei, energyDrift: ed, driftExceeded: de,
       energyMin: emin, energyMax: emax, isSimulationActive: sa,
+      state: {
+        theta1: buffer[offset + FrameField.THETA1]!,
+        omega1: buffer[offset + FrameField.THETA1_DOT]!,
+        theta2: buffer[offset + FrameField.THETA2]!,
+        omega2: buffer[offset + FrameField.THETA2_DOT]!,
+      },
     });
   },
 
@@ -386,6 +392,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMin: 0,
       energyMax: 0,
       isSimulationActive: false,
+      state: {
+        theta1: defaultFrame.theta1,
+        omega1: defaultFrame.theta1Dot,
+        theta2: defaultFrame.theta2,
+        omega2: defaultFrame.theta2Dot,
+      },
     });
   },
 
