@@ -11,3 +11,10 @@ export type { DerivedValues } from "./engine/state-vector";
 // Worker
 export { Float64Pool } from "./worker/float64-pool";
 export { SimulationScheduler, getScheduler } from "./worker/scheduler";
+export { setupSimulationBridge, setWorkerReady, setWorkerNotReady } from "./worker/bridge";
+
+// UI
+export { ParamPanel } from "./ui/ParamPanel";
+export { ParamSlider } from "./ui/ParamSlider";
+export { MethodSelector } from "./ui/MethodSelector";
+export { PresetButtons } from "./ui/PresetButtons";

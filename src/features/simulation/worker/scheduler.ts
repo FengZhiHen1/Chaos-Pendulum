@@ -22,9 +22,15 @@ export class SimulationScheduler {
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private crashCount = 0;
   private running = false;
+  private readyCallbacks: Array<() => void> = [];
 
   constructor() {
     this.pool = new Float64Pool();
+  }
+
+  /** 注册 Worker ready 回调（供 bridge 层使用） */
+  onReady(cb: () => void): void {
+    this.readyCallbacks.push(cb);
   }
 
   // ─── 公开 API ────────────────────────────────
@@ -143,7 +149,8 @@ export class SimulationScheduler {
 
     switch (resp.type) {
       case "ready": {
-        // Worker 就绪，请求第一批
+        // Worker 就绪，通知 bridge + 请求第一批
+        for (const cb of this.readyCallbacks) cb();
         if (this.timeoutId) {
           clearTimeout(this.timeoutId);
           this.timeoutId = null;
