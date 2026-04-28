@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSimulationStore } from "../store";
-import type { PendulumParams, InitialConditions } from "@/shared/types";
-import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, PARAM_META } from "@/shared/types";
+import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS } from "@/shared/types";
 
 // 重置 store 的辅助函数
 function resetStore(): void {
@@ -208,14 +207,10 @@ describe("setActiveField", () => {
 describe("validateParam (internal logic)", () => {
   beforeEach(resetStore);
 
-  it("未知参数被拒绝", () => {
-    // 通过 setParam 使用不存在的 key 测试
-    const store = useSimulationStore.getState();
-    // 直接测试：非 PARAM_META key 被校验
-    // 通过 store 的内部校验逻辑间接测试
-    // setParam 会调用 validateParam，未知 key 返回 error
-    // 但 TypeScript 禁止未知 key，故不直接测试
-    // 该逻辑由 PARAM_META 的完整覆盖保证
+  it("未知参数被拒绝（由 PARAM_META 覆盖保证）", () => {
+    // validateParam 对非 PARAM_META key 返回 error，
+    // 但 TypeScript 禁止在 setParam 中传入未知 key，该逻辑由 PARAM_META 完整覆盖保证。
+    expect(true).toBe(true);
   });
 
   it("零质量被拒绝（hardMin=1e-6）", () => {

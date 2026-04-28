@@ -5,6 +5,7 @@
 > | 版本 | 时间 | 修改人 | 变更摘要 |
 > |------|------|--------|----------|
 > | v1.0 | 2026-04-28 20:14:49 | AI Assistant | 初始版本，对齐已有 useAppStore 约定与各模式组件接口 |
+> | v1.1 | 2026-04-28 21:10:00 | AI Assistant | 修正 MODE_REGISTRY 中故事模式 id 从 `"studio"` 改为 `"story"`（typo）；补充 currentMode→activeMode 重命名说明 |
 
 > **冲突核查指引**：本模块扩展 `useAppStore`（`src/stores/useAppStore.ts`），新增 `activeMode` 字段。已有模块（EXP-01/EXP-02/SIM-02）仅订阅 `deviceType`，不受新增字段影响（Zustand selector 粒度隔离）。
 
@@ -105,7 +106,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
     tooltip: "教学闭环与可编程沙箱 · 快捷键 3",
   },
   {
-    id: "studio",
+    id: "story",
     label: "故事模式",
     shortLabel: "故事",
     iconName: "Play",

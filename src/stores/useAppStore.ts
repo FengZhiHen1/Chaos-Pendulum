@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { AppMode, DeviceType, LoadingState } from "@/shared/types";
+import type { AppMode, DeviceType, LoadingState, ModeDefinition } from "@/shared/types";
+import { MODE_REGISTRY } from "@/shared/types";
 
 interface DebugInfo {
   fps: number;
@@ -9,19 +10,24 @@ interface DebugInfo {
 }
 
 interface AppState {
-  currentMode: AppMode;
+  // ── 已有字段 ──
   deviceType: DeviceType;
   loadingState: LoadingState;
   debugInfo: DebugInfo;
 
-  setMode: (mode: AppMode) => void;
+  // ── SIM-03 新增 ──
+  activeMode: AppMode;
+  previousMode: AppMode | null;
+  modeRegistry: ModeDefinition[];
+
+  // ── Actions ──
+  setMode: (newMode: AppMode) => void;
   setDeviceType: (type: DeviceType) => void;
   setLoadingState: (state: LoadingState) => void;
   updateDebugInfo: (patch: Partial<DebugInfo>) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  currentMode: "explore",
+export const useAppStore = create<AppState>((set, get) => ({
   deviceType: "desktop",
   loadingState: "loading",
   debugInfo: {
@@ -31,7 +37,30 @@ export const useAppStore = create<AppState>((set) => ({
     pyodideLoadPct: 0,
   },
 
-  setMode: (mode) => set({ currentMode: mode }),
+  activeMode: "explore",
+  previousMode: null,
+  modeRegistry: MODE_REGISTRY,
+
+  setMode: (newMode) => {
+    const { activeMode } = get();
+    // 幂等：相同模式不触发
+    if (newMode === activeMode) return;
+
+    // 模式名有效性校验
+    if (!MODE_REGISTRY.some((m) => m.id === newMode)) {
+      console.warn(`[SIM-03] 非法 mode 值: ${newMode}`);
+      return;
+    }
+
+    console.info("mode_switch", {
+      from: activeMode,
+      to: newMode,
+      timestamp: Date.now(),
+    });
+
+    set({ previousMode: activeMode, activeMode: newMode });
+  },
+
   setDeviceType: (type) => set({ deviceType: type }),
   setLoadingState: (state) => set({ loadingState: state }),
   updateDebugInfo: (patch) =>
