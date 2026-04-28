@@ -5,6 +5,8 @@ import type { BootProgress } from "./types";
 interface LoadingScreenProps {
   progress: BootProgress;
   showQuotes: boolean;
+  onEnter?: () => void;
+  transitioning?: boolean;
 }
 
 function formatEta(seconds: number): string {
@@ -14,7 +16,7 @@ function formatEta(seconds: number): string {
   return `预计剩余 ${mins} 分钟`;
 }
 
-export function LoadingScreen({ progress, showQuotes }: LoadingScreenProps) {
+export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: LoadingScreenProps) {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [fadeKey, setFadeKey] = useState(0);
 
@@ -33,7 +35,11 @@ export function LoadingScreen({ progress, showQuotes }: LoadingScreenProps) {
   const pct = Math.round(progress.overallProgress * 100);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden select-none">
+    <div
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden select-none transition-opacity duration-300 ${
+        transitioning ? "opacity-0" : "opacity-100"
+      }`}
+    >
       {/* 微弱网格纹理 */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -122,8 +128,22 @@ export function LoadingScreen({ progress, showQuotes }: LoadingScreenProps) {
           )}
         </div>
 
+        {/* 准备就绪：进入按钮 */}
+        {onEnter && progress.phase === "ready" && (
+          <button
+            type="button"
+            onClick={onEnter}
+            className="mt-4 px-8 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium text-lg tracking-wider
+                       hover:from-blue-400 hover:to-violet-400
+                       active:scale-95 transition-all duration-200
+                       animate-fade-in-up"
+          >
+            进入应用
+          </button>
+        )}
+
         {/* 混沌名言 */}
-        {showQuotes && quotes.length > 0 && (
+        {showQuotes && quotes.length > 0 && !onEnter && (
           <div className="max-w-md text-center mt-2 min-h-[80px]">
             <div
               key={fadeKey}

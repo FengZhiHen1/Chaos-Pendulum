@@ -107,13 +107,17 @@ export function BootManager({ config = {}, children }: BootManagerProps) {
     // 移除全局 loading class
     document.documentElement.classList.remove("app-loading");
 
-    // 触发出场过渡动画
+    // 停在 ready 阶段，显示"进入应用"按钮，等待用户手动点击
+    updateProgress({ phase: "ready", phaseProgress: 1, description: "准备就绪" });
+    setLoadingState("ready");
+  }, [setLoadingState, updateProgress]);
+
+  const handleEnter = useCallback(() => {
     setTransitioning(true);
     setTimeout(() => {
       setShowChildren(true);
-      setLoadingState("ready");
     }, 200);
-  }, [setLoadingState]);
+  }, []);
 
   const handleError = useCallback(
     (type: BootError["type"], message: string, retryable = true) => {
@@ -333,10 +337,12 @@ export function BootManager({ config = {}, children }: BootManagerProps) {
 
   return (
     <>
-      {(loadingState === "loading" || transitioning) && (
+      {!showChildren && loadingState !== "error" && (
         <LoadingScreen
           progress={bootProgress}
           showQuotes={mergedConfig.showQuotes}
+          onEnter={loadingState === "ready" ? handleEnter : undefined}
+          transitioning={transitioning}
         />
       )}
       {loadingState === "error" && error && (
