@@ -53,6 +53,20 @@ export class SimulationScheduler {
 
   // ─── 公开 API ────────────────────────────────
 
+  /** 注入外部已创建的 Worker 实例（供 SYS-04 启动流程使用） */
+  injectWorker(worker: Worker): void {
+    if (this.worker) {
+      this.worker.terminate();
+    }
+    this.worker = worker;
+    this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+      this.handleWorkerMessage(e.data);
+    };
+    this.worker.onerror = (event) => {
+      this.handleWorkerCrash(event);
+    };
+  }
+
   /** 启动仿真 */
   start(
     params: PendulumParams,
@@ -62,7 +76,9 @@ export class SimulationScheduler {
     if (this.running) return;
     this.running = true;
 
-    this.createWorker();
+    if (!this.worker) {
+      this.createWorker();
+    }
     this.send({
       type: "init",
       params,
