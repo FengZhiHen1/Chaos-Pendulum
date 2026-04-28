@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import { BREAKPOINTS } from "./src/shared/hooks/useDeviceType";
+import { BREAKPOINTS } from "./src/shared/constants/breakpoints";
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
