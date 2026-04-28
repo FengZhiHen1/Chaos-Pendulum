@@ -68,6 +68,8 @@ interface SimulationState extends SimulationFrame {
   engineError: string | null;
   /** 引擎事件通知（供 toast UI 消费）。消费后应设为 null。 */
   engineEvent: { type: "recovered"; message: string } | null;
+  /** 仿真重置计数器，每次新仿真运行时递增 */
+  resetTrigger: number;
 
   // 参数面板 UI
   activeField: string | null;
@@ -81,6 +83,7 @@ interface SimulationState extends SimulationFrame {
   setRunning: (running: boolean) => void;
   setEngineError: (error: string | null) => void;
   consumeFrameFromBuffer: (buffer: Float64Array, frameIndex: number) => void;
+  incrementResetTrigger: () => void;
 
   // ── SIM-04 能量监控 ──
   energyInitial: number | null;
@@ -160,6 +163,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   isRunning: false,
   engineError: null,
   engineEvent: null,
+  resetTrigger: 0,
 
   activeField: null,
   fieldErrors: {},
@@ -183,6 +187,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setRunning: (isRunning) => set({ isRunning }),
 
   setEngineError: (engineError) => set({ engineError }),
+
+  incrementResetTrigger: () => set((s) => ({ resetTrigger: s.resetTrigger + 1 })),
 
   consumeFrameFromBuffer: (buffer, frameIndex) => {
     const offset = frameIndex * FRAME_STRIDE;
@@ -322,6 +328,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       method: preset.method ?? s.method,
       fieldErrors: {},
       isSceneFrozen: false,
+      resetTrigger: s.resetTrigger + 1,
     });
     return null;
   },
@@ -389,7 +396,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   },
 
   resetToDefaults: () => {
-    set({
+    set((s) => ({
       params: { ...DEFAULT_PARAMS },
       initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
       method: DEFAULT_METHOD,
@@ -402,13 +409,14 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMin: 0,
       energyMax: 0,
       isSimulationActive: false,
+      resetTrigger: s.resetTrigger + 1,
       state: {
         theta1: defaultFrame.theta1,
         omega1: defaultFrame.theta1Dot,
         theta2: defaultFrame.theta2,
         omega2: defaultFrame.theta2Dot,
       },
-    });
+    }));
   },
 
   clearFieldErrors: () => set({ fieldErrors: {}, isSceneFrozen: false }),

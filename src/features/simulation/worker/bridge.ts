@@ -1,5 +1,6 @@
 import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/types";
 import { useSimulationStore } from "../store";
+import { useAnalyzeStore } from "@/features/analyze/store";
 import { getScheduler } from "./scheduler";
 
 let workerReady = false;
@@ -13,13 +14,17 @@ let pendingUpdateDiff: Partial<PendulumParams> = {};
 let resetTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingResetIC: InitialConditions | null = null;
 
-/** 参数更新去抖窗口 ≈ 1 帧 @60fps（1/60 ≈ 16.7ms），合并同一帧内的多次按键输入 */
+/** 参数更新去抖窗口 ≈ 1 帧 @60fps（1/60 ≈ 16.7ms） */
 const DEBOUNCE_MS = 16;
 
 // ─── 追踪上次同步值 ────────────────────────────
 
 let lastSyncedParams: PendulumParams = { ...useSimulationStore.getState().params };
 let lastRunning = false;
+let lastResetTrigger = useSimulationStore.getState().resetTrigger;
+let lastActiveView = useAnalyzeStore.getState().activeView;
+let lastPoincareCondition = useAnalyzeStore.getState().poincareSection.condition;
+let lastPoincareIsActive = useAnalyzeStore.getState().poincareSection.isActive;
 
 // ─── Worker 就绪标记 ───────────────────────────
 
@@ -60,15 +65,30 @@ function enqueue(type: string, data: unknown): void {
   pendingCommands.push({ type, data });
 }
 
-// ─── Store 订阅（监听全量 state，手动 diff） ──────
+// ─── 同步庞加莱截面条件 ────────────────────────
+
+function syncPoincareCondition(): void {
+  const sched = getScheduler();
+  const analyze = useAnalyzeStore.getState();
+  const active = analyze.activeView === "poincare" && analyze.poincareSection.isActive;
+  const cond = active ? analyze.poincareSection.condition : null;
+  sched.setPoincareCondition(cond);
+}
+
+// ─── Store 订阅 ────────────────────────────────
 
 export function setupSimulationBridge(): () => void {
-  // 注册 Worker ready 回调 → 清空待发送队列
-  getScheduler().onReady(() => {
-    setWorkerReady();
+  const sched = getScheduler();
+
+  // Worker ready → 清空待发送队列
+  sched.onReady(() => setWorkerReady());
+
+  // 庞加莱截面点到达 → 写入分析 store
+  const unsubPoincare = sched.onPoincarePoints((pts) => {
+    useAnalyzeStore.getState().poincareSection.addPoints(pts);
   });
 
-  const unsub = useSimulationStore.subscribe((state, prevState) => {
+  const unsubSim = useSimulationStore.subscribe((state, prevState) => {
     // ── params 变更 ──
     if (state.params !== prevState.params) {
       const diff: Partial<PendulumParams> = {};
@@ -122,17 +142,58 @@ export function setupSimulationBridge(): () => void {
     // ── isRunning 变更 ──
     if (state.isRunning !== lastRunning) {
       lastRunning = state.isRunning;
-      const sched = getScheduler();
-      if (state.isRunning && !sched.isRunning) {
-        sched.start(state.params, state.initialConditions, state.method);
-      } else if (!state.isRunning && sched.isRunning) {
-        sched.pause();
+      const s = getScheduler();
+      if (state.isRunning && !s.isRunning) {
+        s.start(state.params, state.initialConditions, state.method);
+      } else if (!state.isRunning && s.isRunning) {
+        s.pause();
       }
+    }
+
+    // ── resetTrigger 增加 → 新仿真运行，清空庞加莱截面点 ──
+    if (state.resetTrigger !== lastResetTrigger) {
+      lastResetTrigger = state.resetTrigger;
+      useAnalyzeStore.getState().poincareSection.clearPoints();
+    }
+  });
+
+  // 初始同步庞加莱条件
+  syncPoincareCondition();
+
+  // 分析 store 订阅：视图切换 / 条件变更 / 采集开关 → 同步庞加莱条件
+  const unsubAnalyze = useAnalyzeStore.subscribe((state) => {
+    const poincare = state.poincareSection;
+    let needSync = false;
+
+    if (state.activeView !== lastActiveView) {
+      lastActiveView = state.activeView;
+      needSync = true;
+    }
+
+    if (poincare.isActive !== lastPoincareIsActive) {
+      lastPoincareIsActive = poincare.isActive;
+      needSync = true;
+    }
+
+    // 通过字段比较条件是否实质变化
+    if (
+      poincare.condition.variable !== lastPoincareCondition.variable ||
+      poincare.condition.targetValue !== lastPoincareCondition.targetValue ||
+      poincare.condition.direction !== lastPoincareCondition.direction
+    ) {
+      lastPoincareCondition = { ...poincare.condition };
+      needSync = true;
+    }
+
+    if (needSync) {
+      syncPoincareCondition();
     }
   });
 
   return () => {
-    unsub();
+    unsubSim();
+    unsubAnalyze();
+    unsubPoincare();
     if (updateParamsTimer) clearTimeout(updateParamsTimer);
     if (resetTimer) clearTimeout(resetTimer);
   };

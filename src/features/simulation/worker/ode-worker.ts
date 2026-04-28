@@ -3,6 +3,8 @@ import type {
   WorkerResponse,
   PendulumParams,
   IntegratorMethod,
+  PoincarePoint,
+  PoincareSectionCondition,
 } from "@/shared/types";
 import { FRAME_STRIDE, FRAMES_PER_BATCH } from "@/shared/types";
 import { integratorStep } from "../engine/integrators";
@@ -18,6 +20,7 @@ let _params: PendulumParams | null = null;
 let _method: IntegratorMethod = "RK4";
 let _direction: 1 | -1 = 1;
 let _simTime = 0;
+let _batchIndex = 0;
 
 // ─── 消息循环入口 ────────────────────────────────
 
@@ -67,6 +70,7 @@ function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: 
   _method = method;
   _direction = 1;
   _simTime = 0;
+  _batchIndex = 0;
   _phase = "idle";
 
   postResponse({ type: "ready" });
@@ -74,7 +78,7 @@ function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: 
 
 // ─── 步骤 3：批量积分 ───────────────────────────
 
-function handleStep(cmd: { buffer: Float64Array }): void {
+function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondition | null }): void {
   if (_phase === "uninit" || !_state || !_params) {
     postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
     return;
@@ -92,21 +96,30 @@ function handleStep(cmd: { buffer: Float64Array }): void {
   }
 
   const buffer = cmd.buffer;
+  const poincareConfig = cmd.poincare;
+  const poincarePoints: PoincarePoint[] = [];
+  const currentBatchIndex = _batchIndex++;
+
   _phase = "computing";
 
   const dt = 1 / 60;
   const startTime = performance.now();
   let frame = 0;
 
+  // 保存积分前状态，用于穿越检测插值
+  const stateBefore = new Float64Array(_state);
+
   for (; frame < FRAMES_PER_BATCH; frame++) {
+    // ── 穿越检测：记录积分前变量值 ──
+    const varPrev = poincareConfig ? extractVariable(_state, poincareConfig.variable) : null;
+
     // 单步积分
     integratorStep(_state, _params, dt * _direction, _method);
 
     // NaN 检查
     if (hasInvalidValue(_state)) {
       _phase = "error";
-      // transfer 包含已填充帧的 buffer 回主线程
-      transferBuffer(buffer, frame, _simTime);
+      transferBuffer(buffer, frame, _simTime, poincarePoints);
       postResponse({
         type: "error",
         code: "DIVERGED",
@@ -117,6 +130,40 @@ function handleStep(cmd: { buffer: Float64Array }): void {
     }
 
     _simTime += dt * _direction;
+
+    // ── 穿越检测 ──
+    if (poincareConfig && varPrev !== null) {
+      const varCurr = extractVariable(_state, poincareConfig.variable);
+      const signPrev = Math.sign(varPrev - poincareConfig.targetValue);
+      const signCurr = Math.sign(varCurr - poincareConfig.targetValue);
+
+      if (signPrev !== 0 && signCurr !== 0 && signPrev !== signCurr) {
+        const directionMatch =
+          poincareConfig.direction === "both" ||
+          (poincareConfig.direction === "positive" && signCurr > 0) ||
+          (poincareConfig.direction === "negative" && signCurr < 0);
+
+        if (directionMatch) {
+          // 线性插值估计穿越比例
+          const ratio = (poincareConfig.targetValue - varPrev) / (varCurr - varPrev);
+          const tCross = _simTime - dt * _direction + ratio * dt * _direction;
+
+          // 线性插值估计穿越状态
+          const theta2 = normalizeAngle(stateBefore[2]! + ratio * (_state[2]! - stateBefore[2]!));
+          const omega2 = stateBefore[3]! + ratio * (_state[3]! - stateBefore[3]!);
+
+          poincarePoints.push({
+            theta2,
+            omega2,
+            time: tCross,
+            batchIndex: currentBatchIndex,
+          });
+        }
+      }
+    }
+
+    // 更新 stateBefore 为当前状态（供下一帧穿越检测使用）
+    stateBefore.set(_state);
 
     // 反向积分回到 t=0 边界：clamp 到 0，只填充 simTime > 0 的帧
     if (_direction === -1 && _simTime <= 0) {
@@ -142,7 +189,7 @@ function handleStep(cmd: { buffer: Float64Array }): void {
   }
 
   _phase = "idle";
-  transferBuffer(buffer, frame, _simTime);
+  transferBuffer(buffer, frame, _simTime, poincarePoints);
 }
 
 // ─── 步骤 7：参数热更新 ─────────────────────────
@@ -188,6 +235,7 @@ function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: numb
   _state[2] = normalizeAngle(_state[2]!);
   _simTime = 0;
   _direction = 1;
+  _batchIndex = 0;
   _phase = "idle";
   postResponse({ type: "ready" });
 }
@@ -202,6 +250,16 @@ function validateParams(p: PendulumParams): string | null {
   if (p.g < 0 || !isFinite(p.g)) return `参数 g 非法: ${p.g}`;
   if (p.damping < 0 || !isFinite(p.damping)) return `参数 damping 非法: ${p.damping}`;
   return null;
+}
+
+function extractVariable(state: Float64Array, variable: string): number {
+  switch (variable) {
+    case "theta1": return state[0]!;
+    case "omega1": return state[1]!;
+    case "theta2": return state[2]!;
+    case "omega2": return state[3]!;
+    default: return NaN;
+  }
 }
 
 function writeFrame(
@@ -228,12 +286,13 @@ function writeFrame(
   buffer[off + 13] = d.alpha2;
 }
 
-function transferBuffer(buffer: Float64Array, frameCount: number, simTime: number): void {
+function transferBuffer(buffer: Float64Array, frameCount: number, simTime: number, poincarePoints?: PoincarePoint[]): void {
   const resp: WorkerResponse = {
     type: "batchReady",
     buffer,
     frameCount,
     simTime,
+    poincarePoints,
   };
   (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(
     resp,

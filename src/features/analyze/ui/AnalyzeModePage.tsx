@@ -2,6 +2,7 @@ import { useAnalyzeStore } from "../store";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
+import { PoincareSection } from "./PoincareSection";
 
 const LYAPUNOV_PATHS = {
   lyapunov_max: "/assets/lyapunov_max-a1b3f2e8.json",
@@ -21,7 +22,7 @@ export function AnalyzeModePage() {
         <TabsList className="w-full justify-start mb-2">
           <TabsTrigger value="lyapunov">李雅普诺夫指数谱</TabsTrigger>
           <TabsTrigger value="bifurcation">参数空间分岔图</TabsTrigger>
-          <TabsTrigger value="poincare" disabled>庞加莱截面</TabsTrigger>
+          <TabsTrigger value="poincare">庞加莱截面</TabsTrigger>
           <TabsTrigger value="energy-landscape" disabled>能量景观</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -33,9 +34,10 @@ export function AnalyzeModePage() {
         {activeView === "bifurcation" && (
           <BifurcationPlot dataPath={BIFURCATION_PATH} />
         )}
-        {(activeView === "poincare" || activeView === "energy-landscape") && (
+        {activeView === "poincare" && <PoincareSection />}
+        {activeView === "energy-landscape" && (
           <div className="h-full flex items-center justify-center text-lab-border">
-            <p>模式「{activeView}」— 待实现</p>
+            <p>模式「energy-landscape」— 待实现</p>
           </div>
         )}
       </div>

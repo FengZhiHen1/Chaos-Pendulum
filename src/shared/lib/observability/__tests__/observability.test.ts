@@ -200,6 +200,7 @@ describe("ObservabilityCoordinator", () => {
 
     // 模拟 rAF 循环运行超过 throttle 间隔
     const loop = rafCallbacks[0];
+    if (!loop) throw new Error("rafCallbacks[0] 未定义");
     loop(0);
     loop(50);
     loop(150); // 超过 100ms，触发 store 写入

@@ -52,10 +52,25 @@ export interface WorkerInitCommand {
   method: IntegratorMethod;
 }
 
+export interface PoincareSectionCondition {
+  variable: "theta1" | "theta2" | "omega1" | "omega2";
+  targetValue: number;
+  direction: "positive" | "negative" | "both";
+}
+
+export interface PoincarePoint {
+  theta2: number;
+  omega2: number;
+  time: number;
+  batchIndex: number;
+}
+
 export interface WorkerStepCommand {
   type: "step";
   /** 从池中 acquire 的空闲 Float64Array，所有权已 transfer */
   buffer: Float64Array;
+  /** 庞加莱截面条件；非空时 Worker 执行穿越检测 */
+  poincare?: PoincareSectionCondition | null;
 }
 
 export interface WorkerUpdateParamsCommand {
@@ -100,6 +115,8 @@ export interface WorkerBatchReadyResponse {
   frameCount: number;
   /** 本批次最后一帧的仿真时间 (s) */
   simTime: number;
+  /** 本批次检测到的庞加莱截面点 */
+  poincarePoints?: PoincarePoint[];
 }
 
 export type ErrorCode = "DIVERGED" | "TIMEOUT" | "INVALID_STATE";
