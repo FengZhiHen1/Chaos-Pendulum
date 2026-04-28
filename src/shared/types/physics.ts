@@ -130,3 +130,13 @@ export const PRESETS: ParamPreset[] = [
 
 /** Worker 内部状态：存储 [θ₁, θ̇₁, θ₂, θ̇₂] */
 export type WorkerState = Float64Array;
+
+// ─── 状态向量 ──────────────────────────────────
+
+/** 仿真状态向量（3D 渲染消费的简化视图） */
+export interface StateVector {
+  theta1: number;
+  omega1: number;
+  theta2: number;
+  omega2: number;
+}

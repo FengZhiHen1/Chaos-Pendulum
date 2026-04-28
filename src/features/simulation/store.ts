@@ -6,6 +6,7 @@ import type {
   ParamPreset,
   ParamFieldMeta,
   ValidationResult,
+  StateVector,
 } from "@/shared/types";
 import {
   DEFAULT_PARAMS,
@@ -53,6 +54,9 @@ const defaultFrame: SimulationFrame = {
 // ─── Store 类型 ─────────────────────────────────
 
 interface SimulationState extends SimulationFrame {
+  // 仿真状态向量（EXP-01 3D 场景消费）
+  state: StateVector;
+
   // 参数
   params: PendulumParams;
   initialConditions: InitialConditions;
@@ -142,6 +146,12 @@ function validateAll(
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
   ...defaultFrame,
+  state: {
+    theta1: defaultFrame.theta1,
+    omega1: defaultFrame.theta1Dot,
+    theta2: defaultFrame.theta2,
+    omega2: defaultFrame.theta2Dot,
+  },
   params: { ...DEFAULT_PARAMS },
   initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
   method: DEFAULT_METHOD,
