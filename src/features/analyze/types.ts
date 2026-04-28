@@ -1,3 +1,5 @@
+import type { ErrorCode } from "@/features/system/error-handling/types";
+
 // ─── ANL-01 / ANL-02 共享类型定义 ──────────────────
 
 /** 预计算网格参数轴元数据（ANL-01） */
@@ -174,14 +176,66 @@ export interface BifurcationCursor {
 
 /** 缓存条目结构（泛型） */
 export interface PrecomputeCacheEntry<T = PrecomputeDataType> {
-  key: string;
+  /** 缓存键。格式："{type}-{gridHash}"，示例："lyapunov_max-a1b3f2e8" */
+  cacheKey: string;
+  /** 完整的预计算数据 */
   data: T;
-  cachedAt: number;
+  /** 写入缓存的时间戳（ISO 8601） */
+  cachedAt: string;
+  /** JSON 序列化后的字节数（用于 LRU 容量计算） */
   size: number;
+  /** 缓存命中次数，LRU 辅助指标 */
+  hitCount: number;
 }
 
 /** 数据加载生命周期状态 */
 export type LoadStatus = "idle" | "loading" | "ready" | "error";
+
+/** 预计算数据加载错误码（SYS-03 定义，委托给 SYS-02 ErrorCode） */
+export type PrecomputeErrorCode = Extract<
+  ErrorCode,
+  "PRECOMPUTE_FETCH_FAILED" | "PRECOMPUTE_FORMAT_ERROR" | "PRECOMPUTE_VERSION_MISMATCH"
+>;
+
+/** ─── SYS-03 usePrecomputeData ────────────────────── */
+
+/** 预计算数据加载的输入参数 */
+export interface UsePrecomputeDataInput {
+  /** 数据类型："lyapunov_max" | "lyapunov_min" | "energy_curvature" | "bifurcation" */
+  dataType: "lyapunov_max" | "lyapunov_min" | "energy_curvature" | "bifurcation";
+  /** 数据文件的 Vite 构建产物 URL（通过 new URL('...', import.meta.url) 获取） */
+  dataUrl: string;
+  /** 预期的参数网格哈希（16 字符 hex） */
+  expectedGridHash: string;
+  /** 预期的数据类型（与 dataType 冗余校验） */
+  expectedType: string;
+  /** 期望的 solverVersion，默认 "1.0.0" */
+  expectedSolverVersion?: string;
+  /** 是否启用，默认 true */
+  enabled?: boolean;
+  /** fetch 超时时间（毫秒），默认 10000 */
+  fetchTimeoutMs?: number;
+  /** 最大重试次数，默认 3 */
+  maxRetries?: number;
+  /** 重试退避基础时间（毫秒），默认 1000 */
+  retryBaseMs?: number;
+}
+
+/** usePrecomputeData() hook 的返回值 */
+export interface PrecomputeDataState<T = PrecomputeDataType> {
+  /** 加载状态 */
+  status: LoadStatus;
+  /** 加载成功后的预计算数据（status === "ready" 时非 null） */
+  data: T | null;
+  /** 加载失败时的错误信息（status === "error" 时非 null） */
+  errorMessage: string | null;
+  /** 错误码（status === "error" 时非 null） */
+  errorCode: PrecomputeErrorCode | null;
+  /** 数据来源："cache" | "network" | null（未加载） */
+  source: "cache" | "network" | null;
+  /** 手动重新加载 */
+  retry: () => void;
+}
 
 /** 参数名 → Zustand 字段映射 */
 export const PARAM_NAME_TO_STORE_KEY: Record<
@@ -231,3 +285,28 @@ export function resolveStoreParam(
   const storeValue = mapping.transform ? mapping.transform(value, fixedParams) : value;
   return { storeKey: mapping.key, storeValue };
 }
+
+// ─── ANL-03 庞加莱截面 ── UI 专用类型 ───────────────
+
+export interface PoincareHoverData {
+  visible: boolean;
+  position: { x: number; y: number };
+  theta2: number;
+  omega2: number;
+  time: number;
+  source: "current" | "baseline";
+}
+
+export interface PoincareStatus {
+  isActive: boolean;
+  pointCount: number;
+  baselinePointCount: number;
+  lastPointTime: number | null;
+}
+
+export const PRESET_CONDITIONS: Record<string, { variable: "theta1" | "theta2" | "omega1" | "omega2"; targetValue: number; direction: "positive" | "negative" | "both" }> = {
+  "θ₁ = 0, θ̇₁ > 0": { variable: "theta1", targetValue: 0, direction: "positive" },
+  "θ₁ = 0, θ̇₁ < 0": { variable: "theta1", targetValue: 0, direction: "negative" },
+  "θ₂ = π/2": { variable: "theta2", targetValue: Math.PI / 2, direction: "both" },
+  "θ₂ = -π/2": { variable: "theta2", targetValue: -Math.PI / 2, direction: "both" },
+};

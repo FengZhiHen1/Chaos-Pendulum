@@ -4,7 +4,7 @@ import { interpolateRdBu, interpolateViridis } from "d3-scale-chromatic";
 import { useAnalyzeStore } from "../store";
 import { useSimulationStore } from "@/features/simulation";
 import { useContainerSize } from "@/shared/hooks/useContainerSize";
-import { getPrecomputeData, setPrecomputeData } from "@/shared/lib/cache/precomputeCache";
+import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
 import { measure } from "@/shared/lib/observability/perf-mark";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Button } from "@/shared/components/ui/button";
@@ -12,10 +12,6 @@ import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData }
 import { classifyLambda, resolveStoreParam } from "../types";
 import { ParameterFillDialog } from "./ParameterFillDialog";
 
-const EXPECTED_SOLVER_VERSION = "1.0.0";
-const FETCH_TIMEOUT_MS = 10_000;
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1_000, 2_000, 4_000];
 const CURSOR_DEBOUNCE_MS = 50;
 
 interface Props {
@@ -31,7 +27,6 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const cursorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCountRef = useRef(0);
 
   const { width: cw, height: ch, ready: sizeReady } = useContainerSize({ ref: containerRef, debounceMs: 100 });
   const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
@@ -53,112 +48,43 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
   const [cursor, setCursor] = useState<HeatmapCursor>({ visible: false, x: 0, y: 0, paramXValue: 0, paramYValue: 0 });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogCell, setDialogCell] = useState<{ col: number; row: number } | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // ── Toast 辅助 ────────────────────────────────────
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage((current) => (current === msg ? null : current)), 5000);
-  }, []);
+  // ── 数据加载（SYS-03 usePrecomputeData）─────────────
+  const activePath = dataPaths[activeLayer] ?? "";
+  const activeHash = (activePath.match(/-([a-f0-9]+)\.json$/) ?? [])[1] ?? "";
 
-  // ── 数据加载 ──────────────────────────────────────
-  const fetchData = useCallback(async (layer: LyapunovLayerType, signal: AbortSignal) => {
-    const path = dataPaths[layer];
-    if (!path) throw new Error(`未知图层: ${layer}`);
+  const precomputeState = usePrecomputeData<LyapunovGrid>({
+    dataType: activeLayer,
+    dataUrl: activePath,
+    expectedGridHash: activeHash,
+    expectedType: activeLayer,
+  });
 
-    const hashMatch = path.match(/-(\w+)\.json$/);
-    const gridHash = hashMatch ? hashMatch[1]! : "";
-
-    const cached = await getPrecomputeData<LyapunovGrid>(layer, gridHash);
-    if (cached && !signal.aborted) {
-      return cached;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    try {
-      const res = await fetch(path, { signal });
-      clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: LyapunovGrid = await res.json();
-
-      if (!data.metadata || !data.grid || !Array.isArray(data.grid)) {
-        throw new Error("JSON 结构非法：缺少 metadata 或 grid");
-      }
-      if (data.metadata.type !== layer) {
-        throw new Error(`类型不匹配: ${data.metadata.type} !== ${layer}`);
-      }
-      if (gridHash && data.metadata.gridHash !== gridHash) {
-        console.warn(`[LyapunovHeatmap] gridHash 不匹配: ${data.metadata.gridHash} !== ${gridHash}`);
-      }
-      const stepsY = data.metadata.paramY.steps;
-      const stepsX = data.metadata.paramX.steps;
-      if (data.grid.length !== stepsY || !data.grid.every((row) => row.length === stepsX)) {
-        throw new Error(`网格维度不匹配`);
-      }
-      if (data.metadata.solverVersion && data.metadata.solverVersion !== EXPECTED_SOLVER_VERSION) {
-        showToast(`数据版本 ${data.metadata.solverVersion} 与前端 ${EXPECTED_SOLVER_VERSION} 不匹配`);
-      }
-
-      await setPrecomputeData(layer, data.metadata.gridHash, data);
-      return data;
-    } catch (e) {
-      clearTimeout(timeoutId);
-      throw e;
-    }
-  }, [dataPaths, showToast]);
-
-  const loadLayer = useCallback(async (layer: LyapunovLayerType) => {
-    if (layerCache.has(layer)) {
-      setGridData(layerCache.get(layer)!);
-      setLoadStatus("ready");
-      setLayerCacheStatus(layer, "ready");
-      return;
-    }
-
-    setLoadStatus("loading");
-    setLoadError(null);
-    setGridData(null);
-
-    const controller = new AbortController();
-
-    const attempt = async (): Promise<void> => {
-      try {
-        const data = await fetchData(layer, controller.signal);
-        if (controller.signal.aborted) return;
-        setGridData(data);
-        setLayerCache((prev) => new Map(prev).set(layer, data));
-        setLoadStatus("ready");
-        setLayerCacheStatus(layer, "ready");
-        retryCountRef.current = 0;
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        const retry = retryCountRef.current;
-        if (retry < MAX_RETRIES) {
-          retryCountRef.current = retry + 1;
-          const delay = RETRY_DELAYS[retry] ?? 4000;
-          setTimeout(() => attempt(), delay);
-          return;
-        }
-        const message = err instanceof Error ? err.message : "未知错误";
-        setLoadError(`预计算数据加载失败：${message}`);
-        setLoadStatus("error");
-        setLayerCacheStatus(layer, "error");
-        console.error("[LyapunovHeatmap] 数据加载失败", err);
-        showToast(`预计算数据加载失败：${message}`);
-      }
-    };
-
-    attempt();
-
-    return () => controller.abort();
-  }, [fetchData, layerCache, setLoadStatus, setLoadError, setLayerCacheStatus, showToast]);
-
+  // 同步到 component state 和 store
   useEffect(() => {
-    const cleanup = loadLayer(activeLayer);
-    return () => { cleanup.then(() => {}).catch(() => {}); };
-  }, [activeLayer, loadLayer]);
+    if (precomputeState.status === "loading") {
+      setLoadStatus("loading");
+      setLoadError(null);
+    } else if (precomputeState.status === "ready" && precomputeState.data) {
+      setGridData(precomputeState.data);
+      setLayerCache((prev) => new Map(prev).set(activeLayer, precomputeState.data!));
+      setLoadStatus("ready");
+      setLayerCacheStatus(activeLayer, "ready");
+    } else if (precomputeState.status === "error") {
+      setLoadError(precomputeState.errorMessage ?? "未知错误");
+      setLoadStatus("error");
+      setLayerCacheStatus(activeLayer, "error");
+    }
+  }, [precomputeState, activeLayer, setLoadStatus, setLoadError, setLayerCacheStatus]);
+
+  // 图层切换时，如缓存命中则立即展示
+  useEffect(() => {
+    if (layerCache.has(activeLayer)) {
+      setGridData(layerCache.get(activeLayer)!);
+      setLoadStatus("ready");
+      setLayerCacheStatus(activeLayer, "ready");
+    }
+  }, [activeLayer, layerCache, setLoadStatus, setLayerCacheStatus]);
 
   // ── Canvas 渲染 ───────────────────────────────────
   useEffect(() => {
@@ -545,9 +471,8 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
 
   // ── 重试 ─────────────────────────────────────────
   const handleRetry = useCallback(() => {
-    retryCountRef.current = 0;
-    loadLayer(activeLayer);
-  }, [activeLayer, loadLayer]);
+    precomputeState.retry();
+  }, [precomputeState.retry]);
 
   // ── Tooltip 消费 ─────────────────────────────────
   const hoverTooltip = useAnalyzeStore((s) => s.hoverTooltip);
@@ -578,8 +503,8 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
         {loadStatus === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-lab-dark">
             <p className="text-sm text-white">{loadError}</p>
-            {retryCountRef.current >= MAX_RETRIES ? (
-              <p className="text-xs text-lab-border">离线模式：高级分析功能需预计算数据支持</p>
+            {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
+              <p className="text-xs text-lab-border">数据格式错误，请重新生成预计算数据</p>
             ) : (
               <Button variant="outline" size="sm" onClick={handleRetry}>
                 重试
@@ -675,11 +600,6 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
         />
       )}
 
-      {toastMessage && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-md border border-lab-border bg-lab-panel px-3 py-2 text-xs text-white shadow-md">
-          {toastMessage}
-        </div>
-      )}
     </div>
   );
 }

@@ -4,17 +4,13 @@ import { zoom as d3Zoom, zoomIdentity, type ZoomTransform } from "d3-zoom";
 import { select as d3Select } from "d3-selection";
 import { useContainerSize } from "@/shared/hooks/useContainerSize";
 import { useSimulationStore } from "@/features/simulation";
-import { getPrecomputeData, setPrecomputeData } from "@/shared/lib/cache/precomputeCache";
+import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
 import { measure } from "@/shared/lib/observability/perf-mark";
 import { Button } from "@/shared/components/ui/button";
 import type { BifurcationData, BifurcationHoverData, BifurcationCursor } from "../types";
 import { classifyRegime, resolveStoreParam } from "../types";
 import { BifurcationDialog } from "./BifurcationDialog";
 
-const EXPECTED_SOLVER_VERSION = "1.0.0";
-const FETCH_TIMEOUT_MS = 10_000;
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1_000, 2_000, 4_000];
 const CURSOR_HIT_RADIUS_PX = 8;
 const CLICK_PROXIMITY_PX = 12;
 const HOVER_THROTTLE_MS = 16;
@@ -31,7 +27,6 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hoverThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCountRef = useRef(0);
   const isDraggingCursorRef = useRef(false);
   const cursorXRef = useRef(0);
   const transformRef = useRef<ZoomTransform>(zoomIdentity);
@@ -55,7 +50,6 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogParamValue, setDialogParamValue] = useState<number | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
 
   // ── D3 比例尺 ───────────────────────────────────
@@ -78,83 +72,39 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
       .range([(ch || 0) - MARGIN.bottom, MARGIN.top]);
   }, [data, ch]);
 
-  // ── 数据加载 ──────────────────────────────────────
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage((c) => (c === msg ? null : c)), 5000);
-  }, []);
+  // ── 数据加载（SYS-03 usePrecomputeData）─────────────
+  const type = "bifurcation";
+  const gridHash = (dataPath.match(/-([a-f0-9]+)\.json$/) ?? [])[1] ?? "";
 
-  const loadData = useCallback(async () => {
-    setLoadStatus("loading");
-    setLoadError(null);
-    setData(null);
-    retryCountRef.current = 0;
+  const precomputeState = usePrecomputeData<BifurcationData>({
+    dataType: type,
+    dataUrl: dataPath,
+    expectedGridHash: gridHash,
+    expectedType: type,
+  });
 
-    const hashMatch = dataPath.match(/-(\w+)\.json$/);
-    const gridHash = hashMatch ? hashMatch[1]! : "";
-    const type = "bifurcation";
-
-    const controller = new AbortController();
-
-    const attempt = async (): Promise<void> => {
-      try {
-        const cached = await getPrecomputeData<BifurcationData>(type, gridHash);
-        if (cached && !controller.signal.aborted) {
-          validateAndSet(cached);
-          return;
-        }
-
-        const fetchController = new AbortController();
-        const timeoutId = setTimeout(() => fetchController.abort(), FETCH_TIMEOUT_MS);
-        const res = await fetch(dataPath, { signal: fetchController.signal });
-        clearTimeout(timeoutId);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const parsed: BifurcationData = await res.json();
-        if (controller.signal.aborted) return;
-        validateAndSet(parsed);
-        await setPrecomputeData(type, gridHash, parsed);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        const retry = retryCountRef.current;
-        if (retry < MAX_RETRIES) {
-          retryCountRef.current = retry + 1;
-          setTimeout(() => attempt(), RETRY_DELAYS[retry] ?? 4000);
-          return;
-        }
-        const msg = err instanceof Error ? err.message : "未知错误";
-        setLoadError(`分岔图数据加载失败：${msg}`);
-        setLoadStatus("error");
-        console.error("[BifurcationPlot] 加载失败", err);
-        showToast(`分岔图数据加载失败：${msg}`);
-      }
-    };
-
-    const validateAndSet = (parsed: BifurcationData) => {
-      if (!parsed.metadata || !parsed.samples || !Array.isArray(parsed.samples)) {
-        throw new Error("JSON 结构非法");
-      }
-      if (parsed.metadata.type !== "bifurcation") {
-        throw new Error(`类型不匹配: ${parsed.metadata.type}`);
-      }
-      if (parsed.metadata.scannedParam.max <= parsed.metadata.scannedParam.min) {
-        throw new Error("扫描范围无效");
-      }
-      if (parsed.metadata.solverVersion && parsed.metadata.solverVersion !== EXPECTED_SOLVER_VERSION) {
-        showToast(`数据版本 ${parsed.metadata.solverVersion} 与前端 ${EXPECTED_SOLVER_VERSION} 不匹配`);
-      }
-      setData(parsed);
-      setLoadStatus("ready");
-      retryCountRef.current = 0;
-    };
-
-    attempt();
-    return () => controller.abort();
-  }, [dataPath, showToast]);
+  // 额外领域校验：scan range 有效性
+  const domainValid = useMemo(() => {
+    if (!precomputeState.data) return null;
+    const { scannedParam } = precomputeState.data.metadata;
+    return scannedParam.max > scannedParam.min ? precomputeState.data : null;
+  }, [precomputeState.data]);
 
   useEffect(() => {
-    const cleanup = loadData();
-    return () => { cleanup.then(() => {}).catch(() => {}); };
-  }, [loadData]);
+    if (precomputeState.status === "loading") {
+      setLoadStatus("loading");
+      setLoadError(null);
+    } else if (precomputeState.status === "ready" && domainValid) {
+      setData(domainValid);
+      setLoadStatus("ready");
+    } else if (precomputeState.status === "ready" && !domainValid) {
+      setLoadError("扫描范围无效");
+      setLoadStatus("error");
+    } else if (precomputeState.status === "error") {
+      setLoadError(precomputeState.errorMessage ?? "未知错误");
+      setLoadStatus("error");
+    }
+  }, [precomputeState, domainValid]);
 
   // ── Canvas 渲染 ───────────────────────────────────
   const draw = useCallback(() => {
@@ -653,9 +603,8 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
 
   // ── 重试 ─────────────────────────────────────────
   const handleRetry = useCallback(() => {
-    retryCountRef.current = 0;
-    loadData();
-  }, [loadData]);
+    precomputeState.retry();
+  }, [precomputeState.retry]);
 
   return (
     <div className="flex flex-col h-full w-full gap-2">
@@ -669,8 +618,8 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
         {loadStatus === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-lab-dark">
             <p className="text-sm text-white">{loadError}</p>
-            {retryCountRef.current >= MAX_RETRIES ? (
-              <p className="text-xs text-lab-border">离线模式：高级分析功能需预计算数据支持</p>
+            {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
+              <p className="text-xs text-lab-border">数据格式错误，请重新生成预计算数据</p>
             ) : (
               <Button variant="outline" size="sm" onClick={handleRetry}>
                 重试
@@ -735,11 +684,6 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
         />
       )}
 
-      {toastMessage && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-md border border-lab-border bg-lab-panel px-3 py-2 text-xs text-white shadow-md">
-          {toastMessage}
-        </div>
-      )}
     </div>
   );
 }
