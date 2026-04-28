@@ -5,6 +5,7 @@
 > | 版本 | 时间 | 修改人 | 变更摘要 |
 > |------|------|--------|----------|
 > | v1.0 | 2026-04-28 20:00:00 | AI Assistant | 初始版本，对齐 SIM-01 v2.0 Worker 协议与 EXP-01 的 Zustand store 契约 |
+> | v1.1 | 2026-04-28 21:00:00 | AI Assistant | 修正步骤 8 bridge 代码：Zustand v4.5 subscribe 仅接受单参数 listener(state, prevState)，改用全量 diff 替代 selector 模式 |
 
 > **冲突核查指引**：本版本与 SIM-01 v2.0 的 `PendulumParams` / `WorkerUpdateParamsCommand` / `WorkerResetCommand` 接口一致，与 EXP-01 v1.0 的 `useSimulationStore` 消费模式兼容。若上游接口变更，以时间戳更新的版本为准。
 
@@ -412,52 +413,60 @@ const PARAM_META: ParamFieldMeta[] = [
   ```typescript
   /**
    * Bridge 层：在应用初始化时建立 store → Worker 的订阅管道。
-   * 此逻辑不属于 React 组件，在 src/features/simulation/bridge.ts 中实现。
+   * 此逻辑不属于 React 组件，在 src/features/simulation/worker/bridge.ts 中实现。
+   *
+   * 注意：Zustand v4.5 的 subscribe 仅接受单参数 listener(state, prevState)，
+   * 不支持 selector 模式。bridge 订阅全量 state 变更，手动 diff 三个切片。
    */
-  function setupSimulationBridge(worker: Worker, store: typeof useSimulationStore) {
-    // 跟踪上一次已同步到 Worker 的值，避免重复发送
-    let lastSentParams: PendulumParams | null = null;
-    let lastSentIC: InitialConditions | null = null;
-    let lastSentMethod: IntegratorMethod | null = null;
+  function setupSimulationBridge(): () => void {
+    const sched = getScheduler();
+    let lastSyncedParams = { ...store.getState().params };
+    let lastRunning = false;
 
-    // 订阅 params 变更 → Worker updateParams
-    store.subscribe(
-      (state) => state.params,
-      (params) => {
-        if (lastSentParams === null) { lastSentParams = params; return; }
+    const unsub = store.subscribe((state, prevState) => {
+      // ── params 变更 → Worker updateParams（16ms 防抖）──
+      if (state.params !== prevState.params) {
         const diff: Partial<PendulumParams> = {};
-        for (const k of Object.keys(params) as (keyof PendulumParams)[]) {
-          if (params[k] !== lastSentParams[k]) diff[k] = params[k];
+        for (const k of Object.keys(state.params) as (keyof PendulumParams)[]) {
+          if (state.params[k] !== lastSyncedParams[k]) diff[k] = state.params[k];
         }
         if (Object.keys(diff).length > 0) {
-          worker.postMessage({ type: "updateParams", params: diff });
-          lastSentParams = { ...params };
+          Object.assign(pendingUpdateDiff, diff);
+          clearTimeout(updateTimer);
+          updateTimer = setTimeout(() => {
+            const d = { ...pendingUpdateDiff };
+            pendingUpdateDiff = {};
+            lastSyncedParams = { ...store.getState().params };
+            if (workerReady) sched.updateParams(d);
+            else enqueue("updateParams", d);
+          }, 16);
         }
-      },
-      { fireImmediately: false }
-    );
+      }
 
-    // 订阅 initialConditions 变更 → Worker reset
-    store.subscribe(
-      (state) => state.initialConditions,
-      (ic) => {
-        if (lastSentIC === null) { lastSentIC = ic; return; }
-        worker.postMessage({ type: "reset", initialConditions: ic });
-        lastSentIC = { ...ic };
-      },
-      { fireImmediately: false }
-    );
+      // ── initialConditions 变更 → Worker reset（100ms 去重）──
+      if (state.initialConditions !== prevState.initialConditions) {
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => {
+          if (workerReady) sched.reset(state.initialConditions);
+          else enqueue("reset", state.initialConditions);
+        }, 100);
+      }
 
-    // 订阅 method 变更 → Worker setMethod
-    store.subscribe(
-      (state) => state.method,
-      (method) => {
-        if (lastSentMethod === null) { lastSentMethod = method; return; }
-        worker.postMessage({ type: "setMethod", method });
-        lastSentMethod = method;
-      },
-      { fireImmediately: false }
-    );
+      // ── method 变更 → Worker setMethod（立即发送）──
+      if (state.method !== prevState.method) {
+        if (workerReady) sched.setMethod(state.method);
+        else enqueue("setMethod", state.method);
+      }
+
+      // ── isRunning 变更 → 启停仿真 ──
+      if (state.isRunning !== lastRunning) {
+        lastRunning = state.isRunning;
+        if (state.isRunning) sched.start(state.params, state.initialConditions, state.method);
+        else sched.pause();
+      }
+    });
+
+    return unsub;
   }
   ```
 
