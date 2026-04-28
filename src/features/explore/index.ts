@@ -1,1 +1,10 @@
 export { useExploreStore } from "./store";
+export { useButterflyStore } from "./butterfly-store";
+export type { DeltaEditMode, SeparationMetrics, SimSideState, EnergySnapshot } from "./butterfly-store";
+export { ButterflySplit } from "./components/ButterflySplit";
+export { SeparationAlert, DeltaPanel } from "./components/ButterflyUI";
+export { Scene3D } from "./components/Scene3D";
+export { TrailRenderer } from "./components/TrailRenderer";
+export { useTrailBuffer } from "./hooks/useTrailBuffer";
+export type { TrailPoint, TrailBufferAPI } from "./hooks/useTrailBuffer";
+export { ExplorePage } from "./ExplorePage";

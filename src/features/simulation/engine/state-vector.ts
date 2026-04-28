@@ -65,6 +65,20 @@ export function normalizeAngle(angle: number): number {
   return ((angle + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
 }
 
+/** 计算下摆球 3D 坐标（EXP-01 和 EXP-02 共享使用） */
+export function ball2Position(
+  state: { theta1: number; theta2: number },
+  params: { L1: number; L2: number },
+): { x: number; y: number; z: number } {
+  const ball1X = params.L1 * Math.sin(state.theta1);
+  const ball1Y = -params.L1 * Math.cos(state.theta1);
+  return {
+    x: ball1X + params.L2 * Math.sin(state.theta2),
+    y: ball1Y - params.L2 * Math.cos(state.theta2),
+    z: 0,
+  };
+}
+
 /** 检查状态是否包含 NaN 或 Infinity */
 export function hasInvalidValue(state: Float64Array): boolean {
   for (let i = 0; i < state.length; i++) {

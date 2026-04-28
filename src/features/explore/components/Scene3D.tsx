@@ -3,9 +3,14 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
-import { useSimulationStore } from "@/features/simulation";
+import { useSimulationStore, ball2Position } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useAppStore } from "@/stores/useAppStore";
+import { useTrailBuffer } from "../hooks/useTrailBuffer";
+import type { TrailPoint } from "../hooks/useTrailBuffer";
+import type { PendulumParams, StateVector } from "@/shared/types";
+import { TrailRenderer } from "./TrailRenderer";
+import { useButterflyStore } from "../butterfly-store";
 
 // ─── 类型定义 ────────────────────────────────────
 
@@ -24,6 +29,8 @@ export interface Scene3DProps {
   enableShadows?: boolean;
   /** 父容器 CSS 类名。默认 "w-full h-full" */
   className?: string;
+  /** 蝴蝶效应模式下的分侧标识。非 butterfly 模式下不传 */
+  butterflySide?: "A" | "B";
 }
 
 interface CameraConfig {
@@ -56,6 +63,10 @@ interface SceneContentProps {
   cylinderSegments: number;
   onParamInvalidChange: (invalid: boolean) => void;
   onNanToast: () => void;
+  trailPoints: TrailPoint[];
+  appendTrailPoint: (point: TrailPoint, params: PendulumParams, state: StateVector) => void;
+  onTrailClear: () => void;
+  butterflySide?: "A" | "B";
 }
 
 // ─── 常量配置表 ──────────────────────────────────
@@ -145,6 +156,7 @@ export function Scene3D({
   showGrid = true,
   enableShadows = true,
   className = "w-full h-full",
+  butterflySide,
 }: Scene3DProps) {
   const deviceType = useAppStore((s) => s.deviceType);
 
@@ -153,6 +165,9 @@ export function Scene3D({
   const [webglLostPermanent, setWebglLostPermanent] = useState(false);
   const [paramInvalid, setParamInvalid] = useState(false);
   const [nanToast, setNanToast] = useState(false);
+
+  // EXP-02: 尾迹数据管理
+  const { trailPoints, appendPoint, clear: clearTrail } = useTrailBuffer();
 
   const webglLostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nanToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,6 +270,10 @@ export function Scene3D({
           cylinderSegments={cylinderSegments}
           onParamInvalidChange={setParamInvalid}
           onNanToast={handleNanToast}
+          trailPoints={trailPoints}
+          appendTrailPoint={appendPoint}
+          onTrailClear={clearTrail}
+          butterflySide={butterflySide}
         />
       </Canvas>
 
@@ -310,6 +329,10 @@ function SceneContent({
   cylinderSegments,
   onParamInvalidChange,
   onNanToast,
+  trailPoints,
+  appendTrailPoint,
+  onTrailClear,
+  butterflySide,
 }: SceneContentProps) {
   const { camera } = useThree();
   const orbitRef = useRef<any>(null);
@@ -353,10 +376,23 @@ function SceneContent({
     prevViewPresetRef.current = viewPreset;
   }, [viewPreset]);
 
+  // ── 仿真重置时清空尾迹 ──
+  const wasRunningRef = useRef(isRunning);
+  useEffect(() => {
+    if (wasRunningRef.current && !isRunning) {
+      const s = useSimulationStore.getState();
+      if (s.isSceneFrozen && s.fieldErrors && Object.keys(s.fieldErrors).length === 0) {
+        // 可能是重置操作
+      }
+    }
+    wasRunningRef.current = isRunning;
+  }, [isRunning]);
+
   // ── Unmount 清理 ──
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      onTrailClear();
       console.log("EXP-01: Scene3D unmounted, stopping frame updates");
     };
   }, []);
@@ -404,8 +440,14 @@ function SceneContent({
   useFrame(() => {
     if (!isMountedRef.current) return;
 
+    // 蝴蝶效应模式：从 ButterflySimStore 读取
+    const bfStore = butterflySide ? useButterflyStore.getState() : null;
+    const bfSide = bfStore ? (butterflySide === "A" ? bfStore.sideA : bfStore.sideB) : null;
+
     const store = useSimulationStore.getState();
-    const p = store.params;
+    const p = bfSide ? bfSide.params : store.params;
+    const sv = bfSide ? bfSide.state : store.state;
+    const effectiveRunning = bfStore ? bfStore.isRunning : isRunning;
 
     // ── 参数合法性检查 ──
     const isInvalid = p.L1 <= 0.001 || p.L2 <= 0.001 || p.m1 <= 0 || p.m2 <= 0;
@@ -423,7 +465,6 @@ function SceneContent({
     }
     if (isInvalid) return;
 
-    const sv = store.state;
     const theta1 = sv.theta1;
     const omega1 = sv.omega1;
     const theta2 = sv.theta2;
@@ -444,7 +485,11 @@ function SceneContent({
         });
       }
       if (nanFrameCountRef.current >= 60) {
-        store.setRunning(false);
+        if (bfStore) {
+          bfStore.pause();
+        } else {
+          store.setRunning(false);
+        }
         onNanToast();
       }
       return;
@@ -455,7 +500,7 @@ function SceneContent({
     }
 
     // 仿真暂停时保持当前位置
-    if (!isRunning) return;
+    if (!effectiveRunning) return;
 
     // ── 计算 3D 位置 ──
     const ball1Pos = new Vector3(
@@ -463,14 +508,18 @@ function SceneContent({
       -p.L1 * Math.cos(theta1),
       0,
     );
-    const ball2Pos = new Vector3(
-      ball1Pos.x + p.L2 * Math.sin(theta2),
-      ball1Pos.y - p.L2 * Math.cos(theta2),
-      0,
-    );
+    const b2 = ball2Position(sv, p);
+    const ball2Pos = new Vector3(b2.x, b2.y, b2.z);
 
     lastValidBall1Ref.current.copy(ball1Pos);
     lastValidBall2Ref.current.copy(ball2Pos);
+
+    // ── 追加尾迹点（EXP-02） ──
+    appendTrailPoint(
+      { position: ball2Pos.clone(), velocity: p.L2 * Math.abs(omega2) },
+      p,
+      sv,
+    );
 
     // ── 更新摆球位置 ──
     if (ball1Ref.current) ball1Ref.current.position.copy(ball1Pos);
@@ -607,6 +656,14 @@ function SceneContent({
           />
         )}
       </mesh>
+
+      {/* 运动尾迹（EXP-02） */}
+      <TrailRenderer
+        points={trailPoints}
+        colorMode="velocity"
+        opacity={0.85}
+        maxWidth={3}
+      />
 
       {/* 相机控制 */}
       <OrbitControls

@@ -85,6 +85,15 @@ interface SimulationState extends SimulationFrame {
   consumeFrameFromBuffer: (buffer: Float64Array, frameIndex: number) => void;
   incrementResetTrigger: () => void;
 
+  // ── SYS-02 运行时异常处理 ──
+  /** 积分步长 Δt（秒）。默认 1/60 */
+  dt: number;
+  setDt: (dt: number) => void;
+  /** 快捷播放 */
+  play: () => void;
+  /** 快捷暂停 */
+  pause: () => void;
+
   // ── SIM-04 能量监控 ──
   energyInitial: number | null;
   energyDrift: number;
@@ -185,6 +194,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setMethod: (method) => set({ method }),
 
   setRunning: (isRunning) => set({ isRunning }),
+
+  // ── SYS-02 ──
+  dt: 1 / 60,
+  setDt: (dt) => set({ dt }),
+  play: () => set({ isRunning: true }),
+  pause: () => set({ isRunning: false }),
 
   setEngineError: (engineError) => set({ engineError }),
 
