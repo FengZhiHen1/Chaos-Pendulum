@@ -118,6 +118,15 @@ function handleStep(cmd: { buffer: Float64Array }): void {
 
     _simTime += dt * _direction;
 
+    // 反向积分回到 t=0 边界：clamp 到 0，只填充 simTime > 0 的帧
+    if (_direction === -1 && _simTime <= 0) {
+      _simTime = 0;
+      const derived = computeDerived(_state, _params);
+      writeFrame(buffer, frame, _simTime, _state, derived);
+      frame++;
+      break;
+    }
+
     // 计算派生量并写入 buffer
     const derived = computeDerived(_state, _params);
     writeFrame(buffer, frame, _simTime, _state, derived);

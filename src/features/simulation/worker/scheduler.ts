@@ -236,8 +236,10 @@ export class SimulationScheduler {
       method: store.method,
     });
 
-    useSimulationStore.setState({ engineError: null });
-    console.info("[scheduler] 仿真引擎已自动恢复");
+    useSimulationStore.setState({
+      engineError: null,
+      engineEvent: { type: "recovered", message: "仿真引擎已自动恢复" },
+    });
   }
 
   // ─── 帧调度循环 ─────────────────────────────
@@ -291,7 +293,10 @@ export class SimulationScheduler {
     this.timeoutId = setTimeout(() => {
       console.error("[scheduler] Worker 积分超时 2s");
       this.pendingBatch = false;
-      // 归还脏 buffer
+      // 归还脏 buffer；若 currentBuffer 引用同一块内存，先置空
+      if (this.currentBuffer === slot.buffer) {
+        this.currentBuffer = null;
+      }
       this.pool.release(slot.index);
       // 触发崩溃恢复
       this.handleWorkerCrash(new ErrorEvent("timeout"));

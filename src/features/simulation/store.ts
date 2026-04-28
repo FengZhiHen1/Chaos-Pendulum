@@ -15,6 +15,11 @@ import {
 } from "@/shared/types";
 import { FRAME_STRIDE, FRAMES_PER_BATCH, FrameField } from "@/shared/types";
 
+const DRIFT_THRESHOLD = 0.005;
+const MAX_NAN_FRAMES = 60;
+let nanSkipCount = 0;
+let lastDamping = NaN;
+
 // ─── 帧数据 ─────────────────────────────────────
 
 export interface SimulationFrame {
@@ -57,6 +62,8 @@ interface SimulationState extends SimulationFrame {
   // 仿真运行
   isRunning: boolean;
   engineError: string | null;
+  /** 引擎事件通知（供 toast UI 消费）。消费后应设为 null。 */
+  engineEvent: { type: "recovered"; message: string } | null;
 
   // 参数面板 UI
   activeField: string | null;
@@ -71,6 +78,14 @@ interface SimulationState extends SimulationFrame {
   setEngineError: (error: string | null) => void;
   consumeFrameFromBuffer: (buffer: Float64Array, frameIndex: number) => void;
 
+  // ── SIM-04 能量监控 ──
+  energyInitial: number | null;
+  energyDrift: number;
+  driftExceeded: boolean;
+  energyMin: number;
+  energyMax: number;
+  isSimulationActive: boolean;
+
   // ── SIM-02 Actions ──
   setParam: (key: keyof PendulumParams, value: number) => void;
   setInitialCondition: (key: keyof InitialConditions, value: number) => void;
@@ -83,6 +98,7 @@ interface SimulationState extends SimulationFrame {
   resetToDefaults: () => void;
   clearFieldErrors: () => void;
   setPanelExpanded: (expanded: boolean) => void;
+  clearDriftAlarm: () => void;
 }
 
 // ─── 校验逻辑 ───────────────────────────────────
@@ -133,11 +149,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   isRunning: false,
   engineError: null,
+  engineEvent: null,
 
   activeField: null,
   fieldErrors: {},
   isSceneFrozen: false,
   isPanelExpanded: true,
+
+  energyInitial: null,
+  energyDrift: 0,
+  driftExceeded: false,
+  energyMin: 0,
+  energyMax: 0,
+  isSimulationActive: false,
 
   // ── SIM-01 Actions ──
 
@@ -153,22 +177,60 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   consumeFrameFromBuffer: (buffer, frameIndex) => {
     const offset = frameIndex * FRAME_STRIDE;
     if (offset + FRAME_STRIDE > buffer.length) return;
+    const k = buffer[offset + FrameField.KINETIC_ENERGY]!;
+    const v = buffer[offset + FrameField.POTENTIAL_ENERGY]!;
+    const e = buffer[offset + FrameField.TOTAL_ENERGY]!;
+    const currentT = buffer[offset + FrameField.T]!;
+    const prev = get();
+
+    let ei = prev.energyInitial;
+    let emin = prev.energyMin;
+    let emax = prev.energyMax;
+    let ed = prev.energyDrift;
+    let de = prev.driftExceeded;
+    let sa = prev.isSimulationActive;
+
+    if (isNaN(k) || isNaN(v) || isNaN(e)) {
+      nanSkipCount++;
+      if (nanSkipCount >= MAX_NAN_FRAMES) sa = false;
+    } else {
+      if (nanSkipCount > 0) { nanSkipCount = 0; if (!sa) sa = true; }
+      const damp = prev.params.damping;
+      if (!isNaN(lastDamping) && lastDamping !== damp) {
+        de = false;
+        if (damp === 0 && lastDamping > 0) { ei = e; emin = e; emax = e; }
+      }
+      lastDamping = damp;
+
+      if (prev.t > 1.0 && currentT < 0.1) {
+        ei = e; ed = 0; de = false; emin = e; emax = e; sa = true;
+      } else if (ei === null || !sa) {
+        ei = e; ed = 0; emin = e; emax = e; sa = true;
+      } else {
+        emin = Math.min(prev.energyMin, e);
+        emax = Math.max(prev.energyMax, e);
+        ed = Math.abs(e - ei) / Math.max(Math.abs(ei), 1e-10);
+        if (damp === 0 && ed > DRIFT_THRESHOLD) de = true;
+      }
+    }
+
     set({
-      t:              buffer[offset + FrameField.T]!,
-      theta1:         buffer[offset + FrameField.THETA1]!,
-      theta1Dot:      buffer[offset + FrameField.THETA1_DOT]!,
-      theta2:         buffer[offset + FrameField.THETA2]!,
-      theta2Dot:      buffer[offset + FrameField.THETA2_DOT]!,
-      x1:             buffer[offset + FrameField.X1]!,
-      y1:             buffer[offset + FrameField.Y1]!,
-      x2:             buffer[offset + FrameField.X2]!,
-      y2:             buffer[offset + FrameField.Y2]!,
-      kineticEnergy:  buffer[offset + FrameField.KINETIC_ENERGY]!,
-      potentialEnergy:buffer[offset + FrameField.POTENTIAL_ENERGY]!,
-      totalEnergy:    buffer[offset + FrameField.TOTAL_ENERGY]!,
-      alpha1:         buffer[offset + FrameField.ALPHA1]!,
-      alpha2:         buffer[offset + FrameField.ALPHA2]!,
+      t: currentT, theta1: buffer[offset + FrameField.THETA1]!,
+      theta1Dot: buffer[offset + FrameField.THETA1_DOT]!,
+      theta2: buffer[offset + FrameField.THETA2]!,
+      theta2Dot: buffer[offset + FrameField.THETA2_DOT]!,
+      x1: buffer[offset + FrameField.X1]!, y1: buffer[offset + FrameField.Y1]!,
+      x2: buffer[offset + FrameField.X2]!, y2: buffer[offset + FrameField.Y2]!,
+      kineticEnergy: k, potentialEnergy: v, totalEnergy: e,
+      alpha1: buffer[offset + FrameField.ALPHA1]!,
+      alpha2: buffer[offset + FrameField.ALPHA2]!,
+      energyInitial: ei, energyDrift: ed, driftExceeded: de,
+      energyMin: emin, energyMax: emax, isSimulationActive: sa,
     });
+  },
+
+  clearDriftAlarm: () => {
+    if (get().energyDrift < DRIFT_THRESHOLD) set({ driftExceeded: false });
   },
 
   // ── SIM-02 Actions ──
@@ -318,6 +380,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       fieldErrors: {},
       isSceneFrozen: false,
       activeField: null,
+      energyInitial: null,
+      energyDrift: 0,
+      driftExceeded: false,
+      energyMin: 0,
+      energyMax: 0,
+      isSimulationActive: false,
     });
   },
 

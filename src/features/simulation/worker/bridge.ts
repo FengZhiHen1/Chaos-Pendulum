@@ -13,6 +13,7 @@ let pendingUpdateDiff: Partial<PendulumParams> = {};
 let resetTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingResetIC: InitialConditions | null = null;
 
+/** 参数更新去抖窗口 ≈ 1 帧 @60fps（1/60 ≈ 16.7ms），合并同一帧内的多次按键输入 */
 const DEBOUNCE_MS = 16;
 
 // ─── 追踪上次同步值 ────────────────────────────
