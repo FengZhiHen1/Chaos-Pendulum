@@ -69,7 +69,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
     const hashMatch = path.match(/-(\w+)\.json$/);
     const gridHash = hashMatch ? hashMatch[1]! : "";
 
-    const cached = await getPrecomputeData(layer, gridHash);
+    const cached = await getPrecomputeData<LyapunovGrid>(layer, gridHash);
     if (cached && !signal.aborted) {
       return cached;
     }

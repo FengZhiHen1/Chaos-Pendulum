@@ -1,4 +1,5 @@
 export { useAnalyzeStore } from "./store";
 export { AnalyzeModePage } from "./ui/AnalyzeModePage";
 export { LyapunovHeatmap } from "./ui/LyapunovHeatmap";
-export type { LyapunovGrid, LyapunovLayerType, HoverTooltipData, HeatmapCursor } from "./types";
+export { BifurcationPlot } from "./ui/BifurcationPlot";
+export type { LyapunovGrid, LyapunovLayerType, HoverTooltipData, HeatmapCursor, BifurcationData, BifurcationHoverData, BifurcationCursor } from "./types";

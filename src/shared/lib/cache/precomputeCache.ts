@@ -1,5 +1,5 @@
 import { openDB, getStore, putStore } from "./indexed-db";
-import type { LyapunovGrid, PrecomputeCacheEntry } from "@/features/analyze/types";
+import type { PrecomputeDataType, PrecomputeCacheEntry } from "@/features/analyze/types";
 
 const DB_NAME = "chaos-pendulum";
 const DB_VERSION = 1;
@@ -28,16 +28,16 @@ async function getDB(): Promise<IDBDatabase | null> {
   }
 }
 
-export async function getPrecomputeData(
+export async function getPrecomputeData<T extends PrecomputeDataType>(
   type: string,
   gridHash: string,
-): Promise<LyapunovGrid | null> {
+): Promise<T | null> {
   const db = await getDB();
   if (!db) return null;
 
   const key = `${type}-${gridHash}`;
   try {
-    const entry = await getStore<PrecomputeCacheEntry>(db, STORE_NAME, key);
+    const entry = await getStore<PrecomputeCacheEntry<T>>(db, STORE_NAME, key);
     if (!entry) return null;
     return entry.data;
   } catch (e) {
@@ -46,17 +46,17 @@ export async function getPrecomputeData(
   }
 }
 
-export async function setPrecomputeData(
+export async function setPrecomputeData<T extends PrecomputeDataType>(
   type: string,
   gridHash: string,
-  data: LyapunovGrid,
+  data: T,
 ): Promise<void> {
   const db = await getDB();
   if (!db) return;
 
   const key = `${type}-${gridHash}`;
   const serialized = JSON.stringify(data);
-  const entry: PrecomputeCacheEntry = {
+  const entry: PrecomputeCacheEntry<T> = {
     key,
     data,
     cachedAt: Date.now(),
@@ -91,7 +91,6 @@ async function evictLRU(): Promise<void> {
         return;
       }
 
-      // 按 cachedAt 升序，淘汰最旧的
       entries.sort((a, b) => a.cachedAt - b.cachedAt);
       const toDelete = entries.slice(0, entries.length - MAX_ENTRIES);
 
