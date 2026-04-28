@@ -8,6 +8,7 @@ import type {
 import { FRAMES_PER_BATCH } from "@/shared/types";
 import { Float64Pool } from "./float64-pool";
 import { useSimulationStore, BATCH_PREFETCH_THRESHOLD } from "../store";
+import { observabilityCoordinator } from "@/shared/lib/observability";
 
 const TIMEOUT_MS = 2000;
 const MAX_CRASH_RECOVERY = 1;
@@ -166,6 +167,17 @@ export class SimulationScheduler {
           this.timeoutId = null;
         }
 
+        // 测量 Worker 往返耗时
+        if (typeof performance?.mark === "function") {
+          try {
+            performance.mark("worker-step-end");
+            const m = performance.measure("worker-step", "worker-step-start", "worker-step-end");
+            observabilityCoordinator.recordWorkerLatency(m.duration);
+            performance.clearMarks("worker-step-start");
+            performance.clearMarks("worker-step-end");
+          } catch { /* 静默忽略 measure 失败 */ }
+        }
+
         this.currentBuffer = resp.buffer;
         this.consumeIndex = 0;
         this.pendingBatch = false;
@@ -184,6 +196,13 @@ export class SimulationScheduler {
         if (this.timeoutId) {
           clearTimeout(this.timeoutId);
           this.timeoutId = null;
+        }
+        // 清理可能残留的 performance mark
+        if (typeof performance?.clearMarks === "function") {
+          try {
+            performance.clearMarks("worker-step-start");
+            performance.clearMarks("worker-step-end");
+          } catch { /* 静默 */ }
         }
         useSimulationStore.setState({ engineError: resp.message });
 
@@ -283,6 +302,12 @@ export class SimulationScheduler {
     }
 
     this.pendingBatch = true;
+
+    if (typeof performance?.mark === "function") {
+      try {
+        performance.mark("worker-step-start");
+      } catch { /* 静默 */ }
+    }
 
     this.worker.postMessage(
       { type: "step", buffer: slot.buffer },

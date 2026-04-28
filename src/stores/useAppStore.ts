@@ -7,6 +7,8 @@ interface DebugInfo {
   workerLatencyMs: number[];
   errors: string[];
   pyodideLoadPct: number;
+  /** FPS 历史时间线（最近 10s，每秒一个平均值） */
+  fpsHistory: number[];
 }
 
 interface AppState {
@@ -35,6 +37,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     workerLatencyMs: [],
     errors: [],
     pyodideLoadPct: 0,
+    fpsHistory: [],
   },
 
   activeMode: "explore",
