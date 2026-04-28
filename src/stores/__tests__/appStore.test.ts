@@ -109,4 +109,20 @@ describe("useAppStore", () => {
     useAppStore.getState().setDeviceType("mobile");
     expect(useAppStore.getState().deviceType).toBe("mobile");
   });
+
+  it("setDeviceType 拒绝非法值", () => {
+    useAppStore.getState().setDeviceType("desktop");
+    useAppStore.getState().setDeviceType("watch" as "desktop");
+    expect(useAppStore.getState().deviceType).toBe("desktop");
+  });
+
+  it("setDeviceType 接受全部三值", () => {
+    const store = useAppStore.getState();
+    store.setDeviceType("desktop");
+    expect(useAppStore.getState().deviceType).toBe("desktop");
+    store.setDeviceType("tablet");
+    expect(useAppStore.getState().deviceType).toBe("tablet");
+    store.setDeviceType("mobile");
+    expect(useAppStore.getState().deviceType).toBe("mobile");
+  });
 });

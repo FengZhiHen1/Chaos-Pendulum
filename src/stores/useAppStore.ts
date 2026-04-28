@@ -61,7 +61,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ previousMode: activeMode, activeMode: newMode });
   },
 
-  setDeviceType: (type) => set({ deviceType: type }),
+  setDeviceType: (type) => {
+    if (type !== "desktop" && type !== "tablet" && type !== "mobile") {
+      console.warn(`[SYS-01] 非法 deviceType: ${type}`);
+      return;
+    }
+    set({ deviceType: type });
+  },
   setLoadingState: (state) => set({ loadingState: state }),
   updateDebugInfo: (patch) =>
     set((s) => ({ debugInfo: { ...s.debugInfo, ...patch } })),

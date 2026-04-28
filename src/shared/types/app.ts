@@ -56,3 +56,68 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     tooltip: "评审专用一键演示 · 快捷键 4",
   },
 ];
+
+// ── SYS-01 响应式布局引擎类型 ──
+
+/**
+ * useDeviceType() 的返回值。
+ * 供需要感知设备能力的组件消费。
+ */
+export interface DeviceInfo {
+  /** 设备类型（三值）。桌面（≥ 1366px）/ 平板（≥ 768px）/ 手机（< 768px） */
+  deviceType: DeviceType;
+  /** 是否为桌面端（含宽敞桌面 1920+ 和紧凑桌面 1366-1920） */
+  isDesktop: boolean;
+  /** 是否为桌面宽敞布局（≥ 1920px） */
+  isWide: boolean;
+  /** 是否为平板端 */
+  isTablet: boolean;
+  /** 是否为手机端 */
+  isMobile: boolean;
+  /** 当前视口宽度（像素） */
+  viewportWidth: number;
+  /** 当前视口高度（像素） */
+  viewportHeight: number;
+  /** 设备像素比 */
+  dpr: number;
+  /** 是否偏好减少动画 */
+  prefersReducedMotion: boolean;
+}
+
+/**
+ * 各设备类型下的功能降级规则。
+ * 由 SYS-01 定义，由各功能模块自行读取并执行降级。
+ */
+export interface DegradationRules {
+  enable3DShadows: boolean;
+  maxTrailLength: number;
+  enableTrail: boolean;
+  enableSonification: boolean;
+  enableCodeEditor: boolean;
+  enablePrecomputedData: boolean;
+  enableAdvancedAnalysis: boolean;
+}
+
+/**
+ * useContainerSize hook 的输入参数。
+ */
+export interface UseContainerSizeOptions {
+  /** 容器的 Ref 对象 */
+  ref: React.RefObject<HTMLElement | null>;
+  /** 去抖动延迟（毫秒），默认 150 */
+  debounceMs?: number;
+  /** 是否启用，默认 true */
+  enabled?: boolean;
+}
+
+/**
+ * useContainerSize hook 的返回值。
+ */
+export interface ContainerSize {
+  /** 容器内容宽度（像素） */
+  width: number;
+  /** 容器内容高度（像素） */
+  height: number;
+  /** 容器是否已挂载且尺寸有效 */
+  ready: boolean;
+}

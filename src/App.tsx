@@ -1,5 +1,10 @@
+import { DeviceProvider } from "@/components/DeviceProvider";
 import { AppShell } from "@/shared/components/layout/AppShell";
 
 export default function App() {
-  return <AppShell />;
+  return (
+    <DeviceProvider>
+      <AppShell />
+    </DeviceProvider>
+  );
 }

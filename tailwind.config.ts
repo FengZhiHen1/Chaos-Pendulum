@@ -1,9 +1,16 @@
 import type { Config } from "tailwindcss";
+import { BREAKPOINTS } from "./src/shared/hooks/useDeviceType";
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      screens: {
+        sm: "640px",
+        md: `${BREAKPOINTS.TABLET}px`,
+        lg: `${BREAKPOINTS.DESKTOP_COMPACT}px`,
+        xl: `${BREAKPOINTS.DESKTOP_WIDE}px`,
+      },
       colors: {
         lab: {
           dark: "#0a0a0f",
