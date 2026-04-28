@@ -19,6 +19,7 @@ export class ObservabilityCoordinator {
   private latencyCounter = 0;
   private initialized = false;
   private updateDebugInfo?: (patch: Partial<DebugInfo>) => void;
+  private onErrorCallback?: (errors: string[]) => void;
   private rafId = 0;
 
   constructor(config: Partial<ObservabilityConfig> = {}) {
@@ -34,15 +35,22 @@ export class ObservabilityCoordinator {
   }
 
   /** 应用启动时调用一次。初始化所有 tracker 并绑定到 store。 */
-  init(updateDebugInfo: (patch: Partial<DebugInfo>) => void): void {
+  init(
+    updateDebugInfo: (patch: Partial<DebugInfo>) => void,
+    onError?: (errors: string[]) => void,
+  ): void {
     if (this.initialized) return;
     this.initialized = true;
     this.updateDebugInfo = updateDebugInfo;
+    this.onErrorCallback = onError;
 
-    // 1. 全局错误捕获 → Zustand
+    // 1. 全局错误捕获 → Zustand + SYS-02
     initErrorCapture((errors) => {
       try {
         this.updateDebugInfo?.({ errors });
+      } catch { /* 防止回调本身抛错导致无限循环 */ }
+      try {
+        this.onErrorCallback?.(errors);
       } catch { /* 防止回调本身抛错导致无限循环 */ }
     });
 

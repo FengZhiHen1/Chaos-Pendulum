@@ -143,7 +143,7 @@ export async function clearPrecomputeCache(): Promise<void> {
 
 // ─── 错误状态构建 ──────────────────────────────────
 
-function buildErrorState<T>(
+function buildErrorState<T extends PrecomputeDataType>(
   code: PrecomputeErrorCode,
   message: string,
   input: UsePrecomputeDataInput,
