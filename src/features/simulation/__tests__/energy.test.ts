@@ -141,10 +141,10 @@ describe("能量监控 — 阻尼豁免", () => {
 describe("能量监控 — Reset", () => {
   beforeEach(resetStore);
 
-  it("t 从 >1s 突降为 ~0 时重置能量基准", () => {
+  it("resetTrigger 递增时重置能量基准", () => {
     const store = useSimulationStore.getState();
 
-    // 先运行 300 帧
+    // 先运行 300 帧（正常仿真）
     for (let i = 0; i < 300; i++) {
       const { buffer } = makeFrameBuffer({
         [FrameField.T]: (i + 1) * 0.0167,
@@ -157,7 +157,10 @@ describe("能量监控 — Reset", () => {
     expect(beforeReset.energyInitial).toBeCloseTo(-4.905, 1);
     expect(beforeReset.isSimulationActive).toBe(true);
 
-    // Reset：t=0 帧到达（模拟 Worker reset 后首个 batch）
+    // 模拟用户点击 Reset：incrementResetTrigger
+    useSimulationStore.getState().incrementResetTrigger();
+
+    // Reset 后首个 batch 的 t=0 帧到达
     const { buffer } = makeFrameBuffer({
       [FrameField.T]: 0.0167,
       [FrameField.TOTAL_ENERGY]: -5.0, // 新参数的初始能量不同

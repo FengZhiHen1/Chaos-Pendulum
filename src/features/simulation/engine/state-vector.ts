@@ -60,11 +60,10 @@ export function computeDerived(
   };
 }
 
-/** 角度归一化到 [-π, π] */
+/** 角度归一化到 [-π, π) */
 export function normalizeAngle(angle: number): number {
-  // 使用 while 循环而非 % 取模，避免 JS 负数取余的语义陷阱
   let a = angle;
-  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a >= Math.PI) a -= 2 * Math.PI;
   while (a < -Math.PI) a += 2 * Math.PI;
   return a;
 }
