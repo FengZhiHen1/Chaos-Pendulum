@@ -1,8 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { toast as sonnerToast } from "sonner";
 import { notify, _resetNotifyState, markToastProviderMounted } from "../notify";
 
-vi.mock("sonner");
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), {
+    info: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    loading: vi.fn(),
+  }),
+}));
 
 describe("notify", () => {
   beforeEach(() => {
@@ -50,10 +58,11 @@ describe("notify", () => {
     // 三次调用均触发 sonner（同 id 更新），但对外只应产生一个 Toast
     expect(sonnerToast.error).toHaveBeenCalledTimes(3);
     // 第三次调用时 description 应包含 (×3)
-    const lastCall = sonnerToast.error.mock.calls.at(-1);
+    const errorMock = sonnerToast.error as Mock;
+    const lastCall = errorMock.mock.calls[errorMock.mock.calls.length - 1];
     expect(lastCall?.[1]?.description).toContain("(×3)");
     // 三次调用使用同一个 toast id
-    const ids = sonnerToast.error.mock.calls.map((c) => c[1]?.id);
+    const ids = errorMock.mock.calls.map((c: unknown[]) => (c[1] as { id?: string })?.id);
     expect(new Set(ids).size).toBe(1);
   });
 
@@ -65,8 +74,9 @@ describe("notify", () => {
 
     // 两次独立调用，id 不同
     expect(sonnerToast.error).toHaveBeenCalledTimes(2);
-    const firstId = sonnerToast.error.mock.calls[0]![1]!.id;
-    const secondId = sonnerToast.error.mock.calls[1]![1]!.id;
+    const errorMock = sonnerToast.error as Mock;
+    const firstId = errorMock.mock.calls[0]![1]!.id;
+    const secondId = errorMock.mock.calls[1]![1]!.id;
     expect(firstId).not.toBe(secondId);
   });
 
