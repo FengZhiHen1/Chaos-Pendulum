@@ -137,7 +137,14 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     // 单步积分
     integratorStep(_state, _params, dt * _direction, _method);
 
-    // NaN 检查
+    _simTime += dt * _direction;
+
+    // 能量投影：保守系统 (damping=0) 每帧校正能量回初始值
+    if (_projectionEnabled) {
+      _batchEnergyCorrection += projectEnergy(_state, _params, _initialEnergy);
+    }
+
+    // NaN 检查（必须在能量投影之后，以捕获投影可能引入的 NaN）
     if (hasInvalidValue(_state)) {
       _phase = "error";
       transferBuffer(buffer, frame, _simTime, poincarePoints, forceBuffer);
@@ -148,13 +155,6 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
         simTime: _simTime,
       });
       return;
-    }
-
-    _simTime += dt * _direction;
-
-    // 能量投影：保守系统 (damping=0) 每帧校正能量回初始值
-    if (_projectionEnabled) {
-      _batchEnergyCorrection += projectEnergy(_state, _params, _initialEnergy);
     }
 
     // ── 穿越检测 ──

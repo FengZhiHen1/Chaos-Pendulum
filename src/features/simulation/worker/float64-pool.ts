@@ -24,12 +24,23 @@ export class Float64Pool {
   acquire(): { buffer: Float64Array; index: number } | null {
     if (this.free.length === 0) return null;
     const idx = this.free.pop()!;
-    return { buffer: this.buffers[idx]!, index: idx };
+    let buf = this.buffers[idx]!;
+    // buffer 在上一轮 transfer 后可能已 detached，此时需重新分配
+    if (buf.byteLength === 0) {
+      buf = new Float64Array(POOL_SIZE);
+      this.buffers[idx] = buf;
+      this.indexMap.set(buf, idx);
+    }
+    return { buffer: buf, index: idx };
   }
 
-  /** 归还 buffer 到池中 */
-  release(index: number): void {
+  /** 归还 buffer 到池中，可选传入新的 buffer 引用以更新槽位 */
+  release(index: number, newBuffer?: Float64Array): void {
     if (index >= 0 && index < this.buffers.length && !this.free.includes(index)) {
+      if (newBuffer) {
+        this.buffers[index] = newBuffer;
+        this.indexMap.set(newBuffer, index);
+      }
       this.free.push(index);
     }
   }

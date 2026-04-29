@@ -64,18 +64,18 @@ const A63 = -3544 / 2565;
 const A64 = 1859 / 4104;
 const A65 = -11 / 40;
 
-// 4 阶权重 (b4)
-const B41 = 16 / 135;
-const B43 = 6656 / 12825;
-const B44 = 28561 / 56430;
-const B45 = -9 / 50;
-const B46 = 2 / 55;
+// 5 阶权重 (b5*) —— 用于状态推进
+const B51 = 16 / 135;
+const B53 = 6656 / 12825;
+const B54 = 28561 / 56430;
+const B55 = -9 / 50;
+const B56 = 2 / 55;
 
-// 5 阶权重 (b5)
-const B51 = 25 / 216;
-const B53 = 1408 / 2565;
-const B54 = 2197 / 4104;
-const B55 = -1 / 5;
+// 4 阶权重 (b4) —— 用于误差估计
+const B41 = 25 / 216;
+const B43 = 1408 / 2565;
+const B44 = 2197 / 4104;
+const B45 = -1 / 5;
 
 // ─── 自适应 RKF45 ───────────────────────────────
 
@@ -162,8 +162,8 @@ function rkf45Step(
   // 计算 4 阶与 5 阶解，取 5 阶解推进，返回误差估计
   let err = 0;
   for (let i = 0; i < 4; i++) {
-    const y4 = state[i]! + h * (B41 * _rk_k1[i]! + B43 * _rk_k3[i]! + B44 * _rk_k4[i]! + B45 * _rk_k5[i]! + B46 * _rk_k6[i]!);
-    const y5 = state[i]! + h * (B51 * _rk_k1[i]! + B53 * _rk_k3[i]! + B54 * _rk_k4[i]! + B55 * _rk_k5[i]!);
+    const y4 = state[i]! + h * (B41 * _rk_k1[i]! + B43 * _rk_k3[i]! + B44 * _rk_k4[i]! + B45 * _rk_k5[i]!);
+    const y5 = state[i]! + h * (B51 * _rk_k1[i]! + B53 * _rk_k3[i]! + B54 * _rk_k4[i]! + B55 * _rk_k5[i]! + B56 * _rk_k6[i]!);
     const diff = Math.abs(y5 - y4);
     if (diff > err) err = diff;
     state[i] = y5;

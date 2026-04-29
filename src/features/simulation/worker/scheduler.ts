@@ -33,15 +33,21 @@ export class SimulationScheduler {
   private activeIndex = 0;
   /** activeBuffer 的实际帧数（通常 = FRAMES_PER_BATCH，末批可能更少） */
   private activeFrameCount = FRAMES_PER_BATCH;
+  /** activeBuffer 对应的池槽位索引，用于归还 */
+  private activePoolIndex = -1;
   /** 提前到达的下一批次缓冲区（等待 activeBuffer 消费完毕后提升） */
   private nextBuffer: Float64Array | null = null;
   /** nextBuffer 的帧数 */
   private nextFrameCount = 0;
+  /** nextBuffer 对应的池槽位索引 */
+  private nextPoolIndex = -1;
   /** nextBuffer 关联的力数据（延迟转发到 labStore） */
   private nextForceData: Float64Array | null = null;
   /** nextBuffer 关联的庞加莱截面点（延迟转发） */
   private nextPoincarePoints: PoincarePoint[] | null = null;
   private pendingBatch = false;
+  /** 当前 pending 请求使用的池槽位索引 */
+  private pendingPoolIndex = -1;
   private rafId = 0;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private crashCount = 0;
@@ -164,12 +170,18 @@ export class SimulationScheduler {
       this.worker = null;
     }
     if (this.activeBuffer) {
-      this.pool.releaseBuffer(this.activeBuffer);
+      this.pool.release(this.activePoolIndex);
       this.activeBuffer = null;
+      this.activePoolIndex = -1;
     }
     if (this.nextBuffer) {
-      this.pool.releaseBuffer(this.nextBuffer);
+      this.pool.release(this.nextPoolIndex);
       this.nextBuffer = null;
+      this.nextPoolIndex = -1;
+    }
+    if (this.pendingPoolIndex >= 0) {
+      this.pool.release(this.pendingPoolIndex);
+      this.pendingPoolIndex = -1;
     }
     this.activeIndex = 0;
     this.nextForceData = null;
@@ -204,12 +216,18 @@ export class SimulationScheduler {
   /** 重置仿真 */
   reset(initialConditions: InitialConditions): void {
     if (this.activeBuffer) {
-      this.pool.releaseBuffer(this.activeBuffer);
+      this.pool.release(this.activePoolIndex);
       this.activeBuffer = null;
+      this.activePoolIndex = -1;
     }
     if (this.nextBuffer) {
-      this.pool.releaseBuffer(this.nextBuffer);
+      this.pool.release(this.nextPoolIndex);
       this.nextBuffer = null;
+      this.nextPoolIndex = -1;
+    }
+    if (this.pendingPoolIndex >= 0) {
+      this.pool.release(this.pendingPoolIndex);
+      this.pendingPoolIndex = -1;
     }
     this.activeIndex = 0;
     this.nextForceData = null;
@@ -296,6 +314,8 @@ export class SimulationScheduler {
         }
 
         this.pendingBatch = false;
+        const completedPoolIndex = this.pendingPoolIndex;
+        this.pendingPoolIndex = -1;
 
         if (resp.energyCorrection !== undefined) {
           useSimulationStore.setState({ energyCorrection: resp.energyCorrection });
@@ -305,17 +325,22 @@ export class SimulationScheduler {
         if (this.activeBuffer !== null && this.activeIndex < FRAMES_PER_BATCH) {
           // 旧批次仍有未消费帧 → 暂存新批次，不覆盖
           if (this.nextBuffer) {
-            this.pool.releaseBuffer(this.nextBuffer);
+            this.pool.release(this.nextPoolIndex, this.nextBuffer);
           }
           this.nextBuffer = resp.buffer;
           this.nextFrameCount = resp.frameCount;
+          this.nextPoolIndex = completedPoolIndex;
           this.nextForceData = resp.forceData ?? null;
           this.nextPoincarePoints = resp.poincarePoints ?? null;
         } else {
           // 旧批次已消费完毕（或无活跃批次）→ 直接激活新批次
+          if (this.activeBuffer) {
+            this.pool.release(this.activePoolIndex, this.activeBuffer);
+          }
           this.activeBuffer = resp.buffer;
           this.activeIndex = 0;
           this.activeFrameCount = resp.frameCount;
+          this.activePoolIndex = completedPoolIndex;
 
           // 转发力数据到 labStore
           if (resp.forceData) {
@@ -347,6 +372,7 @@ export class SimulationScheduler {
 
       case "error": {
         this.pendingBatch = false;
+        this.pendingPoolIndex = -1;
         if (this.timeoutId) {
           clearTimeout(this.timeoutId);
           this.timeoutId = null;
@@ -385,12 +411,18 @@ export class SimulationScheduler {
     const store = useSimulationStore.getState();
 
     if (this.activeBuffer) {
-      this.pool.releaseBuffer(this.activeBuffer);
+      this.pool.release(this.activePoolIndex);
       this.activeBuffer = null;
+      this.activePoolIndex = -1;
     }
     if (this.nextBuffer) {
-      this.pool.releaseBuffer(this.nextBuffer);
+      this.pool.release(this.nextPoolIndex);
       this.nextBuffer = null;
+      this.nextPoolIndex = -1;
+    }
+    if (this.pendingPoolIndex >= 0) {
+      this.pool.release(this.pendingPoolIndex);
+      this.pendingPoolIndex = -1;
     }
     this.nextForceData = null;
     this.nextPoincarePoints = null;
@@ -454,15 +486,17 @@ export class SimulationScheduler {
       }
 
       if (this.activeIndex >= this.activeFrameCount) {
-        // 归还旧缓冲区到池
-        this.pool.releaseBuffer(this.activeBuffer);
+        // 归还旧缓冲区到池，同时传入新的 buffer 引用以更新池槽位
+        this.pool.release(this.activePoolIndex, this.activeBuffer);
 
         // 提升 nextBuffer 为 activeBuffer（若存在）
         if (this.nextBuffer) {
           this.activeBuffer = this.nextBuffer;
           this.activeIndex = 0;
           this.activeFrameCount = this.nextFrameCount;
+          this.activePoolIndex = this.nextPoolIndex;
           this.nextBuffer = null;
+          this.nextPoolIndex = -1;
 
           // 转发延迟的力数据
           if (this.nextForceData) {
@@ -485,6 +519,7 @@ export class SimulationScheduler {
           this.activeBuffer = null;
           this.activeIndex = 0;
           this.activeFrameCount = FRAMES_PER_BATCH;
+          this.activePoolIndex = -1;
         }
       }
       return true;
@@ -508,6 +543,7 @@ export class SimulationScheduler {
     }
 
     this.pendingBatch = true;
+    this.pendingPoolIndex = slot.index;
 
     if (typeof performance?.mark === "function") {
       try {
@@ -529,6 +565,7 @@ export class SimulationScheduler {
       this.pendingBatch = false;
       // 超时的 buffer 已被 transfer 到 Worker，Worker 已无响应，槽位作废
       this.pool.release(slot.index);
+      this.pendingPoolIndex = -1;
       this.handleWorkerCrash(new ErrorEvent("timeout"));
     }, TIMEOUT_MS);
   }
