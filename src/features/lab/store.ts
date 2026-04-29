@@ -43,6 +43,7 @@ interface LabState {
   setForceActive: (v: boolean) => void;
   setLastForceData: (data: Float64Array) => void;
   setForceExtrema: (e: ForceExtrema) => void;
+  setForceBufferIndex: (idx: number) => void;
   setForceHovered: (h: ForceHovered | null) => void;
   resetForceDecomposition: () => void;
 }
@@ -86,6 +87,8 @@ export const useLabStore = create<LabState>((set) => ({
     set((s) => ({ forceDecomposition: { ...s.forceDecomposition, lastForceData, bufferIndex: 0 } })),
   setForceExtrema: (extrema) =>
     set((s) => ({ forceDecomposition: { ...s.forceDecomposition, extrema } })),
+  setForceBufferIndex: (bufferIndex) =>
+    set((s) => ({ forceDecomposition: { ...s.forceDecomposition, bufferIndex } })),
   setForceHovered: (hovered) =>
     set((s) => ({ forceDecomposition: { ...s.forceDecomposition, hovered } })),
   resetForceDecomposition: () =>

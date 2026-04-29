@@ -101,6 +101,8 @@ interface SimulationState extends SimulationFrame {
   energyMin: number;
   energyMax: number;
   isSimulationActive: boolean;
+  /** 当前消耗的帧索引 (0..FRAMES_PER_BATCH-1)，供 LAB-01 力数据对齐 */
+  consumedFrameIndex: number;
 
   // ── SIM-02 Actions ──
   setParam: (key: keyof PendulumParams, value: number) => void;
@@ -185,6 +187,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   energyMin: 0,
   energyMax: 0,
   isSimulationActive: false,
+  consumedFrameIndex: 0,
 
   // ── SIM-01 Actions ──
 
@@ -257,6 +260,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       alpha2: buffer[offset + FrameField.ALPHA2]!,
       energyInitial: ei, energyDrift: ed, driftExceeded: de,
       energyMin: emin, energyMax: emax, isSimulationActive: sa,
+      consumedFrameIndex: frameIndex,
       state: {
         theta1: buffer[offset + FrameField.THETA1]!,
         omega1: buffer[offset + FrameField.THETA1_DOT]!,
@@ -424,6 +428,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMin: 0,
       energyMax: 0,
       isSimulationActive: false,
+      consumedFrameIndex: 0,
       resetTrigger: s.resetTrigger + 1,
       state: {
         theta1: defaultFrame.theta1,

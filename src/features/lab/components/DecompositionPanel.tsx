@@ -181,11 +181,21 @@ export function DecompositionPanel() {
   const setCoordinateSystem = useLabStore((s) => s.setCoordinateSystem);
   const theta1 = useSimulationStore((s) => s.theta1);
   const theta2 = useSimulationStore((s) => s.theta2);
+  const consumedFrameIndex = useSimulationStore((s) => s.consumedFrameIndex);
 
   if (!active) return null;
 
   const isLoading = !lastForceData;
-  const hasData = lastForceData && lastForceData.length >= FORCE_STRIDE;
+
+  // 从力缓冲中提取当前帧的 Float64Array 视图（零拷贝）
+  const currentFrameData = useMemo(() => {
+    if (!lastForceData || lastForceData.length < FORCE_STRIDE) return null;
+    const offset = consumedFrameIndex * FORCE_STRIDE;
+    if (offset + FORCE_STRIDE > lastForceData.length) return null;
+    return new Float64Array(lastForceData.buffer, lastForceData.byteOffset + offset * Float64Array.BYTES_PER_ELEMENT, FORCE_STRIDE);
+  }, [lastForceData, consumedFrameIndex]);
+
+  const hasData = currentFrameData !== null;
 
   return (
     <div className="w-80 shrink-0 border-l border-white/5 bg-surface-container-lowest/80 backdrop-blur flex flex-col h-full">
@@ -222,8 +232,8 @@ export function DecompositionPanel() {
           </div>
         ) : hasData ? (
           <>
-            <MassTable massIdx={1} data={lastForceData} sys={coordinateSystem} theta={theta1} />
-            <MassTable massIdx={2} data={lastForceData} sys={coordinateSystem} theta={theta2} />
+            <MassTable massIdx={1} data={currentFrameData} sys={coordinateSystem} theta={theta1} />
+            <MassTable massIdx={2} data={currentFrameData} sys={coordinateSystem} theta={theta2} />
             <ExtremaBadges />
           </>
         ) : (
