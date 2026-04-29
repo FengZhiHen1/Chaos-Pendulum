@@ -25,7 +25,7 @@ function StatusIcon({ status }: { status: "idle" | "running" | "passed" | "faile
     case "running":
       return <Circle className="w-4 h-4 text-yellow-400 animate-pulse" />;
     default:
-      return <Circle className="w-4 h-4 text-gray-600" />;
+      return <Circle className="w-4 h-4 text-on-surface-variant" />;
   }
 }
 
@@ -67,14 +67,11 @@ export function LabPage() {
   return (
     <div className="w-full h-full flex flex-col">
       {/* 页头 */}
-      <div
-        className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: "1px solid #1a1a2e" }}
-      >
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <FlaskConical className="w-5 h-5 text-lab-accent" />
-          <h2 className="text-sm font-semibold text-white tracking-wider">实验模式</h2>
-          <span className="text-[10px] text-lab-border bg-lab-panel px-2 py-0.5 rounded">
+          <FlaskConical className="w-5 h-5 text-primary" />
+          <h2 className="text-sm font-semibold text-on-surface tracking-wider">实验模式</h2>
+          <span className="text-[10px] text-on-surface-variant bg-surface-container-low px-2 py-0.5 rounded">
             P2 · 物理验证 + 代码实验
           </span>
         </div>
@@ -89,10 +86,10 @@ export function LabPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧：物理验证套件 */}
         <div className="flex-1 p-4 overflow-y-auto">
-          <h3 className="text-xs font-semibold text-lab-border uppercase tracking-wider mb-4">
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-4">
             物理模型验证
           </h3>
-          <p className="text-xs text-lab-border mb-4 leading-relaxed">
+          <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
             三项自动化验证确保仿真引擎的物理正确性。
             验证使用 RK4 积分器直接调用物理引擎核心函数，无需 Worker 通信开销。
           </p>
@@ -109,13 +106,13 @@ export function LabPage() {
                       ? "border-red-500/30 bg-red-500/5"
                       : validationResults[check.key] === "running"
                         ? "border-yellow-500/30 bg-yellow-500/5"
-                        : "border-lab-border bg-lab-panel",
+                        : "border-white/5 bg-surface-container-low",
                 )}
               >
                 <StatusIcon status={validationResults[check.key]} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-white font-medium">{check.label}</span>
+                    <span className="text-sm text-on-surface font-medium">{check.label}</span>
                     {validationResults[check.key] === "passed" && (
                       <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                         通过
@@ -127,9 +124,9 @@ export function LabPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-lab-border mt-0.5">{check.desc}</p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">{check.desc}</p>
                   {validationDetails[check.key] && (
-                    <p className="text-[10px] text-lab-border mt-1.5 leading-relaxed opacity-80">
+                    <p className="text-[10px] text-on-surface-variant mt-1.5 leading-relaxed opacity-80">
                       {validationDetails[check.key]}
                     </p>
                   )}
@@ -147,7 +144,7 @@ export function LabPage() {
                 "flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all",
                 validationRunning
                   ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 cursor-wait"
-                  : "bg-lab-accent/20 text-lab-accent hover:bg-lab-accent/30 border border-lab-accent/30 active:scale-[0.98]",
+                  : "bg-primary-container text-primary hover:bg-primary/30 border border-primary/30 active:scale-[0.98]",
               )}
             >
               {validationRunning ? (
@@ -163,7 +160,7 @@ export function LabPage() {
               )}
             </button>
             {!anyHasRun && (
-              <p className="text-[10px] text-lab-border mt-2">
+              <p className="text-[10px] text-on-surface-variant mt-2">
                 调用物理引擎核心函数，在浏览器主线程中运行三项验证（约 1-2 秒）
               </p>
             )}
@@ -172,13 +169,12 @@ export function LabPage() {
 
         {/* 右侧：代码实验区 */}
         <div
-          className="w-80 shrink-0 flex flex-col border-l"
-          style={{ borderColor: "#1a1a2e" }}
+          className="w-80 shrink-0 flex flex-col border-l border-white/5"
         >
-          <div className="px-4 py-3 border-b border-lab-border">
+          <div className="px-4 py-3 border-b border-white/5">
             <div className="flex items-center gap-2 mb-3">
-              <Code className="w-3.5 h-3.5 text-lab-border" />
-              <h4 className="text-xs font-semibold text-white">代码模板</h4>
+              <Code className="w-3.5 h-3.5 text-on-surface-variant" />
+              <h4 className="text-xs font-semibold text-on-surface">代码模板</h4>
             </div>
             <div className="space-y-1">
               {TEMPLATES.map((t) => (
@@ -189,36 +185,36 @@ export function LabPage() {
                   className={cn(
                     "w-full text-left px-3 py-2 rounded text-xs border transition-colors",
                     activeTemplate === t.id
-                      ? "border-lab-accent/40 bg-lab-accent/10 text-lab-accent"
-                      : "border-transparent text-lab-border hover:border-lab-border bg-lab-panel",
+                      ? "border-primary/40 bg-primary-container text-primary"
+                      : "border-transparent text-on-surface-variant hover:border-white/5 bg-surface-container-low",
                     "opacity-60 cursor-not-allowed",
                   )}
                 >
                   <span className="font-medium">{t.name}</span>
-                  <span className="text-[10px] text-lab-border ml-2">{t.file}</span>
+                  <span className="text-[10px] text-on-surface-variant ml-2">{t.file}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-lab-border mt-3">
+            <p className="text-[10px] text-on-surface-variant mt-3">
               Pyodide 沙箱集成开发中，届时支持在线编辑与运行 Python 物理模拟代码
             </p>
           </div>
 
           {/* 报告生成器 */}
-          <div className="mt-auto p-4 border-t border-lab-border">
+          <div className="mt-auto p-4 border-t border-white/5">
             <div className="flex items-center gap-2 mb-3">
-              <FileText className="w-3.5 h-3.5 text-lab-border" />
-              <h4 className="text-xs font-semibold text-white">实验报告</h4>
+              <FileText className="w-3.5 h-3.5 text-on-surface-variant" />
+              <h4 className="text-xs font-semibold text-on-surface">实验报告</h4>
             </div>
             <button
               type="button"
               disabled
-              className="w-full flex items-center justify-center gap-2 py-2 rounded text-xs font-medium bg-gray-700/50 text-gray-500 border border-gray-700 cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded text-xs font-medium bg-surface-container text-on-surface-variant border border-white/5 cursor-not-allowed"
             >
               <FileText className="w-3.5 h-3.5" />
               生成 A4 PDF 报告
             </button>
-            <p className="text-[10px] text-lab-border mt-2 text-center">
+            <p className="text-[10px] text-on-surface-variant mt-2 text-center">
               参数表 + 关键帧截图 + 数据图表 + 物理结论
             </p>
           </div>
