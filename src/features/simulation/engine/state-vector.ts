@@ -62,7 +62,11 @@ export function computeDerived(
 
 /** 角度归一化到 [-π, π] */
 export function normalizeAngle(angle: number): number {
-  return ((angle + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  // 使用 while 循环而非 % 取模，避免 JS 负数取余的语义陷阱
+  let a = angle;
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
 }
 
 /** 计算下摆球 3D 坐标（EXP-01 和 EXP-02 共享使用） */

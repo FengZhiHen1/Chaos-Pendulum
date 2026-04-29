@@ -1,26 +1,56 @@
 import type { PendulumParams } from "@/shared/types";
 
 /**
+ * 分母近零保护阈值。
+ * 取值依据：双摆 denom = m₁+m₂ - m₂cos²(δ)，在 m₁,m₂ ∈ [0.01, 10] kg 范围内，
+ * denom 最小值出现在 m₁→0.01,m₂→10,δ=0 时 ≈ 0.01。1e-12 远小于此量级，
+ * 仅在浮点精度边界（如 m₁,m₂ 极端不成比例或 δ 接近 π/2 时 cos²→0）触发。
+ */
+const DENOM_EPSILON = 1e-12;
+
+/**
  * ODE 右端函数：计算双摆拉格朗日方程（含线性阻尼）。
  * 输入 state: [θ₁, ω₁, θ₂, ω₂]，返回导数: [ω₁, α₁, ω₂, α₂]。
  */
-export function odeRhs(state: Float64Array, p: PendulumParams): Float64Array {
+export function odeRhs(state: Float64Array, p: PendulumParams, out?: Float64Array): Float64Array {
+  const w1 = state[1]!;
+  const w2 = state[3]!;
+  const b = p.damping;
+
+  const { alpha1, alpha2 } = computeAlphas(state, p);
+
+  // 返回 [ω₁, α₁ - b·ω₁, ω₂, α₂ - b·ω₂]
+  const result = out ?? new Float64Array(4);
+  result[0] = w1;
+  result[1] = alpha1 - b * w1;
+  result[2] = w2;
+  result[3] = alpha2 - b * w2;
+  return result;
+}
+
+/**
+ * 双摆角加速度核心公式 [α₁, α₂]（无阻尼）。
+ * odeRhs 和 angularAcceleration 均调用此函数，避免冗余 ODE 展开。
+ */
+export function computeAlphas(
+  state: Float64Array,
+  p: PendulumParams,
+): { alpha1: number; alpha2: number } {
   const t1 = state[0]!;
   const w1 = state[1]!;
   const t2 = state[2]!;
   const w2 = state[3]!;
-  const { m1, m2, L1, L2, g, damping: b } = p;
+  const { m1, m2, L1, L2, g } = p;
 
   const delta = t2 - t1;
   const sinD = Math.sin(delta);
   const cosD = Math.cos(delta);
 
-  // 标准拉格朗日推导：denom = m1 + m2 - m2·cos²(delta)
   const denom = m1 + m2 - m2 * cosD * cosD;
-  // 防止分母过小：保留符号（Math.sign(0) === 0，需兜底为 1 避免除零）
-  const safeDenom = Math.abs(denom) < 1e-12 ? (Math.sign(denom) || 1) * 1e-12 : denom;
+  const safeDenom = Math.abs(denom) < DENOM_EPSILON
+    ? (Math.sign(denom) || 1) * DENOM_EPSILON
+    : denom;
 
-  // 角加速度（无阻尼部分）
   const alpha1 =
     (m2 * L1 * w1 * w1 * sinD * cosD +
       m2 * g * Math.sin(t2) * cosD +
@@ -34,17 +64,16 @@ export function odeRhs(state: Float64Array, p: PendulumParams): Float64Array {
         (g * Math.sin(t1) * cosD - L1 * w1 * w1 * sinD - g * Math.sin(t2))) /
     (L2 * safeDenom);
 
-  // 返回 [ω₁, α₁ - b·ω₁, ω₂, α₂ - b·ω₂]
-  return new Float64Array([w1, alpha1 - b * w1, w2, alpha2 - b * w2]);
+  return { alpha1, alpha2 };
 }
 
 /**
- * 仅返回角加速度 [α₁, α₂]（无阻尼），供 Velocity Verlet 使用。
+ * 仅返回角加速度 [α₁, α₂]（无阻尼），供 Velocity Verlet / LAB-01 力计算使用。
  */
 export function angularAcceleration(
   state: Float64Array,
   p: PendulumParams,
 ): Float64Array {
-  const rhs = odeRhs(state, { ...p, damping: 0 });
-  return new Float64Array([rhs[1]!, rhs[3]!]);
+  const a = computeAlphas(state, p);
+  return new Float64Array([a.alpha1, a.alpha2]);
 }

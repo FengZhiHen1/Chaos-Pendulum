@@ -421,13 +421,17 @@ function SceneContent({
         const maxFrames = 3;
         let consumed = 0;
         while (simTimeAccRef.current >= dt && consumed < maxFrames) {
-          scheduler.tick();
-          simTimeAccRef.current -= dt;
-          consumed++;
+          const didConsume = scheduler.tick();
+          if (didConsume) {
+            simTimeAccRef.current -= dt;
+            consumed++;
+          } else {
+            // 缓冲区为空且等待批次中，保留累加器等待下一帧
+            break;
+          }
         }
-      } else {
-        simTimeAccRef.current = 0;
       }
+      // 注意：暂停时保留 simTimeAccRef，恢复后首帧可平滑插值
     }
 
     // 蝴蝶效应模式：从 ButterflySimStore 读取

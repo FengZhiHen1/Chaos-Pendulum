@@ -328,10 +328,10 @@ interface ForceFrame {
   T1_mag: number;   T1_angle: number;
   Fi1_t_mag: number; Fi1_t_angle: number;
   Fi1_n_mag: number; Fi1_n_angle: number;
-  Fg2_mag: number;
-  T2_mag: number;
-  Fi2_t_mag: number;
-  Fi2_n_mag: number;
+  Fg2_mag: number; Fg2_angle: number;
+  T2_mag: number;   T2_angle: number;
+  Fi2_t_mag: number; Fi2_t_angle: number;
+  Fi2_n_mag: number; Fi2_n_angle: number;
 }
 
 function computeForceFrame(
@@ -371,27 +371,31 @@ function computeForceFrame(
     T1_mag: T1,   T1_angle: theta1 + Math.PI,
     Fi1_t_mag: Fi1_t, Fi1_t_angle: theta1 + Math.sign(alpha1) * Math.PI / 2,
     Fi1_n_mag: Fi1_n, Fi1_n_angle: theta1 + Math.PI,
-    Fg2_mag: Fg2,
-    T2_mag: T2,
-    Fi2_t_mag: Fi2_t,
-    Fi2_n_mag: Fi2_n,
+    Fg2_mag: Fg2, Fg2_angle: -Math.PI / 2,
+    T2_mag: T2,   T2_angle: theta2 + Math.PI,
+    Fi2_t_mag: Fi2_t, Fi2_t_angle: theta2 + Math.sign(alpha2) * Math.PI / 2,
+    Fi2_n_mag: Fi2_n, Fi2_n_angle: theta2 + Math.PI,
   };
 }
 
 function writeForceFrame(buf: Float64Array, frame: number, f: ForceFrame): void {
   const off = frame * FORCE_STRIDE;
-  buf[off + 0] = f.Fg1_mag;
-  buf[off + 1] = f.Fg1_angle;
-  buf[off + 2] = f.T1_mag;
-  buf[off + 3] = f.T1_angle;
-  buf[off + 4] = f.Fi1_t_mag;
-  buf[off + 5] = f.Fi1_t_angle;
-  buf[off + 6] = f.Fi1_n_mag;
-  buf[off + 7] = f.Fi1_n_angle;
-  buf[off + 8] = f.Fg2_mag;
-  buf[off + 9] = f.T2_mag;
-  buf[off + 10] = f.Fi2_t_mag;
-  buf[off + 11] = f.Fi2_n_mag;
+  buf[off + 0]  = f.Fg1_mag;
+  buf[off + 1]  = f.Fg1_angle;
+  buf[off + 2]  = f.T1_mag;
+  buf[off + 3]  = f.T1_angle;
+  buf[off + 4]  = f.Fi1_t_mag;
+  buf[off + 5]  = f.Fi1_t_angle;
+  buf[off + 6]  = f.Fi1_n_mag;
+  buf[off + 7]  = f.Fi1_n_angle;
+  buf[off + 8]  = f.Fg2_mag;
+  buf[off + 9]  = f.Fg2_angle;
+  buf[off + 10] = f.T2_mag;
+  buf[off + 11] = f.T2_angle;
+  buf[off + 12] = f.Fi2_t_mag;
+  buf[off + 13] = f.Fi2_t_angle;
+  buf[off + 14] = f.Fi2_n_mag;
+  buf[off + 15] = f.Fi2_n_angle;
 }
 
 function updateForceExtrema(f: ForceFrame, simTime: number): void {

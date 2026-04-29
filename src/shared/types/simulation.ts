@@ -9,10 +9,10 @@ export const FRAMES_PER_BATCH = 120;
 /** 单批次 buffer 长度 */
 export const BUFFER_LENGTH = FRAMES_PER_BATCH * FRAME_STRIDE; // = 1680
 
-/** 每帧力数据占用的 float64 数（12 个力字段） */
-export const FORCE_STRIDE = 12;
+/** 每帧力数据占用的 float64 数（20 个力字段，含 ball 2 完整方向角 + 4 保留） */
+export const FORCE_STRIDE = 20;
 /** 单批次力数据 buffer 长度 */
-export const FORCE_BUFFER_LENGTH = FRAMES_PER_BATCH * FORCE_STRIDE; // = 1440
+export const FORCE_BUFFER_LENGTH = FRAMES_PER_BATCH * FORCE_STRIDE; // = 2400
 
 /**
  * 单帧字段偏移:
@@ -49,19 +49,24 @@ export const enum FrameField {
 }
 
 /**
- * 力数据字段偏移（每帧 12 个 float64）:
- *   [0]  Fg1_mag     上摆重力大小 (N)
- *   [1]  Fg1_angle   上摆重力方向角 (rad)，固定 -π/2
- *   [2]  T1_mag      杆 1 张力大小 (N)
- *   [3]  T1_angle    杆 1 张力方向角 (rad)，沿杆向上
- *   [4]  Fi1_t_mag   上摆切向惯性力大小 (N)
- *   [5]  Fi1_t_angle 上摆切向惯性力方向角 (rad)
- *   [6]  Fi1_n_mag   上摆法向惯性力大小 (N)
- *   [7]  Fi1_n_angle 上摆法向惯性力方向角 (rad)
- *   [8]  Fg2_mag     下摆重力大小 (N)
- *   [9]  T2_mag      杆 2 张力大小 (N)
- *   [10] Fi2_t_mag   下摆切向惯性力大小 (N)
- *   [11] Fi2_n_mag   下摆法向惯性力大小 (N)
+ * 力数据字段偏移（每帧 20 个 float64）:
+ *   [0]  Fg1_mag      上摆重力大小 (N)
+ *   [1]  Fg1_angle    上摆重力方向角 (rad)，固定 -π/2
+ *   [2]  T1_mag       杆 1 张力大小 (N)
+ *   [3]  T1_angle     杆 1 张力方向角 (rad)，沿杆向上
+ *   [4]  Fi1_t_mag    上摆切向惯性力大小 (N)
+ *   [5]  Fi1_t_angle  上摆切向惯性力方向角 (rad)
+ *   [6]  Fi1_n_mag    上摆法向惯性力大小 (N)
+ *   [7]  Fi1_n_angle  上摆法向惯性力方向角 (rad)
+ *   [8]  Fg2_mag      下摆重力大小 (N)
+ *   [9]  Fg2_angle    下摆重力方向角 (rad)，固定 -π/2
+ *   [10] T2_mag       杆 2 张力大小 (N)
+ *   [11] T2_angle     杆 2 张力方向角 (rad)，沿杆向上
+ *   [12] Fi2_t_mag    下摆切向惯性力大小 (N)
+ *   [13] Fi2_t_angle  下摆切向惯性力方向角 (rad)
+ *   [14] Fi2_n_mag    下摆法向惯性力大小 (N)
+ *   [15] Fi2_n_angle  下摆法向惯性力方向角 (rad)
+ *   [16..19] 保留
  */
 export const enum ForceField {
   FG1_MAG = 0,
@@ -73,9 +78,13 @@ export const enum ForceField {
   FI1_N_MAG = 6,
   FI1_N_ANGLE = 7,
   FG2_MAG = 8,
-  T2_MAG = 9,
-  FI2_T_MAG = 10,
-  FI2_N_MAG = 11,
+  FG2_ANGLE = 9,
+  T2_MAG = 10,
+  T2_ANGLE = 11,
+  FI2_T_MAG = 12,
+  FI2_T_ANGLE = 13,
+  FI2_N_MAG = 14,
+  FI2_N_ANGLE = 15,
 }
 
 /** 力极值记录 */

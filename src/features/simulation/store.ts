@@ -18,8 +18,6 @@ import { FRAME_STRIDE, FRAMES_PER_BATCH, FrameField } from "@/shared/types";
 
 const DRIFT_THRESHOLD = 0.005;
 const MAX_NAN_FRAMES = 60;
-let nanSkipCount = 0;
-let lastDamping = NaN;
 
 // ─── 帧数据 ─────────────────────────────────────
 
@@ -103,6 +101,12 @@ interface SimulationState extends SimulationFrame {
   isSimulationActive: boolean;
   /** 当前消耗的帧索引 (0..FRAMES_PER_BATCH-1)，供 LAB-01 力数据对齐 */
   consumedFrameIndex: number;
+
+  // ── 内部状态（从模块级变量迁移至 store，避免测试污染）──
+  _nanSkipCount: number;
+  _lastDamping: number;
+  /** 上次能量基线建立时的 resetTrigger 值，用于检测仿真重置 */
+  _energyResetGeneration: number;
 
   // ── SIM-02 Actions ──
   setParam: (key: keyof PendulumParams, value: number) => void;
@@ -188,6 +192,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   energyMax: 0,
   isSimulationActive: false,
   consumedFrameIndex: 0,
+  _nanSkipCount: 0,
+  _lastDamping: NaN,
+  _energyResetGeneration: 0,
 
   // ── SIM-01 Actions ──
 
@@ -214,7 +221,6 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const k = buffer[offset + FrameField.KINETIC_ENERGY]!;
     const v = buffer[offset + FrameField.POTENTIAL_ENERGY]!;
     const e = buffer[offset + FrameField.TOTAL_ENERGY]!;
-    const currentT = buffer[offset + FrameField.T]!;
     const prev = get();
 
     let ei = prev.energyInitial;
@@ -223,21 +229,29 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     let ed = prev.energyDrift;
     let de = prev.driftExceeded;
     let sa = prev.isSimulationActive;
+    let nsc = prev._nanSkipCount;
+    let ld = prev._lastDamping;
+    let erg = prev._energyResetGeneration;
+
+    // 检测仿真重置：resetTrigger 变化意味着新一轮仿真已启动
+    const genChanged = prev.resetTrigger !== erg;
 
     if (isNaN(k) || isNaN(v) || isNaN(e)) {
-      nanSkipCount++;
-      if (nanSkipCount >= MAX_NAN_FRAMES) sa = false;
+      nsc++;
+      if (nsc >= MAX_NAN_FRAMES) sa = false;
     } else {
-      if (nanSkipCount > 0) { nanSkipCount = 0; if (!sa) sa = true; }
+      if (nsc > 0) { nsc = 0; if (!sa) sa = true; }
       const damp = prev.params.damping;
-      if (!isNaN(lastDamping) && lastDamping !== damp) {
+      if (!isNaN(ld) && ld !== damp) {
         de = false;
-        if (damp === 0 && lastDamping > 0) { ei = e; emin = e; emax = e; }
+        if (damp === 0 && ld > 0) { ei = e; emin = e; emax = e; }
       }
-      lastDamping = damp;
+      ld = damp;
 
-      if (prev.t > 1.0 && currentT < 0.1) {
+      if (genChanged) {
+        // 仿真重置：重新建立能量基线
         ei = e; ed = 0; de = false; emin = e; emax = e; sa = true;
+        erg = prev.resetTrigger;
       } else if (ei === null || !sa) {
         ei = e; ed = 0; emin = e; emax = e; sa = true;
       } else {
@@ -249,7 +263,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     }
 
     set({
-      t: currentT, theta1: buffer[offset + FrameField.THETA1]!,
+      t: buffer[offset + FrameField.T]!,
+      theta1: buffer[offset + FrameField.THETA1]!,
       theta1Dot: buffer[offset + FrameField.THETA1_DOT]!,
       theta2: buffer[offset + FrameField.THETA2]!,
       theta2Dot: buffer[offset + FrameField.THETA2_DOT]!,
@@ -261,6 +276,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyInitial: ei, energyDrift: ed, driftExceeded: de,
       energyMin: emin, energyMax: emax, isSimulationActive: sa,
       consumedFrameIndex: frameIndex,
+      _nanSkipCount: nsc, _lastDamping: ld, _energyResetGeneration: erg,
       state: {
         theta1: buffer[offset + FrameField.THETA1]!,
         omega1: buffer[offset + FrameField.THETA1_DOT]!,
@@ -429,6 +445,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMax: 0,
       isSimulationActive: false,
       consumedFrameIndex: 0,
+      _nanSkipCount: 0,
+      _lastDamping: NaN,
+      _energyResetGeneration: s.resetTrigger + 1,
       resetTrigger: s.resetTrigger + 1,
       state: {
         theta1: defaultFrame.theta1,

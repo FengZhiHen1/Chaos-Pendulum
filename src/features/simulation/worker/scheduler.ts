@@ -220,10 +220,11 @@ export class SimulationScheduler {
     this.send({ type: "reset", initialConditions });
   }
 
-  /** 外部驱动：消费一帧数据（external tick 模式下由 useFrame 调用） */
-  tick(): void {
-    if (!this.running) return;
-    this.consumeOneFrame();
+  /** 外部驱动：消费一帧数据（external tick 模式下由 useFrame 调用）。
+   * @returns 是否实际消费了一帧（activeBuffer 非空时消费成功） */
+  tick(): boolean {
+    if (!this.running) return false;
+    return this.consumeOneFrame();
   }
 
   get isRunning(): boolean {
@@ -420,8 +421,9 @@ export class SimulationScheduler {
     this.rafId = requestAnimationFrame(() => this.loop());
   }
 
-  /** 消费一帧数据（内部 rAF 和外部 tick 共用） */
-  private consumeOneFrame(): void {
+  /** 消费一帧数据（内部 rAF 和外部 tick 共用）。
+   * @returns 是否实际消费了一帧 */
+  private consumeOneFrame(): boolean {
     const store = useSimulationStore.getState();
 
     if (this.activeBuffer) {
@@ -481,9 +483,11 @@ export class SimulationScheduler {
           this.activeFrameCount = FRAMES_PER_BATCH;
         }
       }
+      return true;
     } else if (!this.pendingBatch) {
       this.requestNextBatch();
     }
+    return false;
   }
 
   /** 获取供渲染插值用的前后帧快照 */

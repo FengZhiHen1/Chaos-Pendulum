@@ -45,7 +45,7 @@ function readForce(data: Float64Array, idx: 1 | 2, kind: "g" | "t" | "i_t" | "i_
   }
 }
 
-/** 读取力角度 */
+/** 读取力角度（ball 1 和 ball 2 均从缓冲区直接读取） */
 function readAngle(data: Float64Array, idx: 1 | 2, kind: "g" | "t" | "i_t" | "i_n"): number {
   if (idx === 1) {
     switch (kind) {
@@ -55,15 +55,11 @@ function readAngle(data: Float64Array, idx: 1 | 2, kind: "g" | "t" | "i_t" | "i_
       case "i_n": return data[ForceField.FI1_N_ANGLE]!;
     }
   } else {
-    // 质量 2 力角度从 theta2 推导（Worker 不传输质量 2 的角度）
-    const sim = useSimulationStore.getState();
-    const t2 = sim.theta2;
-    const a2 = sim.alpha2;
     switch (kind) {
-      case "g": return -Math.PI / 2;
-      case "t": return t2 + Math.PI;
-      case "i_t": return t2 + Math.sign(a2 || 1) * Math.PI / 2;
-      case "i_n": return t2 + Math.PI;
+      case "g": return data[ForceField.FG2_ANGLE]!;
+      case "t": return data[ForceField.T2_ANGLE]!;
+      case "i_t": return data[ForceField.FI2_T_ANGLE]!;
+      case "i_n": return data[ForceField.FI2_N_ANGLE]!;
     }
   }
 }

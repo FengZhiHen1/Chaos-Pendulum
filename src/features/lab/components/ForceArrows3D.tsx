@@ -104,12 +104,11 @@ function SingleArrow({ meta }: SingleArrowProps) {
         case "Fi1_n": mag = f[off + ForceField.FI1_N_MAG]!; angle = f[off + ForceField.FI1_N_ANGLE]!; break;
       }
     } else {
-      const t2 = sim.theta2, a2 = sim.alpha2;
       switch (meta.key) {
-        case "Fg2": mag = f[off + ForceField.FG2_MAG]!; angle = -Math.PI / 2; break;
-        case "T2": mag = f[off + ForceField.T2_MAG]!; angle = t2 + Math.PI; break;
-        case "Fi2_t": mag = f[off + ForceField.FI2_T_MAG]!; angle = t2 + Math.sign(a2 || 1) * Math.PI / 2; break;
-        case "Fi2_n": mag = f[off + ForceField.FI2_N_MAG]!; angle = t2 + Math.PI; break;
+        case "Fg2": mag = f[off + ForceField.FG2_MAG]!; angle = f[off + ForceField.FG2_ANGLE]!; break;
+        case "T2": mag = f[off + ForceField.T2_MAG]!; angle = f[off + ForceField.T2_ANGLE]!; break;
+        case "Fi2_t": mag = f[off + ForceField.FI2_T_MAG]!; angle = f[off + ForceField.FI2_T_ANGLE]!; break;
+        case "Fi2_n": mag = f[off + ForceField.FI2_N_MAG]!; angle = f[off + ForceField.FI2_N_ANGLE]!; break;
       }
     }
 
