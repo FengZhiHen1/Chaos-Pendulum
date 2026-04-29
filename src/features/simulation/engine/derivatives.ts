@@ -17,8 +17,8 @@ export function odeRhs(state: Float64Array, p: PendulumParams): Float64Array {
 
   // 标准拉格朗日推导：denom = m1 + m2 - m2·cos²(delta)
   const denom = m1 + m2 - m2 * cosD * cosD;
-  // 防止分母过小：保留符号
-  const safeDenom = Math.abs(denom) < 1e-12 ? Math.sign(denom) * 1e-12 : denom;
+  // 防止分母过小：保留符号（Math.sign(0) === 0，需兜底为 1 避免除零）
+  const safeDenom = Math.abs(denom) < 1e-12 ? (Math.sign(denom) || 1) * 1e-12 : denom;
 
   // 角加速度（无阻尼部分）
   const alpha1 =

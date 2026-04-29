@@ -25,6 +25,9 @@ import {
 // ─── 工具函数 ─────────────────────────────────
 
 function computeOverallProgress(phase: BootPhase, phaseProgress: number): number {
+  if (phase === "ready") return 1;
+  if (phase === "idle") return 0;
+
   const phases: BootPhase[] = [
     "mounting",
     "worker_init",
@@ -78,7 +81,6 @@ export interface UseBootSequenceAPI {
   error: BootError | null;
   transitioning: boolean;
   showChildren: boolean;
-  handleEnter: () => void;
   handleRetry: () => void;
   handleOffline: () => void;
   mergedConfig: Required<BootConfig>;
@@ -93,6 +95,7 @@ export function useBootSequence(config: BootConfig = {}): UseBootSequenceAPI {
   const bootingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const workerTimeoutRef = useRef(mergedConfig.workerTimeoutMs);
+  const retryCountRef = useRef(0);
 
   const updateProgress = useCallback((patch: Partial<BootProgress>) => {
     setBootProgress((prev) => {
@@ -118,14 +121,15 @@ export function useBootSequence(config: BootConfig = {}): UseBootSequenceAPI {
     document.documentElement.classList.remove("app-loading");
     updateProgress({ phase: "ready", phaseProgress: 1, description: "准备就绪" });
     setLoadingState("ready");
-  }, [setLoadingState, updateProgress]);
 
-  const handleEnter = useCallback(() => {
+    // 自动触发过渡动画：LoadingScreen 淡出 → AppShell 淡入
     setTransitioning(true);
+    const fadeOutDelay = 200; // LoadingScreen 淡出持续时间
+    const staggerDelay = mergedConfig.transitionDurationMs; // AppShell 淡入延迟
     setTimeout(() => {
       setShowChildren(true);
-    }, 200);
-  }, []);
+    }, fadeOutDelay + staggerDelay);
+  }, [setLoadingState, updateProgress, mergedConfig.transitionDurationMs]);
 
   const handleError = useCallback(
     (type: BootError["type"], message: string, retryable = true) => {
@@ -137,14 +141,24 @@ export function useBootSequence(config: BootConfig = {}): UseBootSequenceAPI {
   );
 
   const handleRetry = useCallback(() => {
+    // 设计文档：首次超时后 workerTimeoutMs *= 2；第 2 次仍超时不再重试
+    if (retryCountRef.current >= 1) {
+      handleError(
+        "worker",
+        "您的设备可能不满足性能要求，请使用桌面浏览器",
+        false,
+      );
+      return;
+    }
     setError(null);
     setBootProgress(DEFAULT_BOOT_PROGRESS);
     setTransitioning(false);
     setShowChildren(false);
     workerTimeoutRef.current *= 2;
+    retryCountRef.current++;
     bootingRef.current = false;
     setTimeout(() => startBoot(), 100);
-  }, []);
+  }, [handleError]);
 
   const handleOffline = useCallback(() => {
     setError(null);
@@ -324,7 +338,6 @@ export function useBootSequence(config: BootConfig = {}): UseBootSequenceAPI {
     error,
     transitioning,
     showChildren,
-    handleEnter,
     handleRetry,
     handleOffline,
     mergedConfig,

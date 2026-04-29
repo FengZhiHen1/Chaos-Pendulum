@@ -1,11 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { CHAOS_QUOTES } from "@/shared/data/chaos-quotes";
 import type { BootProgress } from "./types";
 
 interface LoadingScreenProps {
   progress: BootProgress;
   showQuotes: boolean;
-  onEnter?: () => void;
   transitioning?: boolean;
 }
 
@@ -16,27 +15,43 @@ function formatEta(seconds: number): string {
   return `预计剩余 ${mins} 分钟`;
 }
 
-export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: LoadingScreenProps) {
-  const [quoteIndex, setQuoteIndex] = useState(0);
-  const [fadeKey, setFadeKey] = useState(0);
-
+export function LoadingScreen({ progress, showQuotes, transitioning }: LoadingScreenProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [nextIndex, setNextIndex] = useState(1);
+  const [isCrossfading, setIsCrossfading] = useState(false);
   const quotes = useMemo(() => CHAOS_QUOTES, []);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 名言轮播：每 5 秒切换
+  // 名言轮播：每 5 秒交叉淡入淡出
   useEffect(() => {
     if (!showQuotes || quotes.length === 0) return;
-    const timer = setInterval(() => {
-      setQuoteIndex((prev) => (prev + 1) % quotes.length);
-      setFadeKey((k) => k + 1);
+
+    intervalRef.current = setInterval(() => {
+      setIsCrossfading(true);
+      crossfadeTimerRef.current = setTimeout(() => {
+        setCurrentIndex((prev) => {
+          const next = (prev + 1) % quotes.length;
+          setNextIndex((next + 1) % quotes.length);
+          return next;
+        });
+        setIsCrossfading(false);
+      }, 500); // 交叉淡出/淡入时长 500ms
     }, 5000);
-    return () => clearInterval(timer);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (crossfadeTimerRef.current) clearTimeout(crossfadeTimerRef.current);
+    };
   }, [showQuotes, quotes.length]);
 
   const pct = Math.round(progress.overallProgress * 100);
+  const currentQuote = quotes[currentIndex];
+  const nextQuote = quotes[nextIndex];
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface overflow-hidden select-none transition-opacity duration-300 ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface overflow-hidden select-none transition-opacity duration-200 ${
         transitioning ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -97,8 +112,8 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
 
         {/* 标题 */}
         <div className="flex flex-col items-center gap-1 animate-fade-in-up">
-          <h1 className="text-2xl font-bold text-on-surface tracking-[0.1em]">
-            混沌实验室
+          <h1 className="text-2xl font-semibold text-on-surface tracking-[0.1em]">
+            双摆混沌实验室
           </h1>
           <p className="text-base font-light text-on-surface-variant">
             Chaos Pendulum Lab
@@ -122,38 +137,39 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
             </span>
           </div>
           {progress.etaSeconds > 0 && (
-            <span className="text-on-surface-variant/[0.5] text-xs">
+            <span className="text-on-surface-variant text-xs">
               {formatEta(progress.etaSeconds)}
             </span>
           )}
         </div>
 
-        {/* 准备就绪：进入按钮 */}
-        {onEnter && progress.phase === "ready" && (
-          <button
-            type="button"
-            onClick={onEnter}
-            className="mt-4 px-8 py-3 rounded-lg bg-primary text-[#0D1117] font-medium text-lg tracking-wider
-                       hover:bg-primary-hover
-                       active:scale-95 transition-all duration-200
-                       animate-fade-in-up"
-          >
-            进入应用
-          </button>
-        )}
-
-        {/* 混沌名言 */}
-        {showQuotes && quotes.length > 0 && !onEnter && (
-          <div className="max-w-md text-center mt-2 min-h-[80px]">
+        {/* 混沌名言：交叉淡入淡出 */}
+        {showQuotes && quotes.length > 0 && (
+          <div className="relative max-w-md text-center mt-2 min-h-[80px] w-full">
+            {/* 当前名言：淡出 */}
             <div
-              key={fadeKey}
-              className="flex flex-col items-center animate-crossfade-in"
+              className={`absolute inset-0 flex flex-col items-center transition-opacity duration-500 ease-out ${
+                isCrossfading ? "opacity-0" : "opacity-100"
+              }`}
             >
               <p className="text-on-surface-variant text-base italic leading-relaxed">
-                &ldquo;{quotes[quoteIndex]!.quote}&rdquo;
+                &ldquo;{currentQuote?.quote}&rdquo;
               </p>
               <p className="text-on-surface-variant/[0.5] text-sm mt-2">
-                — {quotes[quoteIndex]!.author}
+                — {currentQuote?.author}
+              </p>
+            </div>
+            {/* 下一条名言：淡入 */}
+            <div
+              className={`absolute inset-0 flex flex-col items-center transition-opacity duration-500 ease-out ${
+                isCrossfading ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <p className="text-on-surface-variant text-base italic leading-relaxed">
+                &ldquo;{nextQuote?.quote}&rdquo;
+              </p>
+              <p className="text-on-surface-variant/[0.5] text-sm mt-2">
+                — {nextQuote?.author}
               </p>
             </div>
           </div>
@@ -176,10 +192,6 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes crossfade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
         .animate-pendulum-upper {
           animation: pendulum-swing-upper 2.5s ease-in-out infinite;
           transform-origin: 32px 8px;
@@ -190,9 +202,6 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
         }
         .animate-fade-in-up {
           animation: fade-in-up 0.8s ease-out both;
-        }
-        .animate-crossfade-in {
-          animation: crossfade-in 0.5s ease-out both;
         }
       `}</style>
     </div>

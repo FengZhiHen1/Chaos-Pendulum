@@ -15,6 +15,10 @@ export interface SimSideState {
   state: StateVector;
   params: PendulumParams;
   energy: EnergySnapshot;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
   workerReady: boolean;
   simTime: number;
 }
@@ -39,7 +43,12 @@ interface ButterflySimStoreState {
   pause: () => void;
   reset: () => void;
   updateParams: (patch: Partial<PendulumParams>) => void;
-  _updateSide: (side: "A" | "B", state: StateVector, energy: EnergySnapshot) => void;
+  _updateSide: (
+    side: "A" | "B",
+    state: StateVector,
+    energy: EnergySnapshot,
+    derived: { x1: number; y1: number; x2: number; y2: number },
+  ) => void;
   _setWorkerReady: (side: "A" | "B", ready: boolean) => void;
   setEditMode: (mode: DeltaEditMode) => void;
   setDelta: (deltaDeg: number) => void;
@@ -52,6 +61,7 @@ function defaultSideState(): SimSideState {
     state: { theta1: 0, omega1: 0, theta2: 0, omega2: 0 },
     params: { m1: 1.0, m2: 1.0, L1: 1.0, L2: 1.0, g: 9.81, damping: 0 },
     energy: { kinetic: 0, potential: 0, total: 0 },
+    x1: 0, y1: 0, x2: 0, y2: 0,
     workerReady: false,
     simTime: 0,
   };
@@ -137,7 +147,7 @@ export const useButterflyStore = create<ButterflySimStoreState>((set, get) => ({
     }
   },
 
-  _updateSide: (side, state, energy) => {
+  _updateSide: (side, state, energy, derived) => {
     const current = get();
     const sideKey = side === "A" ? "sideA" : "sideB";
     const otherKey = side === "A" ? "sideB" : "sideA";
@@ -145,6 +155,10 @@ export const useButterflyStore = create<ButterflySimStoreState>((set, get) => ({
       ...current[sideKey],
       state: { ...state },
       energy: { ...energy },
+      x1: derived.x1,
+      y1: derived.y1,
+      x2: derived.x2,
+      y2: derived.y2,
     };
 
     // 计算分离度

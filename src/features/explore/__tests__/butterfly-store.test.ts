@@ -38,8 +38,8 @@ describe("ButterflySimStore", () => {
   it("_updateSide 正确计算当前分离度", () => {
     const store = useButterflyStore.getState();
     // 摆 A 状态不变，摆 B 产生差异
-    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
-    store._updateSide("B", { theta1: 0.5, omega1: 0, theta2: 0.5, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
+    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
+    store._updateSide("B", { theta1: 0.5, omega1: 0, theta2: 0.5, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
 
     const s = useButterflyStore.getState();
     expect(s.separation.currentSeparation).toBeCloseTo(Math.sqrt(0.5 * 0.5 + 0.5 * 0.5), 4);
@@ -47,8 +47,8 @@ describe("ButterflySimStore", () => {
 
   it("分离度 > π/2 时 isFullyDecoupled 为 true", () => {
     const store = useButterflyStore.getState();
-    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
-    store._updateSide("B", { theta1: Math.PI, omega1: 0, theta2: Math.PI, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
+    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
+    store._updateSide("B", { theta1: Math.PI, omega1: 0, theta2: Math.PI, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
 
     const s = useButterflyStore.getState();
     const expected = Math.sqrt(Math.PI * Math.PI + Math.PI * Math.PI);
@@ -62,9 +62,9 @@ describe("ButterflySimStore", () => {
     useButterflyStore.getState().init(baseParams, { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, 0);
     const store = useButterflyStore.getState();
     // 制造偏差
-    store._updateSide("B", { theta1: 0.3, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
+    store._updateSide("B", { theta1: 0.3, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
     // 收回到较小偏差
-    store._updateSide("B", { theta1: 0.1, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
+    store._updateSide("B", { theta1: 0.1, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
 
     const s = useButterflyStore.getState();
     expect(s.separation.maxSeparation).toBeCloseTo(0.3, 4);
@@ -141,8 +141,8 @@ describe("ButterflySimStore", () => {
 
   it("reset 后分离度清零", () => {
     const store = useButterflyStore.getState();
-    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
-    store._updateSide("B", { theta1: 3, omega1: 0, theta2: 3, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 });
+    store._updateSide("A", { theta1: 0, omega1: 0, theta2: 0, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
+    store._updateSide("B", { theta1: 3, omega1: 0, theta2: 3, omega2: 0 }, { kinetic: 0, potential: 0, total: 0 }, { x1: 0, y1: 0, x2: 0, y2: 0 });
     expect(useButterflyStore.getState().separation.currentSeparation).toBeGreaterThan(0);
 
     store.reset();

@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
-import { useSimulationStore, ball2Position } from "@/features/simulation";
+import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useTrailBuffer } from "../hooks/useTrailBuffer";
 import { useSceneController } from "../hooks/useSceneController";
@@ -474,13 +474,16 @@ function SceneContent({
     if (!effectiveRunning) return;
 
     // ── 计算 3D 位置 ──
-    const ball1Pos = new Vector3(
-      p.L1 * Math.sin(theta1),
-      -p.L1 * Math.cos(theta1),
-      0,
-    );
-    const b2 = ball2Position(sv, p);
-    const ball2Pos = new Vector3(b2.x, b2.y, b2.z);
+    // 直接使用 Worker 已算好的笛卡尔坐标，消除参数-状态异步不匹配导致的闪现
+    let ball1Pos: Vector3;
+    let ball2Pos: Vector3;
+    if (bfSide) {
+      ball1Pos = new Vector3(bfSide.x1, bfSide.y1, 0);
+      ball2Pos = new Vector3(bfSide.x2, bfSide.y2, 0);
+    } else {
+      ball1Pos = new Vector3(store.x1, store.y1, 0);
+      ball2Pos = new Vector3(store.x2, store.y2, 0);
+    }
 
     lastValidBall1Ref.current.copy(ball1Pos);
     lastValidBall2Ref.current.copy(ball2Pos);

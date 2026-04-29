@@ -14,15 +14,10 @@ export function BootManager({ config = {}, children }: BootManagerProps) {
     error,
     transitioning,
     showChildren,
-    handleEnter,
     handleRetry,
     handleOffline,
     mergedConfig,
   } = useBootSequence(config);
-
-  const loadingState = bootProgress.phase === "ready"
-    ? "ready"
-    : error ? "error" : "loading";
 
   return (
     <>
@@ -30,7 +25,6 @@ export function BootManager({ config = {}, children }: BootManagerProps) {
         <LoadingScreen
           progress={bootProgress}
           showQuotes={mergedConfig.showQuotes}
-          onEnter={loadingState === "ready" ? handleEnter : undefined}
           transitioning={transitioning}
         />
       )}

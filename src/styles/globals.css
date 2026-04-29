@@ -33,3 +33,22 @@
   10%, 50%, 90% { transform: translateX(-4px); }
   30%, 70% { transform: translateX(4px); }
 }
+
+/* ── AppShell Staggered Entrance ── */
+@keyframes appshell-stage-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes appshell-panel-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-appshell-stage {
+  animation: appshell-stage-fade-in 400ms ease-out both;
+}
+
+.animate-appshell-panel {
+  animation: appshell-panel-fade-in 300ms ease-out 200ms both;
+}

@@ -173,7 +173,14 @@ export class ButterflyScheduler {
           total: buf[offset + 11]!,
         };
 
-        store._updateSide(side, stateVec, energy);
+        const derived = {
+          x1: buf[offset + 5]!,
+          y1: buf[offset + 6]!,
+          x2: buf[offset + 7]!,
+          y2: buf[offset + 8]!,
+        };
+
+        store._updateSide(side, stateVec, energy, derived);
 
         // 归还 buffer
         sw.pool.releaseBuffer(resp.buffer);

@@ -38,7 +38,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="h-screen w-screen flex flex-col bg-surface text-on-surface">
         {/* 桌面端顶部导航 48px */}
         {isDesktop && (
-          <nav className="h-12 flex items-center px-6 bg-surface-container-lowest shrink-0">
+          <nav className="h-12 flex items-center px-6 bg-surface-container-lowest shrink-0 animate-appshell-panel">
             <span className="text-sm font-semibold tracking-wider text-on-surface mr-8 shrink-0">
               双摆混沌实验室
             </span>
@@ -47,7 +47,7 @@ export function AppShell({ children }: AppShellProps) {
         )}
 
         {/* 主内容区：各模式页面自行管理内部布局 */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden animate-appshell-stage">
           <ModeErrorBoundary>
             {activeContent ?? (
               <div className="h-full flex items-center justify-center text-on-surface-variant">
@@ -60,7 +60,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* 平板/手机端底部导航 */}
         {!isDesktop && (
           <nav
-            className="h-12 flex items-center bg-surface-container-lowest shrink-0"
+            className="h-12 flex items-center bg-surface-container-lowest shrink-0 animate-appshell-panel"
             style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
           >
             <GlobalNavBar />

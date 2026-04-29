@@ -23,7 +23,7 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
 
       <div className="relative flex flex-col items-center gap-5 max-w-sm px-6">
         {/* 警告图标 */}
-        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-separation-alert/20 flex items-center justify-center">
           <svg
             width="32"
             height="32"
@@ -33,7 +33,7 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-red-400"
+            className="text-separation-alert"
           >
             <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
             <line x1="12" x2="12" y1="9" y2="13" />
@@ -46,16 +46,28 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
         <p className="text-on-surface-variant text-sm text-center">{error.message}</p>
 
         <div className="flex gap-4 mt-2">
+          {/* 重试按钮：Primary 样式 */}
           <button
+            type="button"
             onClick={onRetry}
-            className="px-5 py-2.5 bg-primary text-[#0D1117] rounded-lg font-medium text-sm hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
+            disabled={!error.retryable}
+            className="px-5 py-2.5 rounded-lg bg-primary text-[#0D1117] font-medium text-sm
+                       hover:bg-primary-hover active:scale-95 transition-all duration-200
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow
+                       disabled:opacity-40 disabled:cursor-not-allowed"
           >
             重试
           </button>
+          {/* 离线模式按钮：Outline 样式 */}
           {showOffline && (
             <button
+              type="button"
               onClick={onOffline}
-              className="px-5 py-2.5 border border-white/5 text-on-surface rounded-lg font-medium text-sm hover:bg-surface-container-low transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
+              className="px-5 py-2.5 rounded-lg border border-on-surface-variant/20
+                         text-on-surface font-medium text-sm
+                         hover:bg-surface-container-low hover:border-on-surface-variant/40
+                         active:scale-95 transition-all duration-200
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
             >
               离线模式
             </button>
