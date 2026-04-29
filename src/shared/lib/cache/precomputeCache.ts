@@ -214,7 +214,14 @@ export async function loadPrecomputeData<T extends PrecomputeDataType>(
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const json = await response.json();
+      // Python json.dumps 将 float('nan')/inf 序列化为 NaN/Infinity，
+      // 这些 token 不在 JSON 标准中，JS 的 JSON.parse 会抛 SyntaxError。
+      // 清洗为 null 后再解析。
+      const rawText = await response.text();
+      const cleanText = rawText
+        .replace(/\bNaN\b/g, "null")
+        .replace(/-?Infinity/g, "null");
+      const json = JSON.parse(cleanText);
 
       // 3. 校验 metadata
       if (json.metadata?.type !== expectedType) {

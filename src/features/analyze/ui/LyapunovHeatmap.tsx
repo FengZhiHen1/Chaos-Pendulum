@@ -126,7 +126,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
     let hasValid = false;
     for (const row of grid) {
       for (const v of row) {
-        if (!isNaN(v)) {
+        if (v !== null && !isNaN(v)) {
           hasValid = true;
           if (v < minVal) minVal = v;
           if (v > maxVal) maxVal = v;
@@ -169,7 +169,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
           const pw = Math.ceil((x + 1) * cellW) - px;
           const ph = Math.ceil((y + 1) * cellH) - py;
 
-          if (v === undefined || isNaN(v)) {
+          if (v === null || v === undefined || isNaN(v)) {
             offCtx.fillStyle = "#333333";
           } else {
             offCtx.fillStyle = colorScale(v);
@@ -286,7 +286,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
     if (col < 0 || col >= stepsX || row < 0 || row >= stepsY) return;
 
     const value = gridData.grid[row]?.[col];
-    if (value === undefined || isNaN(value)) {
+    if (value === null || value === undefined || isNaN(value)) {
       console.info(`跳过 NaN 格点 (${col}, ${row})`);
       return;
     }

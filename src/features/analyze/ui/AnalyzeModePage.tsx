@@ -1,5 +1,4 @@
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useAnalysisView } from "../hooks/useAnalysisView";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
@@ -15,7 +14,7 @@ const LYAPUNOV_PATHS = {
 const BIFURCATION_PATH = "/assets/bifurcation-a1b3f2e8.json";
 
 export function AnalyzeModePage() {
-  const { activeView, setActiveView, loadStatus, isDesktop } =
+  const { activeView, setActiveView, isDesktop } =
     useAnalysisView();
 
   return (
@@ -48,41 +47,17 @@ export function AnalyzeModePage() {
         </Tabs>
 
         <div className="flex-1 min-h-0">
-          {/* 加载骨架屏 */}
-          {loadStatus === "loading" && (
-            <div className="h-full space-y-3 p-2">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-[60%] w-full" />
-              <Skeleton className="h-4 w-64" />
-            </div>
+          {activeView === "lyapunov" && (
+            <LyapunovHeatmap dataPaths={LYAPUNOV_PATHS} />
           )}
-
-          {/* 加载失败降级 */}
-          {loadStatus === "error" && (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-on-surface-variant">
-              <p className="text-sm">离线模式：该分析功能需预计算数据支持</p>
-              <p className="text-xs text-on-surface-variant/60">
-                请检查网络连接后刷新页面
-              </p>
-            </div>
+          {activeView === "bifurcation" && (
+            <BifurcationPlot dataPath={BIFURCATION_PATH} />
           )}
-
-          {/* 图表内容 */}
-          {(loadStatus === "ready" || loadStatus === "idle") && (
-            <>
-              {activeView === "lyapunov" && (
-                <LyapunovHeatmap dataPaths={LYAPUNOV_PATHS} />
-              )}
-              {activeView === "bifurcation" && (
-                <BifurcationPlot dataPath={BIFURCATION_PATH} />
-              )}
-              {activeView === "poincare" && <PoincareSection />}
-              {activeView === "energy-landscape" && (
-                <div className="h-full flex items-center justify-center text-on-surface-variant">
-                  <p>能量景观 — 待实现 (P2)</p>
-                </div>
-              )}
-            </>
+          {activeView === "poincare" && <PoincareSection />}
+          {activeView === "energy-landscape" && (
+            <div className="h-full flex items-center justify-center text-on-surface-variant">
+              <p>能量景观 — 待实现 (P2)</p>
+            </div>
           )}
         </div>
       </div>
