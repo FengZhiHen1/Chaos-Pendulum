@@ -134,7 +134,7 @@ export class ButterflyScheduler {
       type: "init",
       params,
       initialConditions: ic,
-      method: "RK4",
+      method: "RKF45",
     });
 
     return sw;
@@ -237,7 +237,7 @@ export class ButterflyScheduler {
       type: "init",
       params,
       initialConditions: ic,
-      method: "RK4",
+      method: "RKF45",
     });
   }
 

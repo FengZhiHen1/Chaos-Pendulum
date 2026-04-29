@@ -58,9 +58,9 @@ describe("odeRhs", () => {
 // ─── 积分器测试 ─────────────────────────────────
 
 describe("integratorStep", () => {
-  it("RK4 单步后状态不含 NaN", () => {
+  it("RKF45 单步后状态不含 NaN", () => {
     const state = new Float64Array([Math.PI / 2, 0, Math.PI / 2, 0]);
-    integratorStep(state, defaultParams, 1 / 60, "RK4");
+    integratorStep(state, defaultParams, 1 / 60, "RKF45");
     expect(hasInvalidValue(state)).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe("integratorStep", () => {
     expect(hasInvalidValue(state)).toBe(false);
   });
 
-  it("RK4 能量漂移在可接受范围内（短时间）", () => {
+  it("RKF45 能量漂移在可接受范围内（短时间）", () => {
     // 使用非零初始能量的条件：θ₁=60°, θ₂=-45°
     const state = new Float64Array([Math.PI / 3, 0, -Math.PI / 4, 0]);
     const dt = 1 / 60;
@@ -84,7 +84,7 @@ describe("integratorStep", () => {
     expect(Math.abs(initialEnergy)).toBeGreaterThan(1); // 确保能量非零
 
     for (let i = 0; i < 600; i++) {
-      integratorStep(state, defaultParams, dt, "RK4");
+      integratorStep(state, defaultParams, dt, "RKF45");
     }
 
     const finalEnergy = computeDerived(state, defaultParams).totalEnergy;
@@ -108,11 +108,11 @@ describe("integratorStep", () => {
     expect(isFinite(e.totalEnergy)).toBe(true);
   });
 
-  it("未知方法回退为 RK4", () => {
+  it("未知方法回退为 RKF45", () => {
     const state = new Float64Array([Math.PI / 2, 0, Math.PI / 2, 0]);
     // 不应抛出异常
     expect(() => {
-      integratorStep(state, defaultParams, 1 / 60, "Unknown" as "RK4");
+      integratorStep(state, defaultParams, 1 / 60, "Unknown" as "RKF45");
     }).not.toThrow();
     expect(hasInvalidValue(state)).toBe(false);
   });

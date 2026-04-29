@@ -29,7 +29,7 @@ export function useLabValidation(): UseLabValidationAPI {
     setAllPassed(false);
 
     setTimeout(() => {
-      const results = runAllValidations("RK4");
+      const results = runAllValidations("RKF45");
       let allOk = true;
       for (const r of results) {
         setValidationResult(r.test, r.passed ? "passed" : "failed");

@@ -38,7 +38,7 @@ function resetStore(): void {
   useSimulationStore.setState({
     params: { ...DEFAULT_PARAMS },
     initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
-    method: "RK4",
+    method: "RKF45",
     isRunning: true,
     t: 0,
     theta1: Math.PI / 2,

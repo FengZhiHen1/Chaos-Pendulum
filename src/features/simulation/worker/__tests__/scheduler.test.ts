@@ -166,7 +166,7 @@ describe("SimulationScheduler 启动与初始化", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1.0, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     const initMsg = worker.lastPost();
@@ -179,14 +179,14 @@ describe("SimulationScheduler 启动与初始化", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.clearPosts();
 
     scheduler.start(
       { m1: 2, m2: 2, L1: 2, L2: 2, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     expect(worker.posts.length).toBe(0);
@@ -197,7 +197,7 @@ describe("SimulationScheduler 启动与初始化", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.clearPosts();
 
@@ -218,7 +218,7 @@ describe("SimulationScheduler 批处理生命周期", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     // ready → requestNextBatch
     worker.dispatchMessage({ type: "ready" });
@@ -249,7 +249,7 @@ describe("SimulationScheduler 批处理生命周期", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -277,7 +277,7 @@ describe("SimulationScheduler 批处理生命周期", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
     worker.clearPosts();
@@ -309,7 +309,7 @@ describe("SimulationScheduler 双缓冲", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -351,7 +351,7 @@ describe("SimulationScheduler 双缓冲", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -388,7 +388,7 @@ describe("SimulationScheduler 池耗尽处理", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     // 模拟 20 个批次的完整生命周期（超出池容量 10）
@@ -418,7 +418,7 @@ describe("SimulationScheduler Worker 崩溃恢复", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     // 先完成一个批次使 store 有当前状态
@@ -447,7 +447,7 @@ describe("SimulationScheduler Worker 崩溃恢复", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     // 第一个 mock Worker（由 createWorker 在 start 时创建）
@@ -478,7 +478,7 @@ describe("SimulationScheduler 超时处理", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -505,7 +505,7 @@ describe("SimulationScheduler Worker 错误响应", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     worker.dispatchMessage({
@@ -529,7 +529,7 @@ describe("SimulationScheduler 力数据转发 (LAB-01)", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -556,7 +556,7 @@ describe("SimulationScheduler 力数据转发 (LAB-01)", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -602,7 +602,7 @@ describe("SimulationScheduler 庞加莱截面转发", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -633,7 +633,7 @@ describe("SimulationScheduler 庞加莱截面转发", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -662,7 +662,7 @@ describe("SimulationScheduler pause / resume / destroy / reset", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     expect(scheduler.isRunning).toBe(true);
 
@@ -678,7 +678,7 @@ describe("SimulationScheduler pause / resume / destroy / reset", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     scheduler.pause();
 
@@ -698,7 +698,7 @@ describe("SimulationScheduler pause / resume / destroy / reset", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
 
     scheduler.destroy();
@@ -712,7 +712,7 @@ describe("SimulationScheduler pause / resume / destroy / reset", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
     worker.clearPosts();
@@ -777,7 +777,7 @@ describe("SimulationScheduler 插值快照", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -820,7 +820,7 @@ describe("SimulationScheduler 部分批次", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 
@@ -840,7 +840,7 @@ describe("SimulationScheduler 部分批次", () => {
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
-      "RK4",
+      "RKF45",
     );
     worker.dispatchMessage({ type: "ready" });
 

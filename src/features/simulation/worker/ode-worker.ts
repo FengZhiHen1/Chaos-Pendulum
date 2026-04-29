@@ -8,28 +8,42 @@ import type {
   ForceExtrema,
 } from "@/shared/types";
 import { FRAME_STRIDE, FRAMES_PER_BATCH, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
-import { integratorStep } from "../engine/integrators";
+import { integratorStep, getIntegrator } from "../engine/integrators";
 import { computeDerived, normalizeAngle, hasInvalidValue, projectEnergy } from "../engine/state-vector";
 
-// ─── Worker 内部状态 ──────────────────────────────
+// ─── Worker 上下文 ──────────────────────────────
 
 type WorkerPhase = "uninit" | "idle" | "computing" | "error";
 
-let _phase: WorkerPhase = "uninit";
-let _state: Float64Array | null = null; // [θ₁, ω₁, θ₂, ω₂]
-let _params: PendulumParams | null = null;
-let _method: IntegratorMethod = "RK4";
-let _direction: 1 | -1 = 1;
-let _simTime = 0;
-let _batchIndex = 0;
-let _computeForces = false;
-let _forceExtrema: ForceExtrema | null = null;
-/** 仿真启动时的初始总能量（J），供保守系统能量投影使用。 */
-let _initialEnergy = 0;
-/** 能量投影是否启用（仅 damping=0 时启用，与初始能量是否为 0 解耦） */
-let _projectionEnabled = false;
-/** 本批次累积的能量投影校正量 (J) */
-let _batchEnergyCorrection = 0;
+interface WorkerContext {
+  phase: WorkerPhase;
+  state: Float64Array | null;
+  params: PendulumParams | null;
+  method: IntegratorMethod;
+  direction: 1 | -1;
+  simTime: number;
+  batchIndex: number;
+  computeForces: boolean;
+  forceExtrema: ForceExtrema | null;
+  initialEnergy: number;
+  projectionEnabled: boolean;
+  batchEnergyCorrection: number;
+}
+
+const ctx: WorkerContext = {
+  phase: "uninit",
+  state: null,
+  params: null,
+  method: "RKF45",
+  direction: 1,
+  simTime: 0,
+  batchIndex: 0,
+  computeForces: false,
+  forceExtrema: null,
+  initialEnergy: 0,
+  projectionEnabled: false,
+  batchEnergyCorrection: 0,
+};
 
 // ─── 消息循环入口 ────────────────────────────────
 
@@ -64,161 +78,139 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
   }
 };
 
-// ─── 步骤 2：初始化 ─────────────────────────────
+// ─── 状态重置（init / reset 共享）─────────────────
+
+function resetWorkerState(
+  ic: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number },
+  params: PendulumParams,
+  method: IntegratorMethod,
+): void {
+  ctx.state = new Float64Array([ic.theta1, ic.theta1Dot, ic.theta2, ic.theta2Dot]);
+  ctx.state[0] = normalizeAngle(ctx.state[0]!);
+  ctx.state[2] = normalizeAngle(ctx.state[2]!);
+  ctx.params = { ...params };
+  ctx.method = method;
+  ctx.direction = 1;
+  ctx.simTime = 0;
+  ctx.batchIndex = 0;
+  ctx.computeForces = false;
+  ctx.forceExtrema = null;
+  ctx.projectionEnabled = params.damping === 0;
+  ctx.initialEnergy = ctx.projectionEnabled ? computeDerived(ctx.state, params).totalEnergy : 0;
+  ctx.batchEnergyCorrection = 0;
+  ctx.phase = "idle";
+}
+
+// ─── 初始化 ─────────────────────────────────────
 
 function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number }; method: IntegratorMethod }): void {
-  const { params, initialConditions: ic, method } = cmd;
-
-  const err = validateParams(params);
+  const err = validateParams(cmd.params);
   if (err) {
     postResponse({ type: "error", code: "INVALID_STATE", message: err, simTime: -1 });
     return;
   }
-
-  _state = new Float64Array([ic.theta1, ic.theta1Dot, ic.theta2, ic.theta2Dot]);
-  _state[0] = normalizeAngle(_state[0]!);
-  _state[2] = normalizeAngle(_state[2]!);
-  _params = { ...params };
-  _method = method;
-  _direction = 1;
-  _simTime = 0;
-  _batchIndex = 0;
-  _computeForces = false;
-  _forceExtrema = null;
-  _projectionEnabled = params.damping === 0;
-  _initialEnergy = _projectionEnabled ? computeDerived(_state, params).totalEnergy : 0;
-  _batchEnergyCorrection = 0;
-  _phase = "idle";
-
+  resetWorkerState(cmd.initialConditions, cmd.params, cmd.method);
   postResponse({ type: "ready" });
 }
 
-// ─── 步骤 3：批量积分 ───────────────────────────
+// ─── 批量积分 ───────────────────────────────────
 
 function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondition | null }): void {
-  if (_phase === "uninit" || !_state || !_params) {
+  if (ctx.phase === "uninit" || !ctx.state || !ctx.params) {
     postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
     return;
   }
 
-  if (_phase === "error") {
-    postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 处于 error 状态，请先 reset", simTime: _simTime });
+  if (ctx.phase === "error") {
+    postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 处于 error 状态，请先 reset", simTime: ctx.simTime });
     return;
   }
 
-  if (hasInvalidValue(_state)) {
-    _phase = "error";
-    postResponse({ type: "error", code: "DIVERGED", message: `数值发散于 t=${_simTime}`, simTime: _simTime });
+  if (hasInvalidValue(ctx.state)) {
+    ctx.phase = "error";
+    postResponse({ type: "error", code: "DIVERGED", message: `数值发散于 t=${ctx.simTime}`, simTime: ctx.simTime });
     return;
   }
 
   const buffer = cmd.buffer;
   const poincareConfig = cmd.poincare;
   const poincarePoints: PoincarePoint[] = [];
-  const currentBatchIndex = _batchIndex++;
+  const currentBatchIndex = ctx.batchIndex++;
+  const forceBuffer = ctx.computeForces ? new Float64Array(FORCE_BUFFER_LENGTH) : null;
 
-  // 力数据缓冲区（仅在 computeForces 激活时分配）
-  const forceBuffer = _computeForces ? new Float64Array(FORCE_BUFFER_LENGTH) : null;
-
-  _phase = "computing";
+  ctx.phase = "computing";
 
   const dt = 1 / 60;
   const startTime = performance.now();
   let frame = 0;
-  _batchEnergyCorrection = 0;
+  ctx.batchEnergyCorrection = 0;
 
-  // 保存积分前状态，用于穿越检测插值
-  const stateBefore = new Float64Array(_state);
+  const stateBefore = new Float64Array(ctx.state);
 
   for (; frame < FRAMES_PER_BATCH; frame++) {
-    // ── 穿越检测：记录积分前变量值 ──
-    const varPrev = poincareConfig ? extractVariable(_state, poincareConfig.variable) : null;
+    const varPrev = poincareConfig ? extractVariable(ctx.state, poincareConfig.variable) : null;
 
     // 单步积分
-    integratorStep(_state, _params, dt * _direction, _method);
+    integratorStep(ctx.state, ctx.params, dt * ctx.direction, ctx.method);
 
-    _simTime += dt * _direction;
+    ctx.simTime += dt * ctx.direction;
 
-    // 能量投影：保守系统 (damping=0) 每帧校正能量回初始值
-    if (_projectionEnabled) {
-      _batchEnergyCorrection += projectEnergy(_state, _params, _initialEnergy);
+    // 能量投影（保守系统）
+    if (ctx.projectionEnabled) {
+      ctx.batchEnergyCorrection += projectEnergy(ctx.state, ctx.params, ctx.initialEnergy);
     }
 
-    // NaN 检查（必须在能量投影之后，以捕获投影可能引入的 NaN）
-    if (hasInvalidValue(_state)) {
-      _phase = "error";
-      transferBuffer(buffer, frame, _simTime, poincarePoints, forceBuffer);
+    // NaN 检查（必须在能量投影之后）
+    if (hasInvalidValue(ctx.state)) {
+      ctx.phase = "error";
+      transferBuffer(buffer, frame, ctx.simTime, poincarePoints, forceBuffer);
       postResponse({
         type: "error",
         code: "DIVERGED",
-        message: `数值发散于 t≈${_simTime.toFixed(2)}, 方法=${_method}`,
-        simTime: _simTime,
+        message: `数值发散于 t≈${ctx.simTime.toFixed(2)}, 方法=${ctx.method}`,
+        simTime: ctx.simTime,
       });
       return;
     }
 
-    // ── 穿越检测 ──
+    // 庞加莱截面穿越检测
     if (poincareConfig && varPrev !== null) {
-      const varCurr = extractVariable(_state, poincareConfig.variable);
-      const signPrev = Math.sign(varPrev - poincareConfig.targetValue);
-      const signCurr = Math.sign(varCurr - poincareConfig.targetValue);
-
-      if (signPrev !== 0 && signCurr !== 0 && signPrev !== signCurr) {
-        const directionMatch =
-          poincareConfig.direction === "both" ||
-          (poincareConfig.direction === "positive" && signCurr > 0) ||
-          (poincareConfig.direction === "negative" && signCurr < 0);
-
-        if (directionMatch) {
-          // 线性插值估计穿越比例
-          const ratio = (poincareConfig.targetValue - varPrev) / (varCurr - varPrev);
-          const tCross = _simTime - dt * _direction + ratio * dt * _direction;
-
-          // 线性插值估计穿越状态
-          const theta2 = normalizeAngle(stateBefore[2]! + ratio * (_state[2]! - stateBefore[2]!));
-          const omega2 = stateBefore[3]! + ratio * (_state[3]! - stateBefore[3]!);
-
-          poincarePoints.push({
-            theta2,
-            omega2,
-            time: tCross,
-            batchIndex: currentBatchIndex,
-          });
-        }
-      }
+      detectPoincareCrossing(
+        stateBefore, ctx.state,
+        ctx.simTime, dt, ctx.direction,
+        poincareConfig, currentBatchIndex, poincarePoints,
+      );
     }
 
-    // 更新 stateBefore 为当前状态（供下一帧穿越检测使用）
-    stateBefore.set(_state);
+    stateBefore.set(ctx.state);
 
-    // 反向积分回到 t=0 边界：clamp 到 0，只填充 simTime > 0 的帧
-    if (_direction === -1 && _simTime <= 0) {
-      _simTime = 0;
-      const derived = computeDerived(_state, _params);
-      writeFrame(buffer, frame, _simTime, _state, derived);
+    // 反向积分回到 t=0 边界
+    if (ctx.direction === -1 && ctx.simTime <= 0) {
+      ctx.simTime = 0;
+      const derived = computeDerived(ctx.state, ctx.params);
+      writeFrame(buffer, frame, ctx.simTime, ctx.state, derived);
       if (forceBuffer) {
-        const forces = computeForceFrame(_state, derived, _params);
+        const forces = computeForceFrame(ctx.state, derived, ctx.params);
         writeForceFrame(forceBuffer, frame, forces);
-        updateForceExtrema(forces, _simTime);
+        updateForceExtrema(forces, ctx.simTime);
       }
       frame++;
       break;
     }
 
-    // 计算派生量并写入 buffer
-    const derived = computeDerived(_state, _params);
-    writeFrame(buffer, frame, _simTime, _state, derived);
+    // 写入帧缓冲
+    const derived = computeDerived(ctx.state, ctx.params);
+    writeFrame(buffer, frame, ctx.simTime, ctx.state, derived);
 
-    // 力计算
     if (forceBuffer) {
-      const forces = computeForceFrame(_state, derived, _params);
+      const forces = computeForceFrame(ctx.state, derived, ctx.params);
       writeForceFrame(forceBuffer, frame, forces);
-      updateForceExtrema(forces, _simTime);
+      updateForceExtrema(forces, ctx.simTime);
     }
 
     // 角度归一化
-    _state[0] = normalizeAngle(_state[0]!);
-    _state[2] = normalizeAngle(_state[2]!);
+    ctx.state[0] = normalizeAngle(ctx.state[0]!);
+    ctx.state[2] = normalizeAngle(ctx.state[2]!);
   }
 
   const elapsed = performance.now() - startTime;
@@ -226,81 +218,107 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     console.warn(`[ode-worker] handleStep 耗时 ${elapsed.toFixed(1)}ms，接近帧预算`);
   }
 
-  _phase = "idle";
-  transferBuffer(buffer, frame, _simTime, poincarePoints, forceBuffer);
+  ctx.phase = "idle";
+  transferBuffer(buffer, frame, ctx.simTime, poincarePoints, forceBuffer);
 }
 
-// ─── 步骤 7：参数热更新 ─────────────────────────
+// ─── 庞加莱截面穿越检测 ──────────────────────────
+
+function detectPoincareCrossing(
+  stateBefore: Float64Array,
+  stateCurrent: Float64Array,
+  simTime: number,
+  dt: number,
+  direction: 1 | -1,
+  config: PoincareSectionCondition,
+  batchIndex: number,
+  results: PoincarePoint[],
+): void {
+  const varPrev = extractVariable(stateBefore, config.variable);
+  const varCurr = extractVariable(stateCurrent, config.variable);
+  const signPrev = Math.sign(varPrev - config.targetValue);
+  const signCurr = Math.sign(varCurr - config.targetValue);
+
+  if (signPrev === 0 || signCurr === 0 || signPrev === signCurr) return;
+
+  const directionMatch =
+    config.direction === "both" ||
+    (config.direction === "positive" && signCurr > 0) ||
+    (config.direction === "negative" && signCurr < 0);
+
+  if (!directionMatch) return;
+
+  const ratio = (config.targetValue - varPrev) / (varCurr - varPrev);
+  const tCross = simTime - dt * direction + ratio * dt * direction;
+  const theta2 = normalizeAngle(stateBefore[2]! + ratio * (stateCurrent[2]! - stateBefore[2]!));
+  const omega2 = stateBefore[3]! + ratio * (stateCurrent[3]! - stateBefore[3]!);
+
+  results.push({ theta2, omega2, time: tCross, batchIndex });
+}
+
+// ─── 参数热更新 ─────────────────────────────────
 
 function handleUpdateParams(cmd: { params: Partial<PendulumParams> }): void {
-  if (!_params) {
+  if (!ctx.params) {
     postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
     return;
   }
 
-  const merged = { ..._params, ...cmd.params };
+  const merged = { ...ctx.params, ...cmd.params };
   const err = validateParams(merged);
   if (err) {
-    postResponse({ type: "error", code: "INVALID_STATE", message: err, simTime: _simTime });
+    postResponse({ type: "error", code: "INVALID_STATE", message: err, simTime: ctx.simTime });
     return;
   }
 
-  _params = merged;
-  // 阻尼状态变化 → 重算能量投影基线
-  _projectionEnabled = _params.damping === 0;
-  if (_projectionEnabled && _state) {
-    _initialEnergy = computeDerived(_state, _params).totalEnergy;
+  ctx.params = merged;
+  ctx.projectionEnabled = ctx.params.damping === 0;
+  if (ctx.projectionEnabled && ctx.state) {
+    ctx.initialEnergy = computeDerived(ctx.state, ctx.params).totalEnergy;
   } else {
-    _initialEnergy = 0;
+    ctx.initialEnergy = 0;
   }
 }
 
-// ─── 步骤 8：方向切换 ───────────────────────────
+// ─── 方向切换 ───────────────────────────────────
 
 function handleSetDirection(cmd: { direction: 1 | -1 }): void {
   if (cmd.direction === 1 || cmd.direction === -1) {
-    _direction = cmd.direction;
+    ctx.direction = cmd.direction;
   }
 }
 
 // ─── 积分方法切换 ───────────────────────────────
 
 function handleSetMethod(cmd: { method: IntegratorMethod }): void {
-  if (cmd.method === "RK4" || cmd.method === "VelocityVerlet" || cmd.method === "Euler") {
-    _method = cmd.method;
+  if (getIntegrator(cmd.method)) {
+    ctx.method = cmd.method;
   }
 }
 
-// ─── 配置（力计算开关等） ──────────────────────
+// ─── 配置 ──────────────────────────────────────
 
 function handleConfig(cmd: { computeForces?: boolean }): void {
   if (typeof cmd.computeForces === "boolean") {
-    _computeForces = cmd.computeForces;
-    if (!_computeForces) {
-      _forceExtrema = null;
+    ctx.computeForces = cmd.computeForces;
+    if (!ctx.computeForces) {
+      ctx.forceExtrema = null;
     }
   }
 }
 
-// ─── 重置 ─────────────────────────────────────
+// ─── 重置 ──────────────────────────────────────
 
 function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number } }): void {
-  const ic = cmd.initialConditions;
-  _state = new Float64Array([ic.theta1, ic.theta1Dot, ic.theta2, ic.theta2Dot]);
-  _state[0] = normalizeAngle(_state[0]!);
-  _state[2] = normalizeAngle(_state[2]!);
-  _simTime = 0;
-  _direction = 1;
-  _batchIndex = 0;
-  _forceExtrema = null;
-  _projectionEnabled = _params!.damping === 0;
-  _initialEnergy = _projectionEnabled ? computeDerived(_state, _params!).totalEnergy : 0;
-  _batchEnergyCorrection = 0;
-  _phase = "idle";
+  if (!ctx.params) {
+    postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
+    return;
+  }
+  resetWorkerState(cmd.initialConditions, ctx.params, ctx.method);
   postResponse({ type: "ready" });
 }
 
-// ─── 辅助函数 ──────────────────────────────────
+// ─── 参数校验 ───────────────────────────────────
 
 function validateParams(p: PendulumParams): string | null {
   if (p.m1 <= 0 || !isFinite(p.m1)) return `参数 m1 非法: ${p.m1}`;
@@ -321,6 +339,8 @@ function extractVariable(state: Float64Array, variable: string): number {
     default: return NaN;
   }
 }
+
+// ─── 帧写入 ────────────────────────────────────
 
 function writeFrame(
   buffer: Float64Array,
@@ -346,7 +366,7 @@ function writeFrame(
   buffer[off + 13] = d.alpha2;
 }
 
-// ─── 力计算 ──────────────────────────────────
+// ─── 力计算 ────────────────────────────────────
 
 interface ForceFrame {
   Fg1_mag: number; Fg1_angle: number;
@@ -369,23 +389,17 @@ function computeForceFrame(
   const alpha1 = derived.alpha1, alpha2 = derived.alpha2;
   const { m1, m2, L1, L2, g } = p;
 
-  // 杆 2 张力
   const dTheta = theta1 - theta2;
   const T2 = m2 * L2 * omega2 * omega2
            + m2 * g * Math.cos(theta2)
            + m2 * L1 * (alpha1 * Math.cos(dTheta) + omega1 * omega1 * Math.sin(dTheta));
-
-  // 杆 1 张力
   const T1 = m1 * L1 * omega1 * omega1
            + (m1 + m2) * g * Math.cos(theta1)
            + m2 * L2 * (alpha2 * Math.cos(dTheta) - omega2 * omega2 * Math.sin(dTheta))
            + T2 * Math.cos(dTheta);
 
-  // 重力
   const Fg1 = m1 * g;
   const Fg2 = m2 * g;
-
-  // 惯性力
   const Fi1_t = m1 * L1 * Math.abs(alpha1);
   const Fi1_n = m1 * L1 * omega1 * omega1;
   const Fi2_t = m2 * L2 * Math.abs(alpha2);
@@ -424,8 +438,8 @@ function writeForceFrame(buf: Float64Array, frame: number, f: ForceFrame): void 
 }
 
 function updateForceExtrema(f: ForceFrame, simTime: number): void {
-  if (!_forceExtrema) {
-    _forceExtrema = {
+  if (!ctx.forceExtrema) {
+    ctx.forceExtrema = {
       T1_max: { value: f.T1_mag, time: simTime },
       T1_min: { value: f.T1_mag, time: simTime },
       T2_max: { value: f.T2_mag, time: simTime },
@@ -433,19 +447,13 @@ function updateForceExtrema(f: ForceFrame, simTime: number): void {
     };
     return;
   }
-  if (f.T1_mag > _forceExtrema.T1_max.value) {
-    _forceExtrema.T1_max = { value: f.T1_mag, time: simTime };
-  }
-  if (f.T1_mag < _forceExtrema.T1_min.value) {
-    _forceExtrema.T1_min = { value: f.T1_mag, time: simTime };
-  }
-  if (f.T2_mag > _forceExtrema.T2_max.value) {
-    _forceExtrema.T2_max = { value: f.T2_mag, time: simTime };
-  }
-  if (f.T2_mag < _forceExtrema.T2_min.value) {
-    _forceExtrema.T2_min = { value: f.T2_mag, time: simTime };
-  }
+  if (f.T1_mag > ctx.forceExtrema.T1_max.value) ctx.forceExtrema.T1_max = { value: f.T1_mag, time: simTime };
+  if (f.T1_mag < ctx.forceExtrema.T1_min.value) ctx.forceExtrema.T1_min = { value: f.T1_mag, time: simTime };
+  if (f.T2_mag > ctx.forceExtrema.T2_max.value) ctx.forceExtrema.T2_max = { value: f.T2_mag, time: simTime };
+  if (f.T2_mag < ctx.forceExtrema.T2_min.value) ctx.forceExtrema.T2_min = { value: f.T2_mag, time: simTime };
 }
+
+// ─── Buffer 传输 ────────────────────────────────
 
 function transferBuffer(
   buffer: Float64Array,
@@ -461,17 +469,14 @@ function transferBuffer(
     simTime,
     poincarePoints,
     forceData: forceBuffer ?? undefined,
-    forceExtrema: _computeForces ? (_forceExtrema ?? undefined) : undefined,
-    energyCorrection: _batchEnergyCorrection,
+    forceExtrema: ctx.computeForces ? (ctx.forceExtrema ?? undefined) : undefined,
+    energyCorrection: ctx.batchEnergyCorrection,
   };
   const transfers: Transferable[] = [buffer.buffer as ArrayBuffer];
   if (forceBuffer) {
     transfers.push(forceBuffer.buffer as ArrayBuffer);
   }
-  (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(
-    resp,
-    transfers,
-  );
+  (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(resp, transfers);
 }
 
 function postResponse(resp: WorkerResponse): void {

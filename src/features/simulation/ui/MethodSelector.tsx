@@ -13,7 +13,7 @@ const METHOD_OPTIONS: {
   label: string;
   description: string;
 }[] = [
-  { value: "RK4", label: "RK4（4 阶龙格-库塔）", description: "默认，精度与速度平衡" },
+  { value: "RKF45", label: "RKF45（自适应 4(5) 阶）", description: "默认，Fehlberg 嵌入对，自动步长控制" },
   { value: "VelocityVerlet", label: "Velocity Verlet", description: "辛积分器，长时间能量守恒佳" },
   { value: "Euler", label: "Euler（1 阶）", description: "教育用途，展示数值误差" },
 ];

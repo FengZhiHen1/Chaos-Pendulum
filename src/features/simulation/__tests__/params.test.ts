@@ -7,7 +7,7 @@ function resetStore(): void {
   useSimulationStore.setState({
     params: { ...DEFAULT_PARAMS },
     initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
-    method: "RK4",
+    method: "RKF45",
     fieldErrors: {},
     isSceneFrozen: false,
     activeField: null,
@@ -90,7 +90,7 @@ describe("applyPreset", () => {
       description: "",
       params: {},
       initialConditions: { theta1: 0.052, theta1Dot: 0, theta2: 0.034, theta2Dot: 0 },
-      method: "RK4",
+      method: "RKF45",
     });
     expect(err).toBeNull();
     const s = useSimulationStore.getState();

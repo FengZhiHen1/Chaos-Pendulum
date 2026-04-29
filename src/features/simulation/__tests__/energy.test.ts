@@ -39,7 +39,7 @@ function resetStore(): void {
   useSimulationStore.setState({
     params: { ...DEFAULT_PARAMS },
     initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
-    method: "RK4",
+    method: "RKF45",
     fieldErrors: {},
     isSceneFrozen: false,
     activeField: null,

@@ -11,7 +11,7 @@ export interface PendulumParams {
 }
 
 /** 积分方法枚举 */
-export type IntegratorMethod = "RK4" | "VelocityVerlet" | "Euler";
+export type IntegratorMethod = "RKF45" | "VelocityVerlet" | "Euler";
 
 /** 初始条件 */
 export interface InitialConditions {
@@ -77,7 +77,7 @@ export const DEFAULT_INITIAL_CONDITIONS: InitialConditions = {
   theta2Dot: 0,
 };
 
-export const DEFAULT_METHOD: IntegratorMethod = "RK4";
+export const DEFAULT_METHOD: IntegratorMethod = "RKF45";
 
 // ─── 参数元数据表 ───────────────────────────────
 
@@ -109,7 +109,7 @@ export const PRESETS: ParamPreset[] = [
     description: "将两摆设为 3° 以内，验证线性近似",
     params: {},
     initialConditions: { theta1: 0.052, theta1Dot: 0, theta2: 0.034, theta2Dot: 0 },
-    method: "RK4",
+    method: "RKF45",
   },
   {
     id: "single-pendulum",

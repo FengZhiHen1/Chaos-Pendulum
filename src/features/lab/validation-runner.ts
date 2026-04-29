@@ -187,7 +187,7 @@ function runEnergyTest(method: IntegratorMethod): {
 // ─── 公开入口 ──────────────────────────────────────
 
 export function runAllValidations(
-  method: IntegratorMethod = "RK4",
+  method: IntegratorMethod = "RKF45",
   onProgress?: (test: ValidationTestKey, result: ValidationResult) => void,
 ): ValidationResult[] {
   const results: ValidationResult[] = [];

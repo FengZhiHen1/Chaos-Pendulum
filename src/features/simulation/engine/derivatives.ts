@@ -69,11 +69,16 @@ export function computeAlphas(
 
 /**
  * 仅返回角加速度 [α₁, α₂]（无阻尼），供 Velocity Verlet / LAB-01 力计算使用。
+ * 提供可选 out 参数避免堆分配。
  */
 export function angularAcceleration(
   state: Float64Array,
   p: PendulumParams,
+  out?: Float64Array,
 ): Float64Array {
   const a = computeAlphas(state, p);
-  return new Float64Array([a.alpha1, a.alpha2]);
+  const result = out ?? new Float64Array(2);
+  result[0] = a.alpha1;
+  result[1] = a.alpha2;
+  return result;
 }
