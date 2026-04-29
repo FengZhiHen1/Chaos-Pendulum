@@ -5,8 +5,9 @@ import type {
   IntegratorMethod,
   PoincarePoint,
   PoincareSectionCondition,
+  ForceExtrema,
 } from "@/shared/types";
-import { FRAME_STRIDE, FRAMES_PER_BATCH } from "@/shared/types";
+import { FRAME_STRIDE, FRAMES_PER_BATCH, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
 import { integratorStep } from "../engine/integrators";
 import { computeDerived, normalizeAngle, hasInvalidValue } from "../engine/state-vector";
 
@@ -21,6 +22,8 @@ let _method: IntegratorMethod = "RK4";
 let _direction: 1 | -1 = 1;
 let _simTime = 0;
 let _batchIndex = 0;
+let _computeForces = false;
+let _forceExtrema: ForceExtrema | null = null;
 
 // ─── 消息循环入口 ────────────────────────────────
 
@@ -47,6 +50,9 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     case "setMethod":
       handleSetMethod(cmd);
       break;
+    case "config":
+      handleConfig(cmd);
+      break;
     default:
       console.warn(`[ode-worker] 未识别的消息类型: ${(cmd as { type: string }).type}`);
   }
@@ -71,6 +77,8 @@ function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: 
   _direction = 1;
   _simTime = 0;
   _batchIndex = 0;
+  _computeForces = false;
+  _forceExtrema = null;
   _phase = "idle";
 
   postResponse({ type: "ready" });
@@ -100,6 +108,9 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
   const poincarePoints: PoincarePoint[] = [];
   const currentBatchIndex = _batchIndex++;
 
+  // 力数据缓冲区（仅在 computeForces 激活时分配）
+  const forceBuffer = _computeForces ? new Float64Array(FORCE_BUFFER_LENGTH) : null;
+
   _phase = "computing";
 
   const dt = 1 / 60;
@@ -119,7 +130,7 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     // NaN 检查
     if (hasInvalidValue(_state)) {
       _phase = "error";
-      transferBuffer(buffer, frame, _simTime, poincarePoints);
+      transferBuffer(buffer, frame, _simTime, poincarePoints, forceBuffer);
       postResponse({
         type: "error",
         code: "DIVERGED",
@@ -170,6 +181,11 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
       _simTime = 0;
       const derived = computeDerived(_state, _params);
       writeFrame(buffer, frame, _simTime, _state, derived);
+      if (forceBuffer) {
+        const forces = computeForceFrame(_state, derived, _params);
+        writeForceFrame(forceBuffer, frame, forces);
+        updateForceExtrema(forces, _simTime);
+      }
       frame++;
       break;
     }
@@ -177,6 +193,13 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     // 计算派生量并写入 buffer
     const derived = computeDerived(_state, _params);
     writeFrame(buffer, frame, _simTime, _state, derived);
+
+    // 力计算
+    if (forceBuffer) {
+      const forces = computeForceFrame(_state, derived, _params);
+      writeForceFrame(forceBuffer, frame, forces);
+      updateForceExtrema(forces, _simTime);
+    }
 
     // 角度归一化
     _state[0] = normalizeAngle(_state[0]!);
@@ -189,7 +212,7 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
   }
 
   _phase = "idle";
-  transferBuffer(buffer, frame, _simTime, poincarePoints);
+  transferBuffer(buffer, frame, _simTime, poincarePoints, forceBuffer);
 }
 
 // ─── 步骤 7：参数热更新 ─────────────────────────
@@ -226,6 +249,17 @@ function handleSetMethod(cmd: { method: IntegratorMethod }): void {
   }
 }
 
+// ─── 配置（力计算开关等） ──────────────────────
+
+function handleConfig(cmd: { computeForces?: boolean }): void {
+  if (typeof cmd.computeForces === "boolean") {
+    _computeForces = cmd.computeForces;
+    if (!_computeForces) {
+      _forceExtrema = null;
+    }
+  }
+}
+
 // ─── 重置 ─────────────────────────────────────
 
 function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number } }): void {
@@ -236,6 +270,7 @@ function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: numb
   _simTime = 0;
   _direction = 1;
   _batchIndex = 0;
+  _forceExtrema = null;
   _phase = "idle";
   postResponse({ type: "ready" });
 }
@@ -286,17 +321,126 @@ function writeFrame(
   buffer[off + 13] = d.alpha2;
 }
 
-function transferBuffer(buffer: Float64Array, frameCount: number, simTime: number, poincarePoints?: PoincarePoint[]): void {
+// ─── 力计算 ──────────────────────────────────
+
+interface ForceFrame {
+  Fg1_mag: number; Fg1_angle: number;
+  T1_mag: number;   T1_angle: number;
+  Fi1_t_mag: number; Fi1_t_angle: number;
+  Fi1_n_mag: number; Fi1_n_angle: number;
+  Fg2_mag: number;
+  T2_mag: number;
+  Fi2_t_mag: number;
+  Fi2_n_mag: number;
+}
+
+function computeForceFrame(
+  state: Float64Array,
+  derived: ReturnType<typeof computeDerived>,
+  p: PendulumParams,
+): ForceFrame {
+  const theta1 = state[0]!, omega1 = state[1]!;
+  const theta2 = state[2]!, omega2 = state[3]!;
+  const alpha1 = derived.alpha1, alpha2 = derived.alpha2;
+  const { m1, m2, L1, L2, g } = p;
+
+  // 杆 2 张力
+  const dTheta = theta1 - theta2;
+  const T2 = m2 * L2 * omega2 * omega2
+           + m2 * g * Math.cos(theta2)
+           + m2 * L1 * (alpha1 * Math.cos(dTheta) + omega1 * omega1 * Math.sin(dTheta));
+
+  // 杆 1 张力
+  const T1 = m1 * L1 * omega1 * omega1
+           + (m1 + m2) * g * Math.cos(theta1)
+           + m2 * L2 * (alpha2 * Math.cos(dTheta) - omega2 * omega2 * Math.sin(dTheta))
+           + T2 * Math.cos(dTheta);
+
+  // 重力
+  const Fg1 = m1 * g;
+  const Fg2 = m2 * g;
+
+  // 惯性力
+  const Fi1_t = m1 * L1 * Math.abs(alpha1);
+  const Fi1_n = m1 * L1 * omega1 * omega1;
+  const Fi2_t = m2 * L2 * Math.abs(alpha2);
+  const Fi2_n = m2 * L2 * omega2 * omega2;
+
+  return {
+    Fg1_mag: Fg1, Fg1_angle: -Math.PI / 2,
+    T1_mag: T1,   T1_angle: theta1 + Math.PI,
+    Fi1_t_mag: Fi1_t, Fi1_t_angle: theta1 + Math.sign(alpha1) * Math.PI / 2,
+    Fi1_n_mag: Fi1_n, Fi1_n_angle: theta1 + Math.PI,
+    Fg2_mag: Fg2,
+    T2_mag: T2,
+    Fi2_t_mag: Fi2_t,
+    Fi2_n_mag: Fi2_n,
+  };
+}
+
+function writeForceFrame(buf: Float64Array, frame: number, f: ForceFrame): void {
+  const off = frame * FORCE_STRIDE;
+  buf[off + 0] = f.Fg1_mag;
+  buf[off + 1] = f.Fg1_angle;
+  buf[off + 2] = f.T1_mag;
+  buf[off + 3] = f.T1_angle;
+  buf[off + 4] = f.Fi1_t_mag;
+  buf[off + 5] = f.Fi1_t_angle;
+  buf[off + 6] = f.Fi1_n_mag;
+  buf[off + 7] = f.Fi1_n_angle;
+  buf[off + 8] = f.Fg2_mag;
+  buf[off + 9] = f.T2_mag;
+  buf[off + 10] = f.Fi2_t_mag;
+  buf[off + 11] = f.Fi2_n_mag;
+}
+
+function updateForceExtrema(f: ForceFrame, simTime: number): void {
+  if (!_forceExtrema) {
+    _forceExtrema = {
+      T1_max: { value: f.T1_mag, time: simTime },
+      T1_min: { value: f.T1_mag, time: simTime },
+      T2_max: { value: f.T2_mag, time: simTime },
+      T2_min: { value: f.T2_mag, time: simTime },
+    };
+    return;
+  }
+  if (f.T1_mag > _forceExtrema.T1_max.value) {
+    _forceExtrema.T1_max = { value: f.T1_mag, time: simTime };
+  }
+  if (f.T1_mag < _forceExtrema.T1_min.value) {
+    _forceExtrema.T1_min = { value: f.T1_mag, time: simTime };
+  }
+  if (f.T2_mag > _forceExtrema.T2_max.value) {
+    _forceExtrema.T2_max = { value: f.T2_mag, time: simTime };
+  }
+  if (f.T2_mag < _forceExtrema.T2_min.value) {
+    _forceExtrema.T2_min = { value: f.T2_mag, time: simTime };
+  }
+}
+
+function transferBuffer(
+  buffer: Float64Array,
+  frameCount: number,
+  simTime: number,
+  poincarePoints?: PoincarePoint[],
+  forceBuffer?: Float64Array | null,
+): void {
   const resp: WorkerResponse = {
     type: "batchReady",
     buffer,
     frameCount,
     simTime,
     poincarePoints,
+    forceData: forceBuffer ?? undefined,
+    forceExtrema: _computeForces ? (_forceExtrema ?? undefined) : undefined,
   };
+  const transfers: Transferable[] = [buffer.buffer as ArrayBuffer];
+  if (forceBuffer) {
+    transfers.push(forceBuffer.buffer as ArrayBuffer);
+  }
   (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(
     resp,
-    [buffer.buffer as ArrayBuffer],
+    transfers,
   );
 }
 

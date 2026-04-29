@@ -10,6 +10,7 @@ import { FRAMES_PER_BATCH } from "@/shared/types";
 import { Float64Pool } from "./float64-pool";
 import { useSimulationStore, BATCH_PREFETCH_THRESHOLD } from "../store";
 import { pushSimulationHistory, clearSimulationHistory } from "../history";
+import { useLabStore } from "@/features/lab/store";
 import { observabilityCoordinator } from "@/shared/lib/observability";
 
 const TIMEOUT_MS = 2000;
@@ -139,6 +140,11 @@ export class SimulationScheduler {
     this.send({ type: "setDirection", direction });
   }
 
+  /** 开关力计算（LAB-01 受力分析） */
+  setComputeForces(active: boolean): void {
+    this.send({ type: "config", computeForces: active });
+  }
+
   /** 重置仿真 */
   reset(initialConditions: InitialConditions): void {
     this.consumeIndex = 0;
@@ -218,6 +224,15 @@ export class SimulationScheduler {
         this.currentBuffer = resp.buffer;
         this.consumeIndex = 0;
         this.pendingBatch = false;
+
+        // 转发力数据到 labStore
+        if (resp.forceData) {
+          const labStore = useLabStore.getState();
+          labStore.setLastForceData(resp.forceData);
+          if (resp.forceExtrema) {
+            labStore.setForceExtrema(resp.forceExtrema);
+          }
+        }
 
         // 转发庞加莱截面点
         if (resp.poincarePoints && resp.poincarePoints.length > 0) {

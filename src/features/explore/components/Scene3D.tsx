@@ -11,6 +11,7 @@ import type { TrailPoint } from "../hooks/useTrailBuffer";
 import type { PendulumParams, StateVector } from "@/shared/types";
 import { TrailRenderer } from "./TrailRenderer";
 import { useButterflyStore } from "../butterfly-store";
+import { ForceArrows3D } from "@/features/lab/components/ForceArrows3D";
 
 // ─── 类型定义 ────────────────────────────────────
 
@@ -626,6 +627,9 @@ function SceneContent({
           />
         )}
       </mesh>
+
+      {/* 受力分析矢量叠加（LAB-01） */}
+      <ForceArrows3D />
 
       {/* 运动尾迹（EXP-02） */}
       <TrailRenderer

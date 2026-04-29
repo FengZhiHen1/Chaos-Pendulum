@@ -9,6 +9,11 @@ export const FRAMES_PER_BATCH = 120;
 /** 单批次 buffer 长度 */
 export const BUFFER_LENGTH = FRAMES_PER_BATCH * FRAME_STRIDE; // = 1680
 
+/** 每帧力数据占用的 float64 数（12 个力字段） */
+export const FORCE_STRIDE = 12;
+/** 单批次力数据 buffer 长度 */
+export const FORCE_BUFFER_LENGTH = FRAMES_PER_BATCH * FORCE_STRIDE; // = 1440
+
 /**
  * 单帧字段偏移:
  *   [0]  t               仿真时间 (s)
@@ -41,6 +46,50 @@ export const enum FrameField {
   TOTAL_ENERGY = 11,
   ALPHA1 = 12,
   ALPHA2 = 13,
+}
+
+/**
+ * 力数据字段偏移（每帧 12 个 float64）:
+ *   [0]  Fg1_mag     上摆重力大小 (N)
+ *   [1]  Fg1_angle   上摆重力方向角 (rad)，固定 -π/2
+ *   [2]  T1_mag      杆 1 张力大小 (N)
+ *   [3]  T1_angle    杆 1 张力方向角 (rad)，沿杆向上
+ *   [4]  Fi1_t_mag   上摆切向惯性力大小 (N)
+ *   [5]  Fi1_t_angle 上摆切向惯性力方向角 (rad)
+ *   [6]  Fi1_n_mag   上摆法向惯性力大小 (N)
+ *   [7]  Fi1_n_angle 上摆法向惯性力方向角 (rad)
+ *   [8]  Fg2_mag     下摆重力大小 (N)
+ *   [9]  T2_mag      杆 2 张力大小 (N)
+ *   [10] Fi2_t_mag   下摆切向惯性力大小 (N)
+ *   [11] Fi2_n_mag   下摆法向惯性力大小 (N)
+ */
+export const enum ForceField {
+  FG1_MAG = 0,
+  FG1_ANGLE = 1,
+  T1_MAG = 2,
+  T1_ANGLE = 3,
+  FI1_T_MAG = 4,
+  FI1_T_ANGLE = 5,
+  FI1_N_MAG = 6,
+  FI1_N_ANGLE = 7,
+  FG2_MAG = 8,
+  T2_MAG = 9,
+  FI2_T_MAG = 10,
+  FI2_N_MAG = 11,
+}
+
+/** 力极值记录 */
+export interface ForceExtremaItem {
+  value: number;
+  time: number;
+}
+
+/** 仿真全程力极值 */
+export interface ForceExtrema {
+  T1_max: ForceExtremaItem;
+  T1_min: ForceExtremaItem;
+  T2_max: ForceExtremaItem;
+  T2_min: ForceExtremaItem;
 }
 
 // ─── 消息协议：主线程 → Worker ────────────────────
@@ -93,13 +142,19 @@ export interface WorkerSetMethodCommand {
   method: IntegratorMethod;
 }
 
+export interface WorkerConfigCommand {
+  type: "config";
+  computeForces?: boolean;
+}
+
 export type WorkerCommand =
   | WorkerInitCommand
   | WorkerStepCommand
   | WorkerUpdateParamsCommand
   | WorkerResetCommand
   | WorkerSetDirectionCommand
-  | WorkerSetMethodCommand;
+  | WorkerSetMethodCommand
+  | WorkerConfigCommand;
 
 // ─── 消息协议：Worker → 主线程 ────────────────────
 
@@ -117,6 +172,10 @@ export interface WorkerBatchReadyResponse {
   simTime: number;
   /** 本批次检测到的庞加莱截面点 */
   poincarePoints?: PoincarePoint[];
+  /** 力分量数据 Float64Array（computeForces 激活时非空） */
+  forceData?: Float64Array;
+  /** 仿真全程力极值（computeForces 激活时非空） */
+  forceExtrema?: ForceExtrema;
 }
 
 export type ErrorCode = "DIVERGED" | "TIMEOUT" | "INVALID_STATE";

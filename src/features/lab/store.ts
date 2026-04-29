@@ -1,8 +1,22 @@
 import { create } from "zustand";
+import type { ForceExtrema } from "@/shared/types";
 
 type ValidationStatus = "idle" | "running" | "passed" | "failed";
 type CoordinateSystem = "cartesian" | "polar" | "natural";
 type ValidationTestKey = "smallAngle" | "singlePendulum" | "energy";
+
+interface ForceHovered {
+  forceType: string;
+  massIndex: 1 | 2;
+}
+
+interface ForceDecompositionState {
+  active: boolean;
+  lastForceData: Float64Array | null;
+  bufferIndex: number;
+  extrema: ForceExtrema | null;
+  hovered: ForceHovered | null;
+}
 
 interface LabState {
   activeTemplate: string | null;
@@ -15,6 +29,7 @@ interface LabState {
   allPassed: boolean;
   coordinateSystem: CoordinateSystem;
   reportGenerating: boolean;
+  forceDecomposition: ForceDecompositionState;
 
   setUserCode: (code: string) => void;
   setCodeStatus: (status: LabState["codeStatus"]) => void;
@@ -25,7 +40,20 @@ interface LabState {
   setAllPassed: (passed: boolean) => void;
   setCoordinateSystem: (sys: CoordinateSystem) => void;
   setReportGenerating: (generating: boolean) => void;
+  setForceActive: (v: boolean) => void;
+  setLastForceData: (data: Float64Array) => void;
+  setForceExtrema: (e: ForceExtrema) => void;
+  setForceHovered: (h: ForceHovered | null) => void;
+  resetForceDecomposition: () => void;
 }
+
+const initialForceDecomposition: ForceDecompositionState = {
+  active: false,
+  lastForceData: null,
+  bufferIndex: 0,
+  extrema: null,
+  hovered: null,
+};
 
 export const useLabStore = create<LabState>((set) => ({
   activeTemplate: null,
@@ -38,6 +66,7 @@ export const useLabStore = create<LabState>((set) => ({
   allPassed: false,
   coordinateSystem: "cartesian",
   reportGenerating: false,
+  forceDecomposition: { ...initialForceDecomposition },
 
   setUserCode: (userCode) => set({ userCode }),
   setCodeStatus: (codeStatus) => set({ codeStatus }),
@@ -50,4 +79,15 @@ export const useLabStore = create<LabState>((set) => ({
   setAllPassed: (allPassed) => set({ allPassed }),
   setCoordinateSystem: (coordinateSystem) => set({ coordinateSystem }),
   setReportGenerating: (reportGenerating) => set({ reportGenerating }),
+
+  setForceActive: (active) =>
+    set((s) => ({ forceDecomposition: { ...s.forceDecomposition, active } })),
+  setLastForceData: (lastForceData) =>
+    set((s) => ({ forceDecomposition: { ...s.forceDecomposition, lastForceData, bufferIndex: 0 } })),
+  setForceExtrema: (extrema) =>
+    set((s) => ({ forceDecomposition: { ...s.forceDecomposition, extrema } })),
+  setForceHovered: (hovered) =>
+    set((s) => ({ forceDecomposition: { ...s.forceDecomposition, hovered } })),
+  resetForceDecomposition: () =>
+    set({ forceDecomposition: { ...initialForceDecomposition } }),
 }));

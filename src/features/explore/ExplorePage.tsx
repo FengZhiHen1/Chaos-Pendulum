@@ -1,4 +1,5 @@
-import { Play, Pause, RotateCcw, GitCompare, X } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { Play, Pause, RotateCcw, GitCompare, X, Eye } from "lucide-react";
 import { Scene3D } from "./components/Scene3D";
 import { TimeReversal } from "./components/TimeReversal";
 import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajectory";
@@ -6,9 +7,13 @@ import { SonificationToggle } from "./components/SonificationToggle";
 import { ButterflySplit } from "./components/ButterflySplit";
 import { TrailControls } from "./components/TrailControls";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
+import { useSimulationStore } from "@/features/simulation/store";
 import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
 import { useButterflyMode } from "./hooks/useButterflyMode";
 import { useAppStore } from "@/stores/useAppStore";
+import { useLabStore } from "@/features/lab/store";
+import { getScheduler } from "@/features/simulation/worker/scheduler";
+import { DecompositionPanel } from "@/features/lab/components/DecompositionPanel";
 import { Button } from "@/shared/components/ui/button";
 
 export function ExplorePage() {
@@ -26,6 +31,55 @@ export function ExplorePage() {
   } = useSimulationControls();
 
   const isDesktop = useAppStore((s) => s.deviceType === "desktop");
+
+  // 受力分析模式（LAB-01）
+  const forceActive = useLabStore((s) => s.forceDecomposition.active);
+  const setForceActive = useLabStore((s) => s.setForceActive);
+  const wasRunningRef = useRef(false);
+
+  const toggleForceAnalysis = useCallback(() => {
+    const wasRunning = useSimulationStore.getState().isRunning;
+    const currentActive = useLabStore.getState().forceDecomposition.active;
+
+    if (!currentActive) {
+      wasRunningRef.current = wasRunning;
+      if (wasRunning) {
+        setRunning(false);
+      }
+      setForceActive(true);
+      getScheduler().setComputeForces(true);
+    } else {
+      setForceActive(false);
+      getScheduler().setComputeForces(false);
+      if (wasRunningRef.current) {
+        setRunning(true);
+      }
+    }
+  }, [setRunning, setForceActive]);
+
+  const exitForceAnalysis = useCallback(() => {
+    if (useLabStore.getState().forceDecomposition.active) {
+      setForceActive(false);
+      getScheduler().setComputeForces(false);
+    }
+  }, [setForceActive]);
+
+  // 键盘快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        toggleForceAnalysis();
+      } else if (e.key === "Escape") {
+        exitForceAnalysis();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleForceAnalysis, exitForceAnalysis]);
 
   if (butterflyActive) {
     return (
@@ -84,12 +138,16 @@ export function ExplorePage() {
           </button>
         </section>
 
-        {/* 右侧图表面板 (300px) — 桌面端 */}
+        {/* 右侧图表面板 (300px) — 桌面端；受力分析激活时替换为分解面板 */}
         {isDesktop && (
-          <aside className="w-[300px] shrink-0 flex flex-col overflow-y-auto bg-surface-container-low">
-            <EnergyMonitorPanel width={284} height={160} />
-            <PhaseSpacePanel size={284} />
-          </aside>
+          forceActive ? (
+            <DecompositionPanel />
+          ) : (
+            <aside className="w-[300px] shrink-0 flex flex-col overflow-y-auto bg-surface-container-low">
+              <EnergyMonitorPanel width={284} height={160} />
+              <PhaseSpacePanel size={284} />
+            </aside>
+          )
         )}
       </div>
 
@@ -114,6 +172,14 @@ export function ExplorePage() {
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1" />
           重置
+        </Button>
+        <Button
+          variant={forceActive ? "secondary" : "tertiary"}
+          size="sm"
+          onClick={toggleForceAnalysis}
+        >
+          <Eye className="h-3.5 w-3.5 mr-1" />
+          {forceActive ? "关闭受力分析" : "受力分析"}
         </Button>
         <Button
           variant="tertiary"
