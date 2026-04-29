@@ -8,6 +8,9 @@ export { integratorStep } from "./engine/integrators";
 export { computeDerived, normalizeAngle, hasInvalidValue, ball2Position } from "./engine/state-vector";
 export type { DerivedValues } from "./engine/state-vector";
 
+// History (EXP-05 时间反演消费)
+export { useSimulationHistory, clearSimulationHistory, getSimulationHistory, pauseHistoryRecording, resumeHistoryRecording } from "./history";
+
 // Worker
 export { Float64Pool } from "./worker/float64-pool";
 export { SimulationScheduler, getScheduler } from "./worker/scheduler";

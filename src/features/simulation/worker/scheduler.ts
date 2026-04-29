@@ -9,6 +9,7 @@ import type {
 import { FRAMES_PER_BATCH } from "@/shared/types";
 import { Float64Pool } from "./float64-pool";
 import { useSimulationStore, BATCH_PREFETCH_THRESHOLD } from "../store";
+import { pushSimulationHistory, clearSimulationHistory } from "../history";
 import { observabilityCoordinator } from "@/shared/lib/observability";
 
 const TIMEOUT_MS = 2000;
@@ -79,6 +80,7 @@ export class SimulationScheduler {
     if (!this.worker) {
       this.createWorker();
     }
+    clearSimulationHistory();
     this.send({
       type: "init",
       params,
@@ -306,6 +308,7 @@ export class SimulationScheduler {
 
     if (this.currentBuffer) {
       store.consumeFrameFromBuffer(this.currentBuffer, this.consumeIndex);
+      pushSimulationHistory(useSimulationStore.getState().state);
       this.consumeIndex++;
 
       if (this.consumeIndex >= BATCH_PREFETCH_THRESHOLD && !this.pendingBatch) {
