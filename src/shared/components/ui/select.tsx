@@ -14,8 +14,8 @@ const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-7 w-full items-center justify-between rounded-md border border-lab-border bg-lab-dark px-2 text-xs text-white",
-      "focus:outline-none focus:ring-1 focus:ring-lab-accent",
+      "flex h-7 w-full items-center justify-between rounded-lg border border-on-surface-variant/10 bg-surface-container-low px-2 text-xs text-on-surface",
+      "focus:outline-none focus:ring-2 focus:ring-primary-focus-glow",
       "disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
@@ -23,7 +23,7 @@ const SelectTrigger = forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-3.5 w-3.5 text-lab-border" />
+      <ChevronDown className="h-3.5 w-3.5 text-on-surface-variant" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -37,7 +37,7 @@ const SelectContent = forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-lab-border bg-lab-panel text-white shadow-md",
+        "relative z-50 min-w-[8rem] overflow-hidden rounded-lg border border-on-surface-variant/10 bg-surface-container text-on-surface shadow-[0_2px_12px_rgba(0,0,0,0.3)]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
         className,
@@ -65,8 +65,8 @@ const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-xs outline-none",
-      "focus:bg-lab-accent/20 focus:text-white",
+      "relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-2 pr-8 text-xs outline-none",
+      "focus:bg-primary-container focus:text-primary",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}

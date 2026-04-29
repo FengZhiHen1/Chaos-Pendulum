@@ -4,21 +4,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-lab-accent disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-lab-accent text-white hover:bg-lab-accent/80",
-        outline: "border border-lab-border bg-transparent hover:bg-lab-panel text-white",
-        ghost: "hover:bg-lab-panel text-lab-border hover:text-white",
+        primary:
+          "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
+        secondary:
+          "bg-surface-container text-primary hover:bg-primary-container",
+        tertiary:
+          "bg-transparent text-on-surface-variant hover:text-on-surface",
+        icon: "h-10 w-10 bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low",
       },
       size: {
-        default: "h-8 px-3 py-1",
-        sm: "h-7 px-2 text-xs",
-        icon: "h-8 w-8",
+        default: "h-9 px-4 py-2",
+        sm: "h-7 px-3 text-xs",
+        icon: "h-10 w-10",
       },
     },
-    defaultVariants: { variant: "default", size: "default" },
+    defaultVariants: { variant: "primary", size: "default" },
   },
 );
 
