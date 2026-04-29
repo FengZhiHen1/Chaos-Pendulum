@@ -29,6 +29,8 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
   const hoverThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingCursorRef = useRef(false);
   const cursorXRef = useRef(0);
+  const cursorDragValueRef = useRef(0); // 拖动中的实时参数值（绕过 React state 闭包过期）
+  const lastSyncedValueRef = useRef<number | null>(null); // 跳过冗余 setCursor
   const transformRef = useRef<ZoomTransform>(zoomIdentity);
 
   const { width: cw, height: ch, ready: sizeReady } = useContainerSize({ ref: containerRef, debounceMs: 100 });
@@ -446,10 +448,12 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
     let val = currentXScale.invert(mx);
     val = Math.max(data.metadata.scannedParam.min, Math.min(data.metadata.scannedParam.max, val));
 
+    cursorDragValueRef.current = val;
+    cursorXRef.current = currentXScale(val);
     setCursor({
       visible: true,
       paramValue: val,
-      x: currentXScale(val),
+      x: cursorXRef.current,
       label: `当前: ${val.toFixed(3)} ${data.metadata.scannedParam.unit}`,
     });
   }, [data, cw, xScale]);
@@ -462,7 +466,8 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
     isDraggingCursorRef.current = false;
 
     const { scannedParam, fixedParams } = data.metadata;
-    const val = cursor.paramValue;
+    // 从 ref 读取拖动终点的实时值（避免 React state 闭包过期）
+    const val = cursorDragValueRef.current;
     const resolved = resolveStoreParam(scannedParam.name, val, fixedParams);
     if (!resolved) {
       console.warn(`[BifurcationPlot] 参数名无法映射: ${scannedParam.name}`);
@@ -476,8 +481,9 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
     } else {
       simInjectParams({ [resolved.storeKey]: resolved.storeValue } as Record<string, number>, {});
     }
+    lastSyncedValueRef.current = val;
     simSetRunning(true);
-  }, [data, cursor.paramValue, simInjectParams, simSetRunning]);
+  }, [data, simInjectParams, simSetRunning]);
 
   useEffect(() => {
     if (!data) return;
@@ -552,10 +558,19 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
   useEffect(() => {
     if (!data || !sizeReady) return;
 
+    // 反向查找：从 scannedParam.name 解析对应的 storeKey
+    const { scannedParam, fixedParams } = data.metadata;
+    const resolved = resolveStoreParam(scannedParam.name, 0, fixedParams);
+
     const updateCursor = () => {
-      const { scannedParam } = data.metadata;
+      if (!resolved) {
+        setCursor((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+
       const state = useSimulationStore.getState();
 
+      // 多路径读取：params + initialConditions
       const storeMap: Record<string, number | undefined> = {
         m1: state.params.m1, m2: state.params.m2,
         L1: state.params.L1, L2: state.params.L2,
@@ -566,17 +581,18 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
         theta2Dot: state.initialConditions.theta2Dot,
       };
 
-      const resolved = resolveStoreParam(scannedParam.name, 0, data.metadata.fixedParams);
-      if (!resolved) {
-        setCursor((prev) => ({ ...prev, visible: false }));
-        return;
-      }
-
       const val = storeMap[resolved.storeKey];
       if (val === undefined || val < scannedParam.min || val > scannedParam.max) {
         setCursor((prev) => ({ ...prev, visible: false }));
         return;
       }
+
+      // 跳过冗余更新：值未变化时不重新 render
+      if (lastSyncedValueRef.current === val) return;
+      lastSyncedValueRef.current = val;
+
+      // 拖动中不覆盖游标位置（由 handleMouseMoveGlobal 控制）
+      if (isDraggingCursorRef.current) return;
 
       const t = transformRef.current;
       const x0 = xScale.invert((-t.x / t.k));
@@ -593,7 +609,9 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
       cursorXRef.current = cx;
     };
 
+    // 订阅仿真 store 变更。updateCursor 内部有值相等 + 拖动守卫，避免冗余 setCursor。
     const unsub = useSimulationStore.subscribe(() => {
+      if (isDraggingCursorRef.current) return; // 拖动中由鼠标事件控制
       updateCursor();
     });
 
