@@ -16,11 +16,31 @@ import { observabilityCoordinator } from "@/shared/lib/observability";
 const TIMEOUT_MS = 2000;
 const MAX_CRASH_RECOVERY = 1;
 
+/** 供渲染层插值使用的坐标快照 */
+export interface InterpSnapshot {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export class SimulationScheduler {
   private worker: Worker | null = null;
   private pool: Float64Pool;
-  private currentBuffer: Float64Array | null = null;
-  private consumeIndex = 0;
+  /** 当前正在消费的缓冲区 */
+  private activeBuffer: Float64Array | null = null;
+  /** activeBuffer 的消费位置 */
+  private activeIndex = 0;
+  /** activeBuffer 的实际帧数（通常 = FRAMES_PER_BATCH，末批可能更少） */
+  private activeFrameCount = FRAMES_PER_BATCH;
+  /** 提前到达的下一批次缓冲区（等待 activeBuffer 消费完毕后提升） */
+  private nextBuffer: Float64Array | null = null;
+  /** nextBuffer 的帧数 */
+  private nextFrameCount = 0;
+  /** nextBuffer 关联的力数据（延迟转发到 labStore） */
+  private nextForceData: Float64Array | null = null;
+  /** nextBuffer 关联的庞加莱截面点（延迟转发） */
+  private nextPoincarePoints: PoincarePoint[] | null = null;
   private pendingBatch = false;
   private rafId = 0;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -29,6 +49,11 @@ export class SimulationScheduler {
   private readyCallbacks: Array<() => void> = [];
   private poincareCondition: PoincareSectionCondition | null = null;
   private poincareCallbacks: Array<(pts: PoincarePoint[]) => void> = [];
+  private externalTick = false;
+
+  // 渲染插值用的前后帧快照（由 consumeOneFrame 维护）
+  private prevSnapshot: InterpSnapshot | null = null;
+  private currSnapshot: InterpSnapshot | null = null;
 
   constructor() {
     this.pool = new Float64Pool();
@@ -51,6 +76,20 @@ export class SimulationScheduler {
   /** 设置当前庞加莱截面条件 */
   setPoincareCondition(cond: PoincareSectionCondition | null): void {
     this.poincareCondition = cond;
+  }
+
+  /** 启用外部 tick 模式：start/resume 不再启动内部 rAF，由渲染层驱动 */
+  enableExternalTick(): void {
+    this.externalTick = true;
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = 0;
+    }
+  }
+
+  /** 禁用外部 tick 模式，恢复内部 rAF 循环 */
+  disableExternalTick(): void {
+    this.externalTick = false;
   }
 
   // ─── 公开 API ────────────────────────────────
@@ -82,13 +121,17 @@ export class SimulationScheduler {
       this.createWorker();
     }
     clearSimulationHistory();
+    this.prevSnapshot = null;
+    this.currSnapshot = null;
     this.send({
       type: "init",
       params,
       initialConditions,
       method,
     });
-    this.rafId = requestAnimationFrame(() => this.loop());
+    if (!this.externalTick) {
+      this.rafId = requestAnimationFrame(() => this.loop());
+    }
   }
 
   /** 暂停仿真 */
@@ -108,7 +151,9 @@ export class SimulationScheduler {
   resume(): void {
     if (this.running || !this.worker) return;
     this.running = true;
-    this.rafId = requestAnimationFrame(() => this.loop());
+    if (!this.externalTick) {
+      this.rafId = requestAnimationFrame(() => this.loop());
+    }
   }
 
   /** 停止并销毁 */
@@ -118,11 +163,22 @@ export class SimulationScheduler {
       this.worker.terminate();
       this.worker = null;
     }
-    this.currentBuffer = null;
-    this.consumeIndex = 0;
+    if (this.activeBuffer) {
+      this.pool.releaseBuffer(this.activeBuffer);
+      this.activeBuffer = null;
+    }
+    if (this.nextBuffer) {
+      this.pool.releaseBuffer(this.nextBuffer);
+      this.nextBuffer = null;
+    }
+    this.activeIndex = 0;
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
     this.pendingBatch = false;
     this.crashCount = 0;
     this.poincareCondition = null;
+    this.prevSnapshot = null;
+    this.currSnapshot = null;
   }
 
   /** 更新物理参数 */
@@ -147,10 +203,27 @@ export class SimulationScheduler {
 
   /** 重置仿真 */
   reset(initialConditions: InitialConditions): void {
-    this.consumeIndex = 0;
-    this.currentBuffer = null;
+    if (this.activeBuffer) {
+      this.pool.releaseBuffer(this.activeBuffer);
+      this.activeBuffer = null;
+    }
+    if (this.nextBuffer) {
+      this.pool.releaseBuffer(this.nextBuffer);
+      this.nextBuffer = null;
+    }
+    this.activeIndex = 0;
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
     this.pendingBatch = false;
+    this.prevSnapshot = null;
+    this.currSnapshot = null;
     this.send({ type: "reset", initialConditions });
+  }
+
+  /** 外部驱动：消费一帧数据（external tick 模式下由 useFrame 调用） */
+  tick(): void {
+    if (!this.running) return;
+    this.consumeOneFrame();
   }
 
   get isRunning(): boolean {
@@ -221,22 +294,42 @@ export class SimulationScheduler {
           } catch { /* 静默忽略 */ }
         }
 
-        this.currentBuffer = resp.buffer;
-        this.consumeIndex = 0;
         this.pendingBatch = false;
 
-        // 转发力数据到 labStore
-        if (resp.forceData) {
-          const labStore = useLabStore.getState();
-          labStore.setLastForceData(resp.forceData);
-          if (resp.forceExtrema) {
-            labStore.setForceExtrema(resp.forceExtrema);
+        // 双缓冲：若 activeBuffer 仍在消费中，新批次暂存到 nextBuffer
+        if (this.activeBuffer !== null && this.activeIndex < FRAMES_PER_BATCH) {
+          // 旧批次仍有未消费帧 → 暂存新批次，不覆盖
+          if (this.nextBuffer) {
+            this.pool.releaseBuffer(this.nextBuffer);
+          }
+          this.nextBuffer = resp.buffer;
+          this.nextFrameCount = resp.frameCount;
+          this.nextForceData = resp.forceData ?? null;
+          this.nextPoincarePoints = resp.poincarePoints ?? null;
+        } else {
+          // 旧批次已消费完毕（或无活跃批次）→ 直接激活新批次
+          this.activeBuffer = resp.buffer;
+          this.activeIndex = 0;
+          this.activeFrameCount = resp.frameCount;
+
+          // 转发力数据到 labStore
+          if (resp.forceData) {
+            const labStore = useLabStore.getState();
+            labStore.setLastForceData(resp.forceData);
+            if (resp.forceExtrema) {
+              labStore.setForceExtrema(resp.forceExtrema);
+            }
+          }
+
+          // 转发庞加莱截面点
+          if (resp.poincarePoints && resp.poincarePoints.length > 0) {
+            for (const cb of this.poincareCallbacks) cb(resp.poincarePoints);
           }
         }
 
-        // 转发庞加莱截面点
-        if (resp.poincarePoints && resp.poincarePoints.length > 0) {
-          for (const cb of this.poincareCallbacks) cb(resp.poincarePoints);
+        // 力极值是全局累积值，无论哪个批次都立即更新
+        if (resp.forceExtrema && !resp.forceData) {
+          useLabStore.getState().setForceExtrema(resp.forceExtrema);
         }
 
         if (resp.frameCount < FRAMES_PER_BATCH) {
@@ -286,15 +379,21 @@ export class SimulationScheduler {
     this.crashCount++;
     const store = useSimulationStore.getState();
 
-    if (this.currentBuffer) {
-      this.pool.releaseBuffer(this.currentBuffer);
-      this.currentBuffer = null;
+    if (this.activeBuffer) {
+      this.pool.releaseBuffer(this.activeBuffer);
+      this.activeBuffer = null;
     }
+    if (this.nextBuffer) {
+      this.pool.releaseBuffer(this.nextBuffer);
+      this.nextBuffer = null;
+    }
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
 
     this.worker?.terminate();
     this.createWorker();
     this.pendingBatch = false;
-    this.consumeIndex = 0;
+    this.activeIndex = 0;
 
     this.send({
       type: "init",
@@ -317,29 +416,79 @@ export class SimulationScheduler {
   // ─── 帧调度循环 ─────────────────────────────
 
   private loop(): void {
-    if (!this.running) return;
+    this.consumeOneFrame();
+    this.rafId = requestAnimationFrame(() => this.loop());
+  }
 
+  /** 消费一帧数据（内部 rAF 和外部 tick 共用） */
+  private consumeOneFrame(): void {
     const store = useSimulationStore.getState();
 
-    if (this.currentBuffer) {
-      store.consumeFrameFromBuffer(this.currentBuffer, this.consumeIndex);
-      pushSimulationHistory(useSimulationStore.getState().state);
-      this.consumeIndex++;
+    if (this.activeBuffer) {
+      // 将当前快照降级为前一帧快照
+      if (this.currSnapshot) {
+        this.prevSnapshot = { ...this.currSnapshot };
+      }
 
-      if (this.consumeIndex >= BATCH_PREFETCH_THRESHOLD && !this.pendingBatch) {
+      store.consumeFrameFromBuffer(this.activeBuffer, this.activeIndex);
+      pushSimulationHistory(useSimulationStore.getState().state);
+      this.activeIndex++;
+
+      // 从更新后的 store 读取新的当前快照
+      const s = useSimulationStore.getState();
+      this.currSnapshot = {
+        x1: s.x1,
+        y1: s.y1,
+        x2: s.x2,
+        y2: s.y2,
+      };
+
+      if (this.activeIndex >= BATCH_PREFETCH_THRESHOLD && !this.pendingBatch && !this.nextBuffer) {
         this.requestNextBatch();
       }
 
-      if (this.consumeIndex >= FRAMES_PER_BATCH) {
-        this.pool.releaseBuffer(this.currentBuffer);
-        this.currentBuffer = null;
-        this.consumeIndex = 0;
+      if (this.activeIndex >= this.activeFrameCount) {
+        // 归还旧缓冲区到池
+        this.pool.releaseBuffer(this.activeBuffer);
+
+        // 提升 nextBuffer 为 activeBuffer（若存在）
+        if (this.nextBuffer) {
+          this.activeBuffer = this.nextBuffer;
+          this.activeIndex = 0;
+          this.activeFrameCount = this.nextFrameCount;
+          this.nextBuffer = null;
+
+          // 转发延迟的力数据
+          if (this.nextForceData) {
+            const labStore = useLabStore.getState();
+            labStore.setLastForceData(this.nextForceData);
+            this.nextForceData = null;
+          }
+
+          // 转发延迟的庞加莱截面点
+          if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
+            for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);
+            this.nextPoincarePoints = null;
+          }
+
+          // 若新批次消费到阈值且有空间预取下一批
+          if (this.activeIndex < BATCH_PREFETCH_THRESHOLD && !this.pendingBatch) {
+            this.requestNextBatch();
+          }
+        } else {
+          this.activeBuffer = null;
+          this.activeIndex = 0;
+          this.activeFrameCount = FRAMES_PER_BATCH;
+        }
       }
     } else if (!this.pendingBatch) {
       this.requestNextBatch();
     }
+  }
 
-    this.rafId = requestAnimationFrame(() => this.loop());
+  /** 获取供渲染插值用的前后帧快照 */
+  getInterpolationFrames(): { prev: InterpSnapshot | null; curr: InterpSnapshot | null } {
+    return { prev: this.prevSnapshot, curr: this.currSnapshot };
   }
 
   private requestNextBatch(): void {
@@ -370,9 +519,7 @@ export class SimulationScheduler {
     this.timeoutId = setTimeout(() => {
       console.error("[scheduler] Worker 积分超时 2s");
       this.pendingBatch = false;
-      if (this.currentBuffer === slot.buffer) {
-        this.currentBuffer = null;
-      }
+      // 超时的 buffer 已被 transfer 到 Worker，Worker 已无响应，槽位作废
       this.pool.release(slot.index);
       this.handleWorkerCrash(new ErrorEvent("timeout"));
     }, TIMEOUT_MS);
