@@ -1,12 +1,12 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
 import { useSimulationStore, ball2Position } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
-import { useAppStore } from "@/stores/useAppStore";
 import { useTrailBuffer } from "../hooks/useTrailBuffer";
+import { useSceneController } from "../hooks/useSceneController";
 import type { TrailPoint } from "../hooks/useTrailBuffer";
 import type { PendulumParams, StateVector } from "@/shared/types";
 import { TrailRenderer } from "./TrailRenderer";
@@ -161,40 +161,22 @@ export function Scene3D({
   butterflySide,
   canvasChildren,
 }: Scene3DProps) {
-  const deviceType = useAppStore((s) => s.deviceType);
+  const {
+    webglSupported,
+    webglLost,
+    webglLostPermanent,
+    nanToast,
+    paramInvalid,
+    setParamInvalid,
+    handleNanToast,
+    effectiveShowGrid,
+    effectiveEnableShadows,
+    sphereSegments,
+    cylinderSegments,
+    onCanvasCreated,
+  } = useSceneController(showGrid, enableShadows);
 
-  const [webglSupported, setWebglSupported] = useState(true);
-  const [webglLost, setWebglLost] = useState(false);
-  const [webglLostPermanent, setWebglLostPermanent] = useState(false);
-  const [paramInvalid, setParamInvalid] = useState(false);
-  const [nanToast, setNanToast] = useState(false);
-
-  // EXP-02: 尾迹数据管理
   const { trailPoints, appendPoint, clear: clearTrail } = useTrailBuffer();
-
-  const webglLostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const nanToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // WebGL 支持检测
-  useEffect(() => {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2");
-    setWebglSupported(!!gl);
-  }, []);
-
-  const handleNanToast = useCallback(() => {
-    setNanToast(true);
-    if (nanToastTimerRef.current) clearTimeout(nanToastTimerRef.current);
-    nanToastTimerRef.current = setTimeout(() => {
-      setNanToast(false);
-    }, 5000);
-  }, []);
-
-  // 响应式降级
-  const effectiveShowGrid = deviceType === "mobile" ? false : showGrid;
-  const effectiveEnableShadows = deviceType !== "desktop" ? false : enableShadows;
-  const sphereSegments = deviceType === "desktop" ? 32 : deviceType === "tablet" ? 16 : 8;
-  const cylinderSegments = deviceType === "desktop" ? 16 : deviceType === "tablet" ? 8 : 4;
 
   const envConfig = ENVIRONMENT_CONFIGS[environment];
 
@@ -245,23 +227,7 @@ export function Scene3D({
         style={{ background: envConfig.background }}
         onCreated={({ gl }) => {
           if (!gl) return;
-          gl.domElement.addEventListener("webglcontextlost", (e) => {
-            e.preventDefault();
-            setWebglLost(true);
-            setWebglLostPermanent(false);
-            console.error("EXP-01: WebGL context lost");
-            webglLostTimerRef.current = setTimeout(() => {
-              setWebglLostPermanent(true);
-            }, 5000);
-          });
-          gl.domElement.addEventListener("webglcontextrestored", () => {
-            setWebglLost(false);
-            setWebglLostPermanent(false);
-            if (webglLostTimerRef.current) {
-              clearTimeout(webglLostTimerRef.current);
-              webglLostTimerRef.current = null;
-            }
-          });
+          onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement });
         }}
       >
         <SceneContent
