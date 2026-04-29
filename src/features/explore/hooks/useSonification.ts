@@ -1,0 +1,142 @@
+import { useEffect, useRef, useCallback } from "react";
+import { useSimulationStore, normalizeAngle } from "@/features/simulation";
+import { useExploreStore } from "../store";
+import { useAppStore } from "@/stores/useAppStore";
+import { useChaosIndicator } from "./useChaosIndicator";
+import {
+  createSonificationEngine,
+  resumeAudioContext,
+  closeAudioContext,
+} from "@/shared/audio";
+import type { SonificationEngine } from "@/shared/audio";
+
+// ─── 常量 ──────────────────────────────────────────
+
+const MAX_ENERGY_EMA_ALPHA = 0.0005; // 半衰期 ≈ 33 秒
+const MAX_ENERGY_MIN = 0.1;
+
+// ─── Hook 返回类型 ─────────────────────────────────
+
+export interface UseSonificationAPI {
+  isActive: boolean;
+  toggle: () => void;
+}
+
+/**
+ * 声音化引擎 Hook。
+ *
+ * 管理音频引擎生命周期：
+ * - 仅桌面端启用
+ * - 惰性初始化（首次 toggle 时创建引擎）
+ * - 每仿真帧更新音频参数
+ * - 组件卸载时清理
+ */
+export function useSonification(): UseSonificationAPI {
+  const deviceType = useAppStore((s) => s.deviceType);
+  const sonificationEnabled = useExploreStore((s) => s.sonificationEnabled);
+  const setSonificationEnabled = useExploreStore((s) => s.setSonificationEnabled);
+
+  const engineRef = useRef<SonificationEngine | null>(null);
+  const maxObservedEnergyRef = useRef(MAX_ENERGY_MIN);
+  const initializedRef = useRef(false);
+  const chaosIndicator = useChaosIndicator();
+
+  // ── 惰性初始化引擎 ──
+  const initEngine = useCallback(() => {
+    if (initializedRef.current && engineRef.current) return;
+    try {
+      engineRef.current = createSonificationEngine();
+      initializedRef.current = true;
+    } catch (err) {
+      console.error("EXP-03: Failed to create sonification engine", err);
+    }
+  }, []);
+
+  // ── 开关切换 ──
+  const toggle = useCallback(() => {
+    if (deviceType !== "desktop") return;
+
+    if (!sonificationEnabled) {
+      // 开启：恢复 AudioContext + 初始化/启用引擎
+      resumeAudioContext()
+        .then(() => {
+          initEngine();
+          if (engineRef.current) {
+            engineRef.current.setEnabled(true);
+          }
+          setSonificationEnabled(true);
+        })
+        .catch(() => {
+          console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
+        });
+    } else {
+      // 关闭：静音但不销毁引擎
+      if (engineRef.current) {
+        engineRef.current.setEnabled(false);
+      }
+      setSonificationEnabled(false);
+    }
+  }, [deviceType, sonificationEnabled, setSonificationEnabled, initEngine]);
+
+  // ── 每帧音频参数更新（订阅仿真时间变化） ──
+  const simTime = useSimulationStore((s) => s.t);
+  const prevSimTimeRef = useRef(simTime);
+
+  useEffect(() => {
+    if (!sonificationEnabled || !engineRef.current || deviceType !== "desktop") return;
+
+    // 仿真时间未变化则跳过（防止重复更新）
+    if (simTime === prevSimTimeRef.current) return;
+    prevSimTimeRef.current = simTime;
+
+    const store = useSimulationStore.getState();
+
+    // 仿真暂停时保持当前音频参数不变
+    if (!store.isRunning) return;
+
+    const { state, kineticEnergy } = store;
+
+    // NaN 保护
+    if (isNaN(state.omega2) || isNaN(state.theta1) || isNaN(state.theta2) || isNaN(kineticEnergy)) {
+      return;
+    }
+
+    const angleBetween = Math.abs(normalizeAngle(state.theta2 - state.theta1));
+
+    // 更新 maxObservedEnergy（EMA 衰减避免历史峰值永久拉高归一化上限）
+    maxObservedEnergyRef.current = Math.max(
+      maxObservedEnergyRef.current * (1 - MAX_ENERGY_EMA_ALPHA) + kineticEnergy * MAX_ENERGY_EMA_ALPHA,
+      kineticEnergy,
+      MAX_ENERGY_MIN,
+    );
+
+    // 混沌检测
+    const { variance } = chaosIndicator.pushAndGet(state.omega2);
+
+    // 更新引擎
+    engineRef.current.update({
+      omega2: state.omega2,
+      angleBetween,
+      kineticEnergy,
+      omega2Variance: variance,
+      maxObservedEnergy: maxObservedEnergyRef.current,
+    });
+  }, [simTime, sonificationEnabled, deviceType, chaosIndicator]);
+
+  // ── 卸载清理 ──
+  useEffect(() => {
+    return () => {
+      if (engineRef.current) {
+        engineRef.current.dispose();
+        engineRef.current = null;
+        initializedRef.current = false;
+      }
+      closeAudioContext();
+    };
+  }, []);
+
+  return {
+    isActive: sonificationEnabled,
+    toggle,
+  };
+}
