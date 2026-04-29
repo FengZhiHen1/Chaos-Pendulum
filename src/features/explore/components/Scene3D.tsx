@@ -31,6 +31,8 @@ export interface Scene3DProps {
   className?: string;
   /** 蝴蝶效应模式下的分侧标识。非 butterfly 模式下不传 */
   butterflySide?: "A" | "B";
+  /** Canvas 内的附加子节点（EXP-05 轨迹叠加层等） */
+  canvasChildren?: React.ReactNode;
 }
 
 interface CameraConfig {
@@ -157,6 +159,7 @@ export function Scene3D({
   enableShadows = true,
   className = "w-full h-full",
   butterflySide,
+  canvasChildren,
 }: Scene3DProps) {
   const deviceType = useAppStore((s) => s.deviceType);
 
@@ -275,6 +278,7 @@ export function Scene3D({
           onTrailClear={clearTrail}
           butterflySide={butterflySide}
         />
+        {canvasChildren}
       </Canvas>
 
       {/* 参数异常遮罩 */}
