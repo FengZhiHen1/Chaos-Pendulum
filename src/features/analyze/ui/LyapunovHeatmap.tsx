@@ -3,6 +3,7 @@ import { scaleSequential } from "d3-scale";
 import { interpolateRdBu, interpolateViridis } from "d3-scale-chromatic";
 import { useAnalyzeStore } from "../store";
 import { useSimulationStore } from "@/features/simulation";
+import { useAppStore } from "@/stores/useAppStore";
 import { useContainerSize } from "@/shared/hooks/useContainerSize";
 import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
 import { measure } from "@/shared/lib/observability/perf-mark";
@@ -341,6 +342,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
       newIC as Parameters<typeof simInjectParams>[1],
     );
     simSetRunning(true);
+    useAppStore.getState().setMode("explore");
 
     setDialogOpen(false);
     setDialogCell(null);
