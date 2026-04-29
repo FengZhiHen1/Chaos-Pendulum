@@ -1,6 +1,7 @@
-import { useEffect, useCallback, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import { setupSimulationBridge } from "@/features/simulation";
+import { useKeyboardShortcuts } from "@/shared/hooks/useKeyboardShortcuts";
+import { useSimulationBridge } from "@/shared/hooks/useSimulationBridge";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import type { AppMode } from "@/shared/types";
 import { MODE_REGISTRY } from "@/shared/types";
@@ -11,38 +12,13 @@ interface AppShellProps {
   children?: ReactNode;
 }
 
-const SHORTCUT_MAP: Record<string, AppMode> = {
-  "1": "explore",
-  "2": "analyze",
-  "3": "lab",
-  "4": "story",
-};
-
 export function AppShell({ children }: AppShellProps) {
   const activeMode = useAppStore((s) => s.activeMode);
   const deviceType = useAppStore((s) => s.deviceType);
-  const setMode = useAppStore((s) => s.setMode);
   const isDesktop = deviceType === "desktop";
 
-  useEffect(() => {
-    const cleanup = setupSimulationBridge();
-    return cleanup;
-  }, []);
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-      const mode = SHORTCUT_MAP[e.key];
-      if (mode) setMode(mode);
-    },
-    [setMode],
-  );
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  useKeyboardShortcuts();
+  useSimulationBridge();
 
   const childrenArray = children != null ? Array.from({ length: 4 }, (_, i) => {
     if (Array.isArray(children)) return children[i];
