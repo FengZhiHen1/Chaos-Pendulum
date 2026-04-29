@@ -12,17 +12,52 @@ export default {
         xl: `${BREAKPOINTS.DESKTOP_WIDE}px`,
       },
       colors: {
-        lab: {
-          dark: "#0a0a0f",
-          panel: "#14141f",
-          border: "#2a2a3f",
-          accent: "#6c5ce7",
-          gold: "#f0c040",
-          purple: "#a855f7",
+        // ── Dark Room Surface System ──
+        surface: {
+          DEFAULT: "#1A1D22",
+          "container-lowest": "#1E2127",
+          "container-low": "#23262C",
+          container: "#2A2D34",
+          "container-high": "#31353D",
         },
+        // ── Bright Stage (3D viewport only) ──
+        stage: {
+          DEFAULT: "#EAECEF",
+        },
+        // ── On-surface text ──
+        "on-surface": {
+          DEFAULT: "#E8EAED",
+          variant: "#9BA0AA",
+        },
+        // ── On-stage text (inside 3D viewport) ──
+        "on-stage": {
+          DEFAULT: "#1B1D21",
+          variant: "#606670",
+        },
+        // ── Brand Accent (Tech Blue) ──
+        primary: {
+          DEFAULT: "#4B9FFF",
+          container: "#1C3A5E",
+          hover: "#6BB3FF",
+          "focus-glow": "rgba(75, 159, 255, 0.25)",
+        },
+        // ── Semantic Data Colors ──
+        "force-gravity": "#4ADE80",
+        "force-tension": "#F87171",
+        "force-inertia": "#60A5FA",
+        "trail-slow": "#3B82F6",
+        "trail-fast": "#EF4444",
+        "lyapunov-stable": "#1E3A5F",
+        "lyapunov-neutral": "#2DD4BF",
+        "lyapunov-chaotic": "#F97316",
+        "separation-alert": "#FF3B3B",
       },
       fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "Fira Code", "monospace"],
+      },
+      borderRadius: {
+        DEFAULT: "8px",
       },
     },
   },
