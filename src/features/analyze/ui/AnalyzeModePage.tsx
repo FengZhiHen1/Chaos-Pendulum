@@ -1,7 +1,6 @@
-import { useAnalyzeStore } from "../store";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { useAppStore } from "@/stores/useAppStore";
+import { useAnalysisView } from "../hooks/useAnalysisView";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
@@ -16,10 +15,8 @@ const LYAPUNOV_PATHS = {
 const BIFURCATION_PATH = "/assets/bifurcation-a1b3f2e8.json";
 
 export function AnalyzeModePage() {
-  const activeView = useAnalyzeStore((s) => s.activeView);
-  const setActiveView = useAnalyzeStore((s) => s.setActiveView);
-  const loadStatus = useAnalyzeStore((s) => s.loadStatus);
-  const isDesktop = useAppStore((s) => s.deviceType === "desktop");
+  const { activeView, setActiveView, loadStatus, isDesktop } =
+    useAnalysisView();
 
   return (
     <div className="h-full w-full flex">

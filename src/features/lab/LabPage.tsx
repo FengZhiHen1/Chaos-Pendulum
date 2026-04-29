@@ -1,8 +1,7 @@
-import { useCallback } from "react";
 import { FlaskConical, CheckCircle, XCircle, Circle, FileText, Code, Play } from "lucide-react";
 import { useLabStore } from "./store";
+import { useLabValidation } from "./hooks/useLabValidation";
 import { cn } from "@/shared/lib/cn";
-import { runAllValidations } from "./validation-runner";
 
 const TEMPLATES = [
   { id: "spring", name: "弹簧摆", file: "spring-pendulum.py" },
@@ -16,7 +15,7 @@ const CHECKS = [
   { key: "energy" as const, label: "能量漂移 (<0.5%)", desc: "无阻尼状态下能量相对漂移" },
 ];
 
-function StatusIcon({ status }: { status: "idle" | "running" | "passed" | "failed" }) {
+function StatusIcon({ status }: { status?: "idle" | "running" | "passed" | "failed" }) {
   switch (status) {
     case "passed":
       return <CheckCircle className="w-4 h-4 text-emerald-400" />;
@@ -30,39 +29,16 @@ function StatusIcon({ status }: { status: "idle" | "running" | "passed" | "faile
 }
 
 export function LabPage() {
-  const validationResults = useLabStore((s) => s.validationResults);
-  const validationDetails = useLabStore((s) => s.validationDetails);
-  const validationRunning = useLabStore((s) => s.validationRunning);
-  const allPassed = useLabStore((s) => s.allPassed);
-  const setValidationResult = useLabStore((s) => s.setValidationResult);
-  const setValidationDetail = useLabStore((s) => s.setValidationDetail);
-  const setValidationRunning = useLabStore((s) => s.setValidationRunning);
-  const setAllPassed = useLabStore((s) => s.setAllPassed);
+  const {
+    validationResults,
+    validationDetails,
+    isRunning: validationRunning,
+    allPassed,
+    anyHasRun,
+    handleRunValidation,
+  } = useLabValidation();
+
   const activeTemplate = useLabStore((s) => s.activeTemplate);
-
-  const handleRunValidation = useCallback(() => {
-    setValidationRunning(true);
-    // 先将所有状态重置为 running
-    setValidationResult("smallAngle", "running");
-    setValidationResult("singlePendulum", "running");
-    setValidationResult("energy", "running");
-    setAllPassed(false);
-
-    // 使用 setTimeout 让 UI 先更新
-    setTimeout(() => {
-      const results = runAllValidations("RK4");
-      let allOk = true;
-      for (const r of results) {
-        setValidationResult(r.test, r.passed ? "passed" : "failed");
-        setValidationDetail(r.test, r.detail);
-        if (!r.passed) allOk = false;
-      }
-      setAllPassed(allOk);
-      setValidationRunning(false);
-    }, 50);
-  }, [setValidationResult, setValidationDetail, setValidationRunning, setAllPassed]);
-
-  const anyHasRun = Object.values(validationResults).some((s) => s !== "idle");
 
   return (
     <div className="w-full h-full flex flex-col">
