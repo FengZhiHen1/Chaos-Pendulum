@@ -73,7 +73,7 @@ export function DeltaPanel({
         <span>δ:</span>
         <input
           type="number"
-          className="w-20 px-1 py-0.5 rounded text-xs bg-transparent border border-gray-600 text-white"
+          className="w-20 px-1 py-0.5 rounded text-xs bg-transparent border border-gray-600 text-on-surface"
           value={deltaDeg}
           min={0}
           max={10}
@@ -121,7 +121,7 @@ export function DeltaPanel({
             onClick={() => onEditModeChange(mode)}
             className={`px-2 py-0.5 rounded text-xs transition-colors ${
               editMode === mode
-                ? "bg-lab-accent text-lab-dark"
+                ? "bg-primary text-[#0D1117]"
                 : "bg-gray-800 text-gray-400 hover:bg-gray-700"
             }`}
           >

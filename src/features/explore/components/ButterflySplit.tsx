@@ -105,7 +105,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
           <button
             type="button"
             onClick={store.isRunning ? handlePause : handlePlay}
-            className="px-3 py-1 rounded text-sm font-medium transition-colors bg-lab-accent text-lab-dark hover:opacity-90"
+            className="px-3 py-1 rounded text-sm font-medium transition-colors bg-primary text-[#0D1117] hover:opacity-90"
           >
             {store.isRunning ? "暂停" : "播放"}
           </button>
@@ -131,7 +131,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
         {isDesktop ? (
           <div className="flex w-full h-full">
             {/* 摆 A */}
-            <div className="relative flex-1 border-r" style={{ borderColor: "#2a2a3f" }}>
+            <div className="relative flex-1 border-r" style={{ borderColor: "#2A2D34" }}>
               <div className="absolute top-2 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50">
                 摆 A — δ=0
               </div>
@@ -146,7 +146,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             </div>
 
             {/* 摆 B */}
-            <div className="relative flex-1 border-l" style={{ borderColor: "#2a2a3f" }}>
+            <div className="relative flex-1 border-l" style={{ borderColor: "#2A2D34" }}>
               <div className="absolute top-2 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50">
                 摆 B — δ={butterflyDelta}°
               </div>

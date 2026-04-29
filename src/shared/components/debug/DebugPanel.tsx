@@ -122,20 +122,20 @@ export function DebugPanel() {
       {/* 面板 */}
       <div
         className={cn(
-          "fixed top-0 right-0 z-50 h-full w-[400px] max-w-[90vw] bg-lab-panel border-l border-lab-border shadow-2xl transition-transform duration-300 ease-in-out",
+          "fixed top-0 right-0 z-50 h-full w-[400px] max-w-[90vw] bg-surface-container-low border-l border-white/5 shadow-2xl transition-transform duration-300 ease-in-out",
           open ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* 头部 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-lab-border">
-          <div className="flex items-center gap-2 text-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <div className="flex items-center gap-2 text-on-surface">
             <Bug className="w-4 h-4" />
             <span className="text-sm font-medium">调试面板</span>
           </div>
           <Button
-            variant="ghost"
+            variant="tertiary"
             size="icon"
-            className="h-7 w-7 text-lab-border hover:text-white"
+            className="h-7 w-7 text-on-surface-variant hover:text-on-surface"
             onClick={() => setOpen(false)}
             aria-label="关闭"
           >
@@ -178,25 +178,25 @@ export function DebugPanel() {
               value={String(errorCount)}
               valueClass={errorCountColor(errorCount)}
             />
-            <MetricRow label="当前模式" value={activeMode} valueClass="text-lab-border" />
-            <MetricRow label="设备类型" value={deviceType} valueClass="text-lab-border" />
+            <MetricRow label="当前模式" value={activeMode} valueClass="text-on-surface-variant" />
+            <MetricRow label="设备类型" value={deviceType} valueClass="text-on-surface-variant" />
           </TabsContent>
 
           {/* Tab 2: 错误日志 */}
           <TabsContent value="errors" className="mt-4">
             <div className="flex gap-2 mb-3">
-              <Button variant="outline" size="sm" className="text-xs" onClick={handleClearErrors}>
+              <Button variant="secondary" size="sm" className="text-xs" onClick={handleClearErrors}>
                 <Trash2 className="w-3 h-3 mr-1" />
                 清空日志
               </Button>
-              <Button variant="outline" size="sm" className="text-xs" onClick={handleCopyErrors}>
+              <Button variant="secondary" size="sm" className="text-xs" onClick={handleCopyErrors}>
                 <Copy className="w-3 h-3 mr-1" />
                 复制全部
               </Button>
             </div>
             <div className="h-[calc(100vh-220px)] overflow-y-auto space-y-1 pr-1">
               {debugInfo.errors.length === 0 ? (
-                <p className="text-xs text-lab-border py-4 text-center">暂无错误</p>
+                <p className="text-xs text-on-surface-variant py-4 text-center">暂无错误</p>
               ) : (
                 debugInfo.errors.map((err, i) => (
                   <div
@@ -214,11 +214,11 @@ export function DebugPanel() {
           <TabsContent value="performance" className="mt-4 space-y-4">
             {/* Worker 耗时分布 */}
             <div>
-              <h4 className="text-xs font-medium text-white mb-2">
+              <h4 className="text-xs font-medium text-on-surface mb-2">
                 Worker 耗时分布（最近 {debugInfo.workerLatencyMs.length} 次）
               </h4>
               {debugInfo.workerLatencyMs.length === 0 ? (
-                <p className="text-xs text-lab-border py-2">暂无性能数据</p>
+                <p className="text-xs text-on-surface-variant py-2">暂无性能数据</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <StatBox label="p50" value={`${latencyStats.p50.toFixed(1)}ms`} />
@@ -231,9 +231,9 @@ export function DebugPanel() {
 
             {/* FPS 时间线 */}
             <div>
-              <h4 className="text-xs font-medium text-white mb-2">FPS 时间线（最近 10s）</h4>
+              <h4 className="text-xs font-medium text-on-surface mb-2">FPS 时间线（最近 10s）</h4>
               {debugInfo.fpsHistory.length === 0 ? (
-                <p className="text-xs text-lab-border py-2">暂无数据</p>
+                <p className="text-xs text-on-surface-variant py-2">暂无数据</p>
               ) : (
                 <div className="font-mono text-xs text-green-400 leading-tight">
                   {sparkline(debugInfo.fpsHistory)}
@@ -258,7 +258,7 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-lab-border">{label}</span>
+      <span className="text-on-surface-variant">{label}</span>
       <span className={cn("font-mono", valueClass)}>{value}</span>
     </div>
   );
@@ -266,9 +266,9 @@ function MetricRow({
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-lab-dark rounded px-2 py-1.5">
-      <div className="text-lab-border text-[10px] uppercase">{label}</div>
-      <div className="text-white font-mono text-xs">{value}</div>
+    <div className="bg-surface rounded px-2 py-1.5">
+      <div className="text-on-surface-variant text-[10px] uppercase">{label}</div>
+      <div className="text-on-surface font-mono text-xs">{value}</div>
     </div>
   );
 }

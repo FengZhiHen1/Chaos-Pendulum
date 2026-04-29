@@ -626,20 +626,20 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
 
   return (
     <div className="flex flex-col h-full w-full gap-2">
-      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden border border-lab-border">
+      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden border border-white/5">
         {(loadStatus === "loading" || loadStatus === "idle") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div className="w-full h-full animate-pulse bg-lab-border/20" />
+            <div className="w-full h-full animate-pulse bg-surface-container/20" />
           </div>
         )}
 
         {loadStatus === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-lab-dark">
-            <p className="text-sm text-white">{loadError}</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface">
+            <p className="text-sm text-on-surface">{loadError}</p>
             {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
-              <p className="text-xs text-lab-border">数据格式错误，请重新生成预计算数据</p>
+              <p className="text-xs text-on-surface-variant">数据格式错误，请重新生成预计算数据</p>
             ) : (
-              <Button variant="outline" size="sm" onClick={handleRetry}>
+              <Button variant="secondary" size="sm" onClick={handleRetry}>
                 重试
               </Button>
             )}
@@ -660,7 +660,7 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
             {/* HUD */}
             {hover.visible && (
               <div
-                className="absolute z-50 pointer-events-none rounded-md border border-lab-border bg-lab-panel px-2 py-1 text-xs text-white shadow-md"
+                className="absolute z-50 pointer-events-none rounded-md border border-white/5 bg-surface-container-low px-2 py-1 text-xs text-on-surface shadow-md"
                 style={{
                   left: Math.min(hover.position.x + 12, (cw || 0) - 180),
                   top: Math.max(hover.position.y - 12, 0),
@@ -674,7 +674,7 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
                   采样点：{hover.pointCount}（{hover.regime}）
                 </div>
                 {hover.sampledValues && hover.sampledValues.length > 0 && (
-                  <div className="mt-0.5 text-lab-border max-w-[200px] truncate">
+                  <div className="mt-0.5 text-on-surface-variant max-w-[200px] truncate">
                     {hover.sampledVariableName} = {"{"}
                     {hover.sampledValues.slice(0, 6).map((v) => v.toFixed(2)).join(", ")}
                     {hover.sampledValues.length > 6 ? ", ..." : ""}

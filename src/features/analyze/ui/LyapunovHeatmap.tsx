@@ -495,20 +495,20 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
         </TabsList>
       </Tabs>
 
-      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden bg-lab-dark border border-lab-border">
+      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden bg-surface border border-white/5">
         {(loadStatus === "loading" || loadStatus === "idle") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div className="w-full h-full animate-pulse bg-lab-border/20" />
+            <div className="w-full h-full animate-pulse bg-surface-container/20" />
           </div>
         )}
 
         {loadStatus === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-lab-dark">
-            <p className="text-sm text-white">{loadError}</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface">
+            <p className="text-sm text-on-surface">{loadError}</p>
             {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
-              <p className="text-xs text-lab-border">数据格式错误，请重新生成预计算数据</p>
+              <p className="text-xs text-on-surface-variant">数据格式错误，请重新生成预计算数据</p>
             ) : (
-              <Button variant="outline" size="sm" onClick={handleRetry}>
+              <Button variant="secondary" size="sm" onClick={handleRetry}>
                 重试
               </Button>
             )}
@@ -556,7 +556,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
 
             {hoverTooltip.visible && (
               <div
-                className="absolute z-50 pointer-events-none rounded-md border border-lab-border bg-lab-panel px-2 py-1 text-xs text-white shadow-md"
+                className="absolute z-50 pointer-events-none rounded-md border border-white/5 bg-surface-container-low px-2 py-1 text-xs text-on-surface shadow-md"
                 style={{
                   left: Math.min(hoverTooltip.position.x + 12, (cw || 0) - 140),
                   top: Math.max(hoverTooltip.position.y - 12, 0),

@@ -336,7 +336,7 @@ export function PoincareSection() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* 控制栏 */}
-      <div className="flex flex-wrap items-center gap-4 px-2 py-2 border-b border-lab-border/30">
+      <div className="flex flex-wrap items-center gap-4 px-2 py-2 border-b border-white/5/30">
         <div className="flex items-center gap-2">
           <button
             onClick={handleToggleActive}
@@ -412,7 +412,7 @@ export function PoincareSection() {
             {poincare.baseline ? ` + 基线: ${poincare.baseline.length}` : ""}
           </span>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="h-7 text-xs"
             onClick={clearPoints}
@@ -421,7 +421,7 @@ export function PoincareSection() {
             清空
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="h-7 text-xs"
             onClick={saveBaseline}
@@ -430,7 +430,7 @@ export function PoincareSection() {
             保存基线
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="h-7 text-xs"
             onClick={clearBaseline}
@@ -489,7 +489,7 @@ export function PoincareSection() {
               当前已有 {poincare.points.length} 个采集点，切换条件将清空所有数据。是否继续？
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={cancelConditionChange}>
+              <Button variant="secondary" onClick={cancelConditionChange}>
                 取消
               </Button>
               <Button onClick={confirmConditionChange}>确认</Button>

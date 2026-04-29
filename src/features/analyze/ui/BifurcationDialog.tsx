@@ -39,22 +39,22 @@ export function BifurcationDialog({ data, paramValue, onConfirm, onCancel }: Pro
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-sm rounded-lg border border-lab-border bg-lab-panel p-5 shadow-xl">
-        <h3 className="text-sm font-semibold text-white mb-3">以此参数启动仿真</h3>
+      <div className="w-full max-w-sm rounded-lg border border-white/5 bg-surface-container-low p-5 shadow-xl">
+        <h3 className="text-sm font-semibold text-on-surface mb-3">以此参数启动仿真</h3>
 
         <div className="mb-3 text-xs space-y-1">
           <div className="flex justify-between">
-            <span className="text-lab-border">{scannedParam.name}</span>
-            <span className="text-lab-accent font-mono">{paramValue.toFixed(4)} {scannedParam.unit}</span>
+            <span className="text-on-surface-variant">{scannedParam.name}</span>
+            <span className="text-primary font-mono">{paramValue.toFixed(4)} {scannedParam.unit}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-lab-border">当前值</span>
-            <span className="text-white line-through">
+            <span className="text-on-surface-variant">当前值</span>
+            <span className="text-on-surface line-through">
               {resolved ? currentStoreValue(resolved.storeKey) : "—"}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-lab-border">混沌判定</span>
+            <span className="text-on-surface-variant">混沌判定</span>
             <span className={
               regime === "混沌" ? "text-red-400" :
               regime === "周期-1" || regime === "周期-2" ? "text-blue-400" :
@@ -66,30 +66,30 @@ export function BifurcationDialog({ data, paramValue, onConfirm, onCancel }: Pro
         </div>
 
         {/* 固定参数表格 */}
-        <div className="mb-4 max-h-32 overflow-y-auto rounded border border-lab-border">
+        <div className="mb-4 max-h-32 overflow-y-auto rounded border border-white/5">
           <table className="w-full text-xs">
             <tbody>
               {Object.entries(fixedParams).map(([k, v]) => (
-                <tr key={k} className="border-b border-lab-border last:border-0">
-                  <td className="px-2 py-1 text-lab-border">{k}</td>
-                  <td className="px-2 py-1 text-white text-right font-mono">{typeof v === "number" ? v.toFixed(3) : String(v)}</td>
+                <tr key={k} className="border-b border-white/5 last:border-0">
+                  <td className="px-2 py-1 text-on-surface-variant">{k}</td>
+                  <td className="px-2 py-1 text-on-surface text-right font-mono">{typeof v === "number" ? v.toFixed(3) : String(v)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <p className="text-xs text-lab-border mb-4">将覆盖当前参数并重新启动仿真</p>
+        <p className="text-xs text-on-surface-variant mb-4">将覆盖当前参数并重新启动仿真</p>
 
         {!resolved && (
           <p className="text-xs text-red-400 mb-4">无法确定参数映射，请手动设置</p>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button variant="tertiary" size="sm" onClick={onCancel}>
             取消
           </Button>
-          <Button variant="default" size="sm" onClick={onConfirm} disabled={!resolved}>
+          <Button variant="primary" size="sm" onClick={onConfirm} disabled={!resolved}>
             确认
           </Button>
         </div>

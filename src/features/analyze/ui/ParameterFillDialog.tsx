@@ -66,23 +66,23 @@ export function ParameterFillDialog({ gridData, cell, onConfirm, onCancel }: Pro
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-sm rounded-lg border border-lab-border bg-lab-panel p-5 shadow-xl">
-        <h3 className="text-sm font-semibold text-white mb-3">确认切换参数</h3>
+      <div className="w-full max-w-sm rounded-lg border border-white/5 bg-surface-container-low p-5 shadow-xl">
+        <h3 className="text-sm font-semibold text-on-surface mb-3">确认切换参数</h3>
 
         <div className="space-y-2 mb-4">
           {changes.map((c) => (
             <div key={c.name} className="flex justify-between text-xs">
-              <span className="text-lab-border">{c.name}</span>
-              <span className="text-white">
-                <span className="text-lab-border line-through mr-1">{c.current}</span>
-                <span className="text-lab-accent">{c.next}</span>
+              <span className="text-on-surface-variant">{c.name}</span>
+              <span className="text-on-surface">
+                <span className="text-on-surface-variant line-through mr-1">{c.current}</span>
+                <span className="text-primary">{c.next}</span>
               </span>
             </div>
           ))}
         </div>
 
         <div className="mb-4 text-xs">
-          <span className="text-lab-border">λ 值：</span>
+          <span className="text-on-surface-variant">λ 值：</span>
           <span className={
             lambdaLabel === "混沌" ? "text-red-400" :
             lambdaLabel === "稳定" ? "text-blue-400" :
@@ -93,13 +93,13 @@ export function ParameterFillDialog({ gridData, cell, onConfirm, onCancel }: Pro
           </span>
         </div>
 
-        <p className="text-xs text-lab-border mb-4">将覆盖当前参数并重新启动仿真</p>
+        <p className="text-xs text-on-surface-variant mb-4">将覆盖当前参数并重新启动仿真</p>
 
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button variant="tertiary" size="sm" onClick={onCancel}>
             取消
           </Button>
-          <Button variant="default" size="sm" onClick={onConfirm}>
+          <Button variant="primary" size="sm" onClick={onConfirm}>
             确认
           </Button>
         </div>

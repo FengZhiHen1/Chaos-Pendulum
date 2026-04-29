@@ -102,14 +102,14 @@ const CAMERA_PRESETS: Record<ViewPreset, CameraConfig> = {
 
 const ENVIRONMENT_CONFIGS: Record<EnvironmentPreset, EnvironmentVisualConfig> = {
   "dark-lab": {
-    background: "#0a0a0f",
+    background: "#1A1D22",
     ambientIntensity: 0.15,
     spotIntensity: 8,
     spotPosition: new Vector3(3, 5, 2),
     gridColor: "#1a1a2e",
   },
   "white-teaching": {
-    background: "#f5f5f5",
+    background: "#EAECEF",
     ambientIntensity: 1.0,
     spotIntensity: 0,
     spotPosition: new Vector3(0, 0, 0),
@@ -200,7 +200,7 @@ export function Scene3D({
 
   if (!webglSupported) {
     return (
-      <div className={`${className} flex items-center justify-center bg-lab-dark text-white`}>
+      <div className={`${className} flex items-center justify-center bg-surface text-on-surface`}>
         <div className="text-center p-8 max-w-md">
           <p className="text-lg mb-4">您的浏览器不支持 WebGL 2.0</p>
           <p className="text-sm text-gray-400 mb-6">
@@ -211,7 +211,7 @@ export function Scene3D({
               href="https://www.google.com/chrome/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-lab-accent hover:underline"
+              className="text-primary hover:underline"
             >
               Chrome
             </a>
@@ -219,7 +219,7 @@ export function Scene3D({
               href="https://www.mozilla.org/firefox/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-lab-accent hover:underline"
+              className="text-primary hover:underline"
             >
               Firefox
             </a>
@@ -227,7 +227,7 @@ export function Scene3D({
               href="https://www.microsoft.com/edge/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-lab-accent hover:underline"
+              className="text-primary hover:underline"
             >
               Edge
             </a>
@@ -294,7 +294,7 @@ export function Scene3D({
       {webglLost && (
         <div className="absolute inset-0 bg-black/70 flex items-center justify-center pointer-events-auto z-10">
           <div className="text-center p-6">
-            <p className="text-sm text-white mb-4">
+            <p className="text-sm text-on-surface mb-4">
               {webglLostPermanent
                 ? "3D 渲染引擎不可用，请刷新页面"
                 : "3D 渲染引擎暂停 — 正在尝试恢复…"}
@@ -303,7 +303,7 @@ export function Scene3D({
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-lab-accent text-lab-dark rounded text-sm font-medium hover:opacity-90"
+                className="px-4 py-2 bg-primary text-[#0D1117] rounded text-sm font-medium hover:opacity-90"
               >
                 刷新页面
               </button>
@@ -314,7 +314,7 @@ export function Scene3D({
 
       {/* NaN Toast */}
       {nanToast && (
-        <div className="absolute bottom-4 right-4 bg-lab-panel px-4 py-2 rounded text-sm text-white shadow-lg z-10 pointer-events-none">
+        <div className="absolute bottom-4 right-4 bg-surface-container-low px-4 py-2 rounded text-sm text-on-surface shadow-lg z-10 pointer-events-none">
           检测到数值发散，仿真已暂停。请调整参数后重试
         </div>
       )}

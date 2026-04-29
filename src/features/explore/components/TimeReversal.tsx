@@ -199,7 +199,7 @@ function TeachingAnnotationPopup({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-white text-sm font-semibold mb-2">
+          <h3 className="text-on-surface text-sm font-semibold mb-2">
             数值漂移 — 混沌的不可逆性
           </h3>
           <p className="text-gray-300 text-xs leading-relaxed">
@@ -209,7 +209,7 @@ function TeachingAnnotationPopup({
         <button
           type="button"
           onClick={onClose}
-          className="text-gray-500 hover:text-white text-base leading-none shrink-0 mt-0.5"
+          className="text-gray-500 hover:text-on-surface text-base leading-none shrink-0 mt-0.5"
         >
           ✕
         </button>
@@ -519,7 +519,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
               ? "bg-red-700 text-red-100 hover:bg-red-600"
               : historyInsufficient
                 ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                : "bg-lab-accent text-lab-dark hover:opacity-90"
+                : "bg-primary text-[#0D1117] hover:opacity-90"
           }`}
           title={tooltipText}
         >

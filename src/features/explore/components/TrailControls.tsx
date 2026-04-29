@@ -20,7 +20,7 @@ export function TrailControls() {
       className="absolute left-3 top-3 z-20 flex items-center gap-1 px-2 py-1.5 rounded-lg"
       style={{ background: "rgba(10, 10, 20, 0.85)", border: "1px solid #1a1a2e" }}
     >
-      <span className="text-[10px] text-lab-border mr-1 shrink-0">尾迹</span>
+      <span className="text-[10px] text-on-surface-variant mr-1 shrink-0">尾迹</span>
       {OPTIONS.map((opt) => (
         <button
           key={opt.value}
@@ -30,8 +30,8 @@ export function TrailControls() {
           className={cn(
             "text-[10px] px-1.5 py-0.5 rounded transition-colors",
             trailLength === opt.value
-              ? "bg-lab-accent/20 text-lab-accent border border-lab-accent/30"
-              : "text-lab-border hover:text-white hover:bg-white/5 border border-transparent",
+              ? "bg-primary-container text-primary border border-primary/30"
+              : "text-on-surface-variant hover:text-on-surface hover:bg-white/5 border border-transparent",
           )}
         >
           {opt.label}
