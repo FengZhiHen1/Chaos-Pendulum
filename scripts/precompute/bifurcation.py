@@ -90,6 +90,9 @@ def main():
     for i, param_val in enumerate(control_values):
         # 构建当前参数组合
         params = dict(FIXED_PARAMS)
+        # 防御：确保 L2 始终存在（ODE 必需）
+        if "L2" not in params:
+            params["L2"] = 1.0
         y0 = base_y0.copy()
 
         if control_param in ("theta1", "theta2"):
