@@ -1,74 +1,78 @@
-# DESIGN.md — 双摆混沌实验室 (Double Pendulum Chaos Lab)
+# DESIGN.md — Double Pendulum Chaos Lab (Revised: Dark Stage Edition)
 
 ---
 
-## North Star: "Making Mathematical Beauty Visible"
+## North Star: "The Illuminated Experiment"
 
-**Core Principle**: The interface must amplify the intrinsic beauty of nonlinear dynamics without competing for attention. Every color, spacing decision, and animation exists to serve one purpose — making chaotic phenomena *feel* profound, precise, and undeniably beyond student-level work. The UI recedes; the physics speaks.
+**Core Principle**: The interface is a dark observation room. All walls recede into shadow. Only the 3D simulation stage is lit — a clean, bright window into the raw beauty of chaotic motion. Control surfaces float in the penumbra, present but never intrusive. The physics speaks from the light.
 
-**Emotional Target**: A quiet, self-assured sophistication. Users should sense within 5 seconds of a demo video that this is not a classroom assignment — it is a polished scientific instrument disguised as visual art.
+**Emotional Target**: A quiet, intense focus. The user feels like a researcher leaning toward the only lit bench in a dark lab. The design says: *this is not a toy — this is an instrument*.
 
 ---
 
 ## Design Philosophy
 
-### No-Line Rule — Strict
-This project adopts the **No-Line Rule** rigorously. Boundaries between interface regions are defined **exclusively** through:
-- Background tonal shifts (surface tokens)
-- Whitespace breathing zones
-- Elevation stacking (shadow depth, not dividers)
+### No-Line Rule — Absolute
+Boundaries between interface regions are defined **exclusively** through:
+- Tonal shifts within the dark surface spectrum
+- Generous whitespace (36–48px breathing zones between panels)
+- Elevation stacking (surface tokens, not box shadows)
 
-Traditional 1px borders and table grids are banned unless they carry **data semantics** (e.g., the axes of a bifurcation diagram, force vector lines). When a visual boundary is unavoidable, use **Ghost Borders**: `outline_variant` at 12–15% opacity, never solid.
+**Light is a boundary.** The bright 3D stage (`#EAECEF`) against the surrounding darkness (`#1A1D22`) is the most powerful separator in the system. No frame, no border ⏤ just the stark contrast between the illuminated experiment and the dark room.
 
-### Rationale
-A double pendulum in motion already produces dense visual information — trailing curves, phase portraits, heatmaps. Adding UI chrome borders would create visual noise that competes with the physics. No-Line Rule ensures the interface feels like a clean laboratory surface, not a crowded dashboard.
+### Dark-First Stage Strategy
+- **Dark Zone (Room)**: Page background, navigation bar, parameter panels, chart panels, modals. All use the dark surface token stack. These elements serve the experiment; they do not demand attention.
+- **Light Zone (Stage)**: The central 3D viewport only. It uses the `stage` surface token — a warm light gray that maximizes contrast for colored trails, force vectors, and 3D geometry. It is the *sole* bright region on the screen.
 
 ---
 
 ## Colors
 
-### Brand Accent
-- **Primary (`#1A6FE0`)** — Tech Blue. Reserved strictly for interactive controls, focus states, active indicators, and the global navigation highlight. Never used as decoration; every occurrence signals "this is actionable."
+### Surface System (Dark Room)
 
-### Surface System (Light Theme)
-The interface is built on a light background, maximizing contrast for scientific visualizations (dark trajectories, colored heatmaps).
+| Token | Hex | Role |
+|:---|:---|:---|
+| `surface` | `#1A1D22` | Page base — deep gray, soft on the eyes during prolonged analysis |
+| `surface-container-lowest` | `#1E2127` | Navigation bar background — a barely perceptible step above the page |
+| `surface-container-low` | `#23262C` | Panel card backgrounds (parameter controls, chart panels) |
+| `surface-container` | `#2A2D34` | Elevated cards, tooltip backgrounds, dropdown menus |
+| `surface-container-high` | `#31353D` | Highest elevation surfaces — modals, dialogs |
+| **`stage`** | **`#EAECEF`** | **The 3D viewport only** — warm light gray, the sole illuminated surface |
+| `on-surface` | `#E8EAED` | Primary text on dark surfaces — high contrast, not pure white |
+| `on-surface-variant` | `#9BA0AA` | Secondary text, metadata, helper labels on dark surfaces |
+| `on-stage` | `#1B1D21` | Primary text inside the light viewport (HUD, measurement overlays) |
+| `on-stage-variant` | `#606670` | Secondary text inside the light viewport |
+
+### Brand Accent (Tech Blue — Adapted for Dark Backgrounds)
 
 | Token | Hex | Usage |
 |:---|:---|:---|
-| `surface` | `#FAFAFA` | Base page background — nearly white, warm undertone to avoid clinical coldness |
-| `surface-container-lowest` | `#F3F4F6` | Primary content wells (3D viewport background, main canvas areas) |
-| `surface-container-low` | `#EAECEF` | Secondary panels, card backgrounds |
-| `surface-container` | `#E0E3E7` | Elevated cards, tooltip backgrounds |
-| `surface-container-high` | `#D6DADF` | Floating modals, highest elevation surfaces |
-| `on-surface` | `#1B1D21` | Primary text — near-black with warmth |
-| `on-surface-variant` | `#606670` | Secondary text, labels, metadata |
+| `primary` | `#4B9FFF` | Interactive controls, focus states, active mode indicator, primary actions. Bright enough for WCAG AA on `#1A1D22`. |
+| `primary-container` | `#1C3A5E` | Selected item backgrounds, hover fills on dark panels |
+| `primary-hover` | `#6BB3FF` | Button hover brightening |
+| `primary-focus-glow` | `rgba(75, 159, 255, 0.25)` | Focus ring on dark backgrounds |
 
-### Semantic Data Colors (Protected)
-These colors carry **physics meaning** and must never be repurposed for decoration.
+### Semantic Data Colors (Protected — Optimized for Dark/Light Dual Use)
+
+These colors carry physics meaning. They are designed to read clearly on both the **dark panels** (where they appear as data glyphs) and the **bright 3D stage** (where they appear as vectors and trails).
 
 | Token | Hex | Semantic Meaning |
 |:---|:---|:---|
-| `force-gravity` | `#2E8B57` | Gravity vector arrows — fixed vertical down |
-| `force-tension` | `#D64545` | Rod tension vector arrows — along rod direction |
-| `force-inertia` | `#5B8DEF` | Inertial force component — dashed arrow style |
-| `trail-slow` | `#2B5EA7` | Low-velocity trail (stationary/periodic) |
-| `trail-fast` | `#E8453C` | High-velocity trail (chaotic bursts) |
-| `lyapunov-stable` | `#0D3B66` | λ < 0 — deep blue (stable region) |
-| `lyapunov-neutral` | `#1A936F` | λ ≈ 0 — teal green (marginal) |
-| `lyapunov-chaotic` | `#E85D04` | λ > 0 — orange-red (chaotic region) |
+| `force-gravity` | `#4ADE80` | Gravity vector arrows — a vivid, dark-safe green |
+| `force-tension` | `#F87171` | Rod tension vector arrows — a saturated, readable red |
+| `force-inertia` | `#60A5FA` | Inertial force component — dashed blue, distinct from primary |
+| `trail-slow` | `#3B82F6` | Low-velocity trail (periodic motion) |
+| `trail-fast` | `#EF4444` | High-velocity trail (chaotic bursts) |
+| `lyapunov-stable` | `#1E3A5F` | Deep navy for λ < 0 regions (stable) on heatmaps |
+| `lyapunov-neutral` | `#2DD4BF` | Teal for λ ≈ 0 (marginal) — glows subtly |
+| `lyapunov-chaotic` | `#F97316` | Bright orange for λ > 0 (chaotic) — demands attention |
+| `separation-alert` | `#FF3B3B` | Butterfly decorrelation pulse — the only "danger red," used once |
 
-### Accent Variants (Derived from Primary)
-| Token | Hex | Usage |
-|:---|:---|:---|
-| `primary-container` | `#D6E4FA` | Selected item backgrounds, hover fills |
-| `primary-hover` | `#155BC4` | Button hover, link hover darkening |
+### Glassmorphism (Floating Panels on Dark Background)
 
-### Dramatic Alert Color (Butterfly Effect)
-- **Separation Alert (`#DC3545`)** — Used exclusively for the "complete decorrelation" moment in the butterfly effect comparator. A saturated crimson that appears only at the dramatic threshold (‖Δθ‖ > 90°), creating an unmistakable physiological signal.
-
-### Glassmorphism (Floating Panels Only)
-- Floating menus and context panels: `rgba(250, 250, 250, 0.82)` background + `backdrop-filter: blur(18px)`.
-- Purpose: Maintain spatial context when panels overlay the 3D scene or heatmaps.
+- Background: `rgba(35, 38, 44, 0.85)` (dark, not light — panels hover in the room's shadow).
+- Backdrop blur: `18px`.
+- Use for: tooltips over the 3D stage, context menus, snapshot previews.
 
 ---
 
@@ -78,17 +82,17 @@ These colors carry **physics meaning** and must never be repurposed for decorati
 
 | Role | Font | Rationale |
 |:---|:---|:---|
-| **Headlines & Mode Labels** | **Inter** (SemiBold, weight 600) | Clean modern geometry. No serifs — the physics already carries enough complexity. Inter's tall x-height ensures readability on projection screens. |
-| **Body & Controls** | **Inter** (Regular 400, Medium 500) | Unified reading experience. One family, multiple weights. |
-| **Data Labels & Monospace** | **JetBrains Mono** | Parameter values, code editor, numerical readouts. Monospace signals precision; JetBrains Mono's ligatures add a subtle "research instrument" quality. |
-| **Subtitles (Story Mode)** | **Inter** (Medium 500, letter-spacing: +0.02em) | Bottom-screen cinematic subtitles — medium weight for projection legibility. |
+| **Headlines & Mode Labels** | **Inter** (SemiBold, weight 600) | Clean, modern, highly legible. Tall x-height for projection screens. |
+| **Body & Controls** | **Inter** (Regular 400, Medium 500) | Unified reading experience. |
+| **Data Labels & Monospace** | **JetBrains Mono** | Parameter values, code editor, numerical readouts. Ligatures add a refined instrument quality. |
+| **Subtitles (Story Mode)** | **Inter** (Medium 500, letter-spacing: +0.02em) | Bottom-screen narrative text — optimized for distance viewing. |
 
 ### Type Scale
 
 | Token | Size / Line-height | Usage |
 |:---|:---|:---|
-| `display-lg` | 28px / 1.3 | Mode title in global nav (single word: 探索 / 分析 / 实验 / 故事) |
-| `headline` | 20px / 1.4 | Section headers within modules |
+| `display-lg` | 28px / 1.3 | Mode title in nav (探索 / 分析 / 实验 / 故事) |
+| `headline` | 20px / 1.4 | Section headers within dark panels |
 | `title` | 16px / 1.5 | Card titles, panel headers |
 | `body` | 14px / 1.6 | Primary body copy, control labels |
 | `body-sm` | 12px / 1.5 | Secondary metadata, axis labels, helper text |
@@ -98,240 +102,211 @@ These colors carry **physics meaning** and must never be repurposed for decorati
 
 ## Elevation & Depth
 
-### Tonal Layering (Primary Mechanism)
-Depth is created through background tone shifts, not heavy shadows. The surface token stack (`surface` → `surface-container-high`) provides a natural 6-level elevation system without a single box-shadow in the base layout.
+### Tonal Layering in Darkness
 
-### Shadow Usage (Reserved for Specific Signals)
+Depth is created by lightening the dark surface stack. There are no heavy shadows in the dark zone — the subtle luminance steps (`surface` → `surface-container-high`) are sufficient because the overall environment is low-light. The eye is sensitive to even 2–3% luminance changes.
+
+### Reserved Shadows
 
 | Element | Shadow Spec | Purpose |
 |:---|:---|:---|
-| **Floating Modals** | `0 8px 32px rgba(27, 29, 33, 0.06), 0 2px 8px rgba(27, 29, 33, 0.04)` | Soft, tinted shadows — barely perceptible but spatially effective |
-| **Butterfly Alert Pulse** | `0 0 60px rgba(220, 53, 69, 0.25)` outer glow + slow animation | Dramatic edge glow during decorrelation event — the only "loud" shadow in the system |
-| **Cards (hover state)** | `0 2px 16px rgba(27, 29, 33, 0.05)` | Subtle lift on hover for snapshot cards, no shadow at rest |
+| **Floating Modals** | `0 12px 32px rgba(0, 0, 0, 0.4)` | Only on modals over the 3D stage — a deep, tinted shadow that pushes the modal into the foreground without a bright outline. |
+| **Butterfly Alert Pulse** | `0 0 80px rgba(255, 59, 59, 0.35)` outer glow | Dramatic edge glow during decorrelation — the only "loud" light in the entire application. |
+| **Cards (hover on dark panels)** | `0 2px 12px rgba(0, 0, 0, 0.3)` | Subtle lift on snapshot cards. No shadow at rest. |
 
 ---
 
 ## Roundness
 
-- **Global Corner Radius**: `8px` — Soft without feeling playful. Applies to cards, buttons, input fields, and panel edges.
+- **Global Corner Radius**: `8px` — Soft, modern, never playful. Applied to cards, buttons, input fields, and panel edges.
 - **Modal Corners**: `12px` — Slightly softer to distinguish floating surfaces.
 - **Slider Thumbs**: `50%` (fully round) — Tactile grab targets.
-- **3D Viewport Frame**: `0px` — Sharp edges. The simulation window is a "window into physics," not a UI component; sharp corners reinforce its role as a raw data viewport.
+- **3D Viewport Frame**: `0px` — Sharp, frameless. The bright stage meets the dark room with a hard, clean edge. No rounding, no border. This is a window.
 
 ---
 
 ## Components
 
+All components in dark panels use the dark surface token stack unless otherwise noted.
+
 ### Buttons
 
-| Variant | Style | Usage |
-|:---|:---|:---|
-| **Primary** | Solid `primary` (`#1A6FE0`) bg, white text, `8px` radius. Hover: `primary-hover` (`#155BC4`). Focus ring: `primary` at 40% opacity, 3px offset. | One per view — the primary action (e.g., "Run Story," "Export Report") |
-| **Secondary** | `surface-container` bg, `primary` text, no border. Hover: `primary-container` bg. | Supporting actions within panels |
-| **Tertiary** | Transparent bg, `on-surface-variant` text. Hover: underline + `primary` color shift. | Inline actions, tool toggles, "Learn More" links |
-| **Icon Button** | 36×36px touch target, `8px` radius, transparent bg. Active state: `primary-container` bg with `primary` icon. | Mode switchers, tool toggles |
+| Variant | Style |
+|:---|:---|
+| **Primary** | Solid `primary` (`#4B9FFF`) bg, `#0D1117` (near-black) text for contrast, `8px` radius. Hover: `primary-hover` (`#6BB3FF`). Focus ring: `primary-focus-glow`. |
+| **Secondary** | `surface-container` bg, `primary` text. Hover: `primary-container` bg. |
+| **Tertiary** | Transparent bg, `on-surface-variant` text. Hover: primary text color shift + subtle underline. |
+| **Icon Button** | 40×40px touch target (critical in dark environment), `8px` radius, transparent bg. Active: `primary-container` bg with `primary` icon. |
 
-### Sound Toggle (Critical Functionality)
-The sonification activation button follows **functional clarity**, not mystery:
-- Default state: Muted speaker icon, `surface-container` bg, `on-surface-variant` icon color. Subtle tooltip: "开启物理声效."
-- Active state: Speaker icon with sound waves, `primary-container` bg, `primary` icon color. No animation loop — steady illumination signals "system is running," not "look at me."
+### Sound Toggle
 
-### Cards (Snapshot, Report, Verification)
-- No borders, no dividers.
+- Default (muted): Speaker icon with slash, `on-surface-variant` color, `surface-container-low` bg. Tooltip: "开启物理声效".
+- Active (unmuted): Speaker icon with waves, `primary` color, `primary-container` bg. Steady illumination — no animation loop.
+
+### Cards
+
 - Background: `surface-container-low` at rest.
-- Header + body separated by `16px` vertical whitespace, not a line.
-- Hover: shift to `surface-container` background + subtle shadow lift (see Elevation section).
+- No borders, no dividers. Sections separated by `16px` vertical whitespace.
+- Hover: shifts to `surface-container` background + subtle shadow.
 
 ### Input Fields
 
 | State | Style |
 |:---|:---|
-| **Rest** | White (`#FFFFFF`) bg, ghost border (`outline_variant` at 15% opacity), `8px` radius |
-| **Focus** | Ghost border → `primary` at 60% opacity, `4px` offset glow `rgba(26, 111, 224, 0.15)` |
-| **Error (Invalid Parameter)** | Ghost border → `#DC3545` at 80% opacity, input shake animation (3 cycles, 4px amplitude, 120ms). Tooltip appears above with valid range in Chinese. 3D scene freezes until parameter is legal. |
-| **Disabled** | `surface-container-low` bg, text at 40% opacity |
+| **Rest** | `surface-container-low` bg, ghost border (`on-surface-variant` at 10% opacity), `8px` radius. Text: `on-surface`. |
+| **Focus** | Ghost border → `primary` at 70% opacity. `primary-focus-glow` box shadow. |
+| **Error** | Ghost border → `#FF3B3B` at 80% opacity. Shake animation (3 cycles, 4px, 120ms). Tooltip with valid range in Chinese appears above. 3D scene freezes. |
+| **Disabled** | `surface` bg, text at 30% opacity. |
 
 ### Sliders
+
 - Track: `surface-container-high` bg, `4px` height, fully rounded.
-- Active fill: `primary` gradient (solid, no gradient — precision over decoration).
-- Thumb: `20×20px`, white fill, `primary` border (2px), `box-shadow: 0 1px 4px rgba(27,29,33,0.12)`. Hover: border width → 3px.
-- Value label: `JetBrains Mono 13px` positioned above thumb, follows drag.
+- Active fill: `primary` solid color.
+- Thumb: `20×20px`, `surface-container` fill, `primary` border (2px). Hover: border → 3px. Shadow: `0 1px 4px rgba(0,0,0,0.5)`.
+- Value label: `JetBrains Mono 13px`, `on-surface`, follows drag.
 
-### Force Vector Arrows (3D Overlay)
-- Gravity: `#2E8B57` (force-gravity), solid arrowhead, fixed vertical orientation.
-- Tension: `#D64545` (force-tension), solid arrowhead, along rod axis.
-- Inertia: `#5B8DEF` (force-inertia), **dashed** line style (6px dash, 4px gap), decomposed into tangential/normal components.
-- Hover label: `rgba(250, 250, 250, 0.90)` glassmorphism tooltip showing magnitude (N) + direction angle.
+### Trail System (Inside the Bright 3D Stage)
 
-### Trail System (3D Scene)
-- Color: Interpolated along `trail-slow` (#2B5EA7) → `trail-fast` (#E8453C) spectrum using HSL interpolation (not RGB — preserves perceptual uniformity).
-- Width: 2px (minimum, stationary) → 8px (maximum, high-velocity bursts). Linear mapping.
-- Opacity: 85% (foreground trail segments), fading to 30% (oldest segments) via exponential decay.
-- Persistence modes: 50 steps / 200 steps / 1000 steps / infinite / current-cycle-only. Mode switcher uses tertiary button style.
+- Background: The `stage` (#EAECEF) provides maximum contrast.
+- Color: Interpolated from `trail-slow` (`#3B82F6`) to `trail-fast` (`#EF4444`) via HSL path.
+- Width: 2px (min) → 8px (max), linear with velocity.
+- Opacity: 95% (new) fading to 25% (old). Exponential decay.
 
-### Lyapunov Heatmap (Analysis Mode)
-- Canvas 2D rendering. Color stops (perceptual, not linear):
-  - λ < -0.5: `lyapunov-stable` (#0D3B66)
-  - λ ≈ 0: `lyapunov-neutral` (#1A936F)
-  - λ > 0.5: `lyapunov-chaotic` (#E85D04)
-- Hover: Crosshair cursor. Tooltip (glassmorphism panel) shows precise λ value + parameter pair.
-- Click: Auto-fills parameters into main control panel and launches 3D simulation.
+### Lyapunov Heatmap (Dark Panel)
 
-### Bifurcation Diagram
-- Monochrome plot area. Data points: `on-surface` at 70% opacity.
-- Current parameter indicator: Vertical dashed line in `primary` color, 1px width (this is a *data line*, not a UI border — exempt from No-Line Rule).
-- Box-select zoom: `primary-container` fill at 30% opacity during drag.
-
-### Poincaré Section Panel (Secondary Panel)
-- 2D scatter plot (θ₂ vs θ̇₂). Points: 4px diameter circles, `primary` color at 70% opacity.
-- Newest points: full opacity. Older points: fade to 20% opacity over trajectory duration.
-- Baseline comparison mode: Current trajectory = `primary`; historical baseline = `on-surface-variant` at 50% opacity.
-- Position: Right-side panel (desktop) or tab-accessible (tablet). Never competes with 3D viewport — this is a "quiet observer" panel.
-
-### Story Mode Controls
-- Playback bar: Bottom of screen, semi-transparent `rgba(250,250,250,0.85)` + `backdrop-blur(12px)`.
-- Subtitle text: Inter Medium 500, 16px, `on-surface`, center-aligned, letter-spacing +0.02em for projection legibility.
-- Active control indicator: Pulsing `primary` glow on the current interactive element (button/slider that the story is referencing). Pulse: 2s cycle, opacity 40% ↔ 100%.
-- "Skip to manual" button: Tertiary style, positioned in top-right corner, always available.
+- Canvas 2D on `surface-container-low` background.
+- Color stops: `lyapunov-stable` (#1E3A5F) → `lyapunov-neutral` (#2DD4BF) → `lyapunov-chaotic` (#F97316).
+- Hover: crosshair, glass tooltip (`rgba(35,38,44,0.92)` with `on-surface` text).
+- Click: auto-fills parameters and launches 3D simulation on the bright stage.
 
 ### Butterfly Effect Comparator (Dual Viewport)
-- Divider between viewports: **4px gap** filled with `surface-container` — not a line, a breathing space that separates two universes.
-- Pendulum A (left): Gold-tinted trail `#D4A017` overlay on standard trail colors.
-- Pendulum B (right): Violet-tinted trail `#7B2D8E` overlay.
-- Separation indicator: Live numerical display showing ‖Δθ‖ in `JetBrains Mono`, positioned at bottom center.
-- **Dramatic Alert** (‖Δθ‖ > 90°):
-  - Screen edges pulse with `separation-alert` (#DC3545) glow: `box-shadow: inset 0 0 80px rgba(220, 53, 69, 0.3)` transitioning over 600ms ease-out.
-  - Central text "完全失相关" fades in (Inter SemiBold, 18px, white on crimson pill background), holds 1.5s, fades out.
-  - Viewport divider expands momentarily from 4px to 12px (300ms ease-out, returns after 1s) — a visual "rift" between the two realities.
-  - This is the **only** moment in the entire application where drama is permitted. All other interactions remain calm.
+
+- Both viewports share the `stage` background.
+- Divider: **4px gap** filled with `surface` (#1A1D22) — a dark rift separating two bright realities.
+- Pendulum A: gold-tinted trail `#FBBF24`.
+- Pendulum B: violet-tinted trail `#A78BFA`.
+- Separation readout: `JetBrains Mono`, `on-stage` text, bottom center.
+- **Decorrelation Alert** (‖Δθ‖ > 90°):
+  - The dark divider gap expands from 4px to 12px (300ms ease-out, returns after 1s).
+  - Screen edges pulse with `separation-alert` glow: `inset 0 0 100px rgba(255,59,59,0.3)`.
+  - Central text "完全失相关" appears: Inter SemiBold 18px, white on `separation-alert` pill, holds 1.5s.
+  - This is the only dramatic moment in the entire application. All other motion is calm.
+
+### Poincaré Section Panel (Dark Side Panel)
+
+- Dark panel: `surface-container-low` bg.
+- Scatter plot points: 4px circles, `primary` color at 80% opacity.
+- New points: full opacity; older points fade to 15%.
+- Compare mode: current = `primary`; historical baseline = `on-surface-variant` at 50%.
 
 ---
 
 ## Layout Architecture (Desktop Primary)
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│  Global Navigation Bar (surface-container, 56px height)     │
-│  [探索] [分析] [实验] [故事]                  [Sonification] │
-│  Mode tabs: primary for active, on-surface-variant inactive │
-├────────────────────────────────────────────────────────────┤
-│  Left Panel           │  Central 3D Viewport  │ Right Panel │
-│  (surface-dim,        │  (surface-container-  │ (surface-   │
-│   280px fixed)        │   lowest, flex)       │  dim, 320px)│
-│                       │                       │             │
-│  • Parameter controls │  ► Double Pendulum    │ • Phase     │
-│  • Initial conditions │    3D Scene           │   Space     │
-│  • Trail settings     │                       │ • Poincaré  │
-│  • View presets       │                       │ • Energy    │
-│                       │                       │   Monitor   │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Nav Bar (surface-container-lowest, 56px, no border)          │
+│  [探索] [分析] [实验] [故事]                   [🔊]           │
+│  Active mode: primary text + subtle primary underline        │
+├──────────────┬───────────────────────────────┬───────────────┤
+│ Left Panel   │  Central 3D Stage (stage bg)  │ Right Panel   │
+│ (surface     │                               │ (surface      │
+│  -container- │  ► Double Pendulum Motion     │  -container-  │
+│  low, 280px) │     in bright isolation       │  low, 320px)  │
+│              │                               │               │
+│ • Parameters │  (The only illuminated region  │ • Phase Space │
+│ • Trail opts │   on the entire screen)        │ • Poincaré    │
+│ • View pres.│                               │ • Energy      │
+└──────────────┴───────────────────────────────┴───────────────┘
 ```
+
+- Left/Right panels: Dark, recessed. Their content uses `on-surface` / `on-surface-variant` text.
+- Central stage: Bright, prominent. The eye goes there immediately.
+- Gap between panels: `24px` of `surface` (#1A1D22) — no dividers, just darkness.
 
 ### Responsive Breakpoints
 
-| Breakpoint | Layout | Degradation Strategy |
+| Breakpoint | Layout | Degradation |
 |:---|:---|:---|
-| ≥ 1280px | Full three-column. Left 280px / Center flex / Right 320px. | No degradation. |
-| 768–1279px | Two-column: Left panel collapses to bottom drawer (48px handle). Right panels become tab-switched. | Sonification disabled (speaker limitations). Trail persistence limited to 200 steps. |
-| < 768px | Single column. 3D viewport full-width. Controls in bottom sheet. Analysis panels in expandable accordion. | 3D shadows disabled. Trail persistence limited to 50 steps. Code editor disabled. Story mode and Explore mode only. |
+| ≥ 1280px | Full 3-column. Left 280 / Center flex / Right 320. | None. |
+| 768–1279px | 2-column: Left panel collapses to bottom drawer. Right panel tabs. | Sonification hidden. Trail max 200 steps. |
+| < 768px | Single column. 3D stage full-width. Bottom sheet for controls. Analysis in accordion. | 3D shadows off. Trail max 50 steps. Code editor hidden. |
 
 ---
 
 ## Micro-Interactions & Motion
 
-### Timing Tokens
+### Timing Tokens (Unchanged)
+
 | Token | Duration | Easing | Usage |
 |:---|:---|:---|:---|
-| `instant` | 120ms | ease-out | Toggle switches, checkbox state changes |
-| `quick` | 200ms | ease-out | Button hover→active, panel expand/collapse |
-| `smooth` | 300ms | ease-in-out | Panel transitions, mode switches, card hovers |
-| `dramatic` | 600ms | ease-out | Butterfly alert glow + rift animation |
-| `ambient` | 2000ms | linear | Story mode control pulse, auto-rotation in demo mode |
+| `instant` | 120ms | ease-out | Toggles |
+| `quick` | 200ms | ease-out | Button hover→active, panel expand |
+| `smooth` | 300ms | ease-in-out | Mode transitions, card hovers |
+| `dramatic` | 600ms | ease-out | Butterfly alert only |
+| `ambient` | 2000ms | linear | Story mode pulse, demo auto-rotation |
 
 ### Mode Transition
-- Switching between 探索/分析/实验/故事 modes: left + right panels cross-fade (200ms opacity transition) while the central 3D viewport remains **uninterrupted**. Simulation state must not flicker.
+- Dark panels cross-fade (200ms opacity). The central bright 3D stage remains **completely static** — no flicker, no reload. Simulation state is preserved.
 
 ### Parameter Input Error
-- Invalid input: Input field shakes (3 cycles, 4px horizontal amplitude, 120ms total). Red ghost border appears simultaneously. Tooltip with valid range fades in above (200ms delay, 200ms fade).
-
-### Loading Sequence (Initial Application Load)
-- Pyodide/WASM download: Determinate progress bar (gradient `primary` fill), percentage text (JetBrains Mono), estimated time remaining.
-- Background: `surface` with subtle animated gradient mesh in `primary-container` tones — signals "system is alive and preparing."
-- On completion: Progress bar slides up (300ms), main interface fades in (400ms).
-- On failure: Progress bar turns amber, "Retry" button (Primary style) appears. Friendly Chinese error message.
-
-### Snapshot Card Interaction
-- Save: 3D scene "flashes" briefly (white overlay at 15% opacity, 150ms) — a camera shutter metaphor, subtle.
-- Card appears in snapshot panel: slides in from top (250ms, ease-out, staggered for multiple cards).
-- Hover: Card elevates (tonal shift + shadow, 200ms).
-- Compare mode: Two selected cards get `primary-container` background, their trajectories overlay on 3D scene.
+- Shake animation on the dark input field, red ghost border, tooltip above. 3D stage freezes but remains bright.
 
 ---
 
-## Initial Loading Experience (SYS-04)
+## Initial Loading Experience
 
-This is the **first impression** for judges and users. It must communicate sophistication before any physics is visible.
+The loading screen is the first moment a judge sees. It must feel like the lights are dimming before an experiment begins.
 
-### Loading Screen Composition
-1. **Background**: `surface` (#FAFAFA) with a slow ambient animation — soft gradient mesh in `primary-container` tones (#D6E4FA), shifting imperceptibly over a 20-second cycle. No visible repeating pattern.
-2. **Center**: Application logo/name "双摆混沌实验室" in Inter SemiBold, 24px, `on-surface`. Below it, a tagline in Inter Regular, 14px, `on-surface-variant`: "浏览器内的非线性动力学研究终端".
-3. **Progress Bar**: Centered below tagline, 320px wide, 4px height. Track: `surface-container` fill. Fill: solid `primary`. No percentage text on the bar — instead, a single line below reads "正在加载物理引擎…" (JetBrains Mono, 12px, `on-surface-variant`).
-4. **Estimated Time**: "预计剩余 45 秒" in `body-sm`, updates every 5 seconds.
-5. **Transition to App**: On 100% completion, the progress bar and text fade out simultaneously (200ms). The main interface fades in (400ms, staggered: nav first, then viewport, then panels).
-
-### Failure State
-- Progress bar fill shifts to `#E85D04` (warning amber, reusing lyapunov-chaotic for its "something is off" association).
-- Text changes to "加载失败 — 请检查网络连接后重试" (`body`, `on-surface`).
-- A "重试" button (Primary) appears below.
-- Background animation continues — the system is still "alive," waiting.
+- **Background**: `surface` (#1A1D22) — full dark.
+- **Center element**: "双摆混沌实验室" in Inter SemiBold 24px, `on-surface`. Tagline in `on-surface-variant`.
+- **Progress bar**: Track `surface-container`. Fill `primary`. Text below: "正在加载物理引擎…" in JetBrains Mono 12px.
+- **ETA**: "预计剩余 45 秒" in `body-sm`, `on-surface-variant`.
+- **Transition to app**: Progress fades out (200ms). The bright 3D stage fades in *first* (400ms), as if a light switches on. Dark panels fade in staggered after the stage is visible.
 
 ---
 
-## Demo Mode (STY-02) — Visual Presentation
+## Demo Mode (Presentation)
 
-When the user activates Demo Mode (one-click from Story Mode or standalone):
-
-- All control panels, navigation text labels, and chart panels **smoothly fade out** (300ms, simultaneous).
-- Navigation bar compresses to a thin 4px `primary` accent line at the top of the viewport.
-- 3D viewport expands to **full viewport**.
-- Auto-rotation begins: camera orbits at 0.5°/s around the pendulum.
-- Watermark: "双摆混沌实验室 · DUT 2026" in `on-surface-variant` at 40% opacity, fixed to bottom-right corner, Inter Regular 11px, letter-spacing +0.04em. Present during manual screenshots, automatically embedded in image exports.
-- Exit: Double-tap or Esc key. All UI elements fade back in (400ms).
+- All dark panels and nav text fade out (300ms). Only the bright 3D stage remains, now filling the viewport.
+- A thin 4px `primary` accent line at the top of the screen is the sole UI remnant.
+- Auto-rotation: 0.5°/s.
+- Watermark: "双摆混沌实验室 · DUT 2026" fixed bottom-right, `on-surface-variant` at 40% opacity. Embedded in exports.
 
 ---
 
 ## Design System Enforcement Rules
 
-1. **No solid borders in layout chrome.** Ghost borders (outline_variant at 12–15%) are the maximum allowed boundary treatment.
-2. **Semantic colors are sacred.** Never use `force-gravity`, `force-tension`, `trail-slow`, `lyapunov-stable`, or `separation-alert` for decorative purposes. They carry physics meaning.
-3. **Primary blue is for interaction only.** If it's not clickable, focusable, or indicating active state, it should not be primary blue.
-4. **One dramatic moment.** The butterfly decorrelation alert is the sole permitted "loud" visual event. No other animation may exceed the `smooth` (300ms) duration or use saturated reds.
-5. **Monospace signals data.** Any numerical value displayed to the user (parameters, λ values, energy readings, timestamps) must use JetBrains Mono. This creates an implicit trust signal: "This is measured, not estimated."
-6. **Whitespace is structural.** Panel separation relies on 24–32px gaps and tonal shifts, never dividers. When in doubt, add breathing room.
-7. **Chinese-first, no i18n overhead.** All UI labels, tooltips, subtitles, and error messages are in Chinese. The monospace numerals and mathematical notation provide universal readability across languages.
+1. **The stage is the only light.** No other surface may use the `stage` token or any color brighter than `surface-container`.
+2. **No solid borders.** Ghost borders (10–12% opacity) are the maximum allowed. The light/dark edge between stage and room is borderless — pure contrast.
+3. **Semantic colors are immutable.** Never use `force-gravity`, `trail-slow`, `separation-alert`, etc. for decoration.
+4. **Primary blue signals interaction.** It appears only on clickable, focusable, or active elements.
+5. **One dramatic moment.** The butterfly decorrelation alert is the sole exception to the calm, dark aesthetic.
+6. **Monospace = measurement.** All numerical data uses JetBrains Mono.
+7. **Whitespace is structure.** Panel separation uses 24–48px gaps and tonal shifts within the dark stack.
 
 ---
 
-## Appendix: Visual Priority Hierarchy
+## Appendix: Visual Priority in the Dark
 
-When screen real estate is constrained (tablet/mobile), elements recede in this order:
+When screen space is limited, darkness recedes first — the light stays.
 
-1. (Last to hide) 3D Viewport — never hidden
-2. Parameter Controls — collapse to drawer
-3. Phase Space / Poincaré panels — move to tabs
-4. Sonification toggle — hide on tablet
-5. Trail persistence options — reduce to presets
-6. Code Editor — hide on mobile
-7. 3D Shadows — disable on mobile
-8. Force Vector Overlay — hide on mobile
+1. (Last to go) The bright 3D stage — always visible.
+2. Parameter controls — collapse into dark drawer.
+3. Analysis panels — move to tabs.
+4. Sonification — hide on tablet.
+5. Trail options — reduce.
+6. Code editor — hide on mobile.
+7. 3D shadows — disable on mobile (performance).
+8. Force vectors — hide on mobile.
 
-The 3D scene is the soul of the application. Everything else serves it.
+The illuminated experiment is the soul. Everything else exists in service of that light.
 
 ---
 
 ## Version
 
-- **Document Version**: 1.0
+- **Document Version**: 2.0 — Dark Stage Revision
 - **Last Updated**: 2026-04-28
-- **Derived From**: Visual Strategy Brief (Phase 1 Consultation) + 功能模块全拆解.md + 功能设计_v0.md
-- **Template Reference**: 模板DESIGN.md.md (Alexandria — High-End Editorial)
+- **Derived From**: Visual Strategy Brief (Phase 1) + Dark/Light Re-allocation Decision + 功能模块全拆解.md + 功能设计_v0.md
+- **Template Reference**: Alexandria — High-End Editorial (adapted for dark-first scientific UI)
