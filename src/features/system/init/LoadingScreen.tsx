@@ -36,7 +36,7 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden select-none transition-opacity duration-300 ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface overflow-hidden select-none transition-opacity duration-300 ${
         transitioning ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -97,32 +97,32 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
 
         {/* 标题 */}
         <div className="flex flex-col items-center gap-1 animate-fade-in-up">
-          <h1 className="text-2xl font-bold text-white tracking-[0.1em]">
+          <h1 className="text-2xl font-bold text-on-surface tracking-[0.1em]">
             混沌实验室
           </h1>
-          <p className="text-base font-light text-white/60">
+          <p className="text-base font-light text-on-surface-variant">
             Chaos Pendulum Lab
           </p>
         </div>
 
         {/* 进度条 */}
         <div className="w-80 max-w-[80vw] flex flex-col gap-2">
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-surface-container rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-white/70 text-sm font-mono tabular-nums">
+            <span className="text-on-surface text-sm font-mono tabular-nums">
               {pct}%
             </span>
-            <span className="text-white/50 text-sm">
+            <span className="text-on-surface-variant text-sm">
               {progress.description}
             </span>
           </div>
           {progress.etaSeconds > 0 && (
-            <span className="text-white/30 text-xs">
+            <span className="text-on-surface-variant/[0.5] text-xs">
               {formatEta(progress.etaSeconds)}
             </span>
           )}
@@ -133,8 +133,8 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
           <button
             type="button"
             onClick={onEnter}
-            className="mt-4 px-8 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium text-lg tracking-wider
-                       hover:from-blue-400 hover:to-violet-400
+            className="mt-4 px-8 py-3 rounded-lg bg-primary text-[#0D1117] font-medium text-lg tracking-wider
+                       hover:bg-primary-hover
                        active:scale-95 transition-all duration-200
                        animate-fade-in-up"
           >
@@ -149,10 +149,10 @@ export function LoadingScreen({ progress, showQuotes, onEnter, transitioning }: 
               key={fadeKey}
               className="flex flex-col items-center animate-crossfade-in"
             >
-              <p className="text-white/60 text-base italic leading-relaxed">
+              <p className="text-on-surface-variant text-base italic leading-relaxed">
                 &ldquo;{quotes[quoteIndex]!.quote}&rdquo;
               </p>
-              <p className="text-white/30 text-sm mt-2">
+              <p className="text-on-surface-variant/[0.5] text-sm mt-2">
                 — {quotes[quoteIndex]!.author}
               </p>
             </div>

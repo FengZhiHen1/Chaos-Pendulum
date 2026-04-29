@@ -10,7 +10,7 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
   const showOffline = error.type !== "worker";
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0f] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface overflow-hidden">
       {/* 微弱网格纹理 */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -41,21 +41,21 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
           </svg>
         </div>
 
-        <h2 className="text-2xl font-semibold text-white">应用启动失败</h2>
+        <h2 className="text-2xl font-semibold text-on-surface">应用启动失败</h2>
 
-        <p className="text-white/60 text-sm text-center">{error.message}</p>
+        <p className="text-on-surface-variant text-sm text-center">{error.message}</p>
 
         <div className="flex gap-4 mt-2">
           <button
             onClick={onRetry}
-            className="px-5 py-2.5 bg-white text-[#0a0a0f] rounded-md font-medium text-sm hover:bg-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            className="px-5 py-2.5 bg-primary text-[#0D1117] rounded-lg font-medium text-sm hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
           >
             重试
           </button>
           {showOffline && (
             <button
               onClick={onOffline}
-              className="px-5 py-2.5 border border-white/30 text-white rounded-md font-medium text-sm hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              className="px-5 py-2.5 border border-white/5 text-on-surface rounded-lg font-medium text-sm hover:bg-surface-container-low transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
             >
               离线模式
             </button>
@@ -63,7 +63,7 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
         </div>
 
         {showOffline && (
-          <p className="text-white/30 text-xs text-center mt-4">
+          <p className="text-on-surface-variant/[0.5] text-xs text-center mt-4">
             离线模式下 Python 沙箱不可用，但 3D 实时仿真与分析模式仍可正常运行
           </p>
         )}
