@@ -80,6 +80,9 @@ function syncPoincareCondition(): void {
 export function setupSimulationBridge(): () => void {
   const sched = getScheduler();
 
+  // 启用外部 tick 模式：数据消费由 Scene3D 的 useFrame 驱动，与渲染严格同步
+  sched.enableExternalTick();
+
   // Worker ready → 清空待发送队列
   sched.onReady(() => setWorkerReady());
 

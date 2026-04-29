@@ -14,6 +14,7 @@ export { useSimulationHistory, clearSimulationHistory, getSimulationHistory, pau
 // Worker
 export { Float64Pool } from "./worker/float64-pool";
 export { SimulationScheduler, getScheduler } from "./worker/scheduler";
+export type { InterpSnapshot } from "./worker/scheduler";
 export { setupSimulationBridge, setWorkerReady, setWorkerNotReady } from "./worker/bridge";
 
 // UI

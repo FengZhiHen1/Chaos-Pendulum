@@ -462,4 +462,4 @@ export function getFrameSlice(
   return buffer.subarray(start, start + FRAME_STRIDE);
 }
 
-export const BATCH_PREFETCH_THRESHOLD = 0.8 * FRAMES_PER_BATCH;
+export const BATCH_PREFETCH_THRESHOLD = 0.5 * FRAMES_PER_BATCH;

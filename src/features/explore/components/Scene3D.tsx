@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
-import { useSimulationStore } from "@/features/simulation";
+import { useSimulationStore, getScheduler } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useTrailBuffer } from "../hooks/useTrailBuffer";
 import { useSceneController } from "../hooks/useSceneController";
@@ -325,6 +325,7 @@ function SceneContent({
   const currentTargetRef = useRef(new Vector3());
   const paramInvalidRef = useRef(false);
   const lastParamsRef = useRef<string>("");
+  const simTimeAccRef = useRef(0);
 
   // Store 订阅（React 重渲染触发器）
   const viewPreset = useExploreStore((s) => s.viewPreset);
@@ -408,8 +409,26 @@ function SceneContent({
   }, [params, sphereSegments, cylinderSegments]);
 
   // ── 每帧更新 ──
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!isMountedRef.current) return;
+
+    // 外部驱动 scheduler 消费帧（仅普通模式，与渲染严格同步）
+    if (!butterflySide) {
+      const scheduler = getScheduler();
+      if (scheduler.isRunning) {
+        simTimeAccRef.current += delta;
+        const dt = 1 / 60;
+        const maxFrames = 3;
+        let consumed = 0;
+        while (simTimeAccRef.current >= dt && consumed < maxFrames) {
+          scheduler.tick();
+          simTimeAccRef.current -= dt;
+          consumed++;
+        }
+      } else {
+        simTimeAccRef.current = 0;
+      }
+    }
 
     // 蝴蝶效应模式：从 ButterflySimStore 读取
     const bfStore = butterflySide ? useButterflyStore.getState() : null;
@@ -474,15 +493,40 @@ function SceneContent({
     if (!effectiveRunning) return;
 
     // ── 计算 3D 位置 ──
-    // 直接使用 Worker 已算好的笛卡尔坐标，消除参数-状态异步不匹配导致的闪现
+    // 普通模式：用 scheduler 提供的 prev/curr 快照做线性插值，
+    // 消除 burst 消费多帧导致的可见跳变（方案二：渲染层插值）
     let ball1Pos: Vector3;
     let ball2Pos: Vector3;
     if (bfSide) {
       ball1Pos = new Vector3(bfSide.x1, bfSide.y1, 0);
       ball2Pos = new Vector3(bfSide.x2, bfSide.y2, 0);
     } else {
-      ball1Pos = new Vector3(store.x1, store.y1, 0);
-      ball2Pos = new Vector3(store.x2, store.y2, 0);
+      const scheduler = getScheduler();
+      const { prev, curr } = scheduler.getInterpolationFrames();
+      const dt = 1 / 60;
+      const alpha = Math.min(simTimeAccRef.current / dt, 1.0);
+
+      // 仿真停止时直接显示 curr，避免 alpha=0 导致画面回退到 prev 产生抽搐
+      const isEffectivelyStopped = !scheduler.isRunning || alpha < 0.001;
+
+      if (curr && (isEffectivelyStopped || !prev)) {
+        ball1Pos = new Vector3(curr.x1, curr.y1, 0);
+        ball2Pos = new Vector3(curr.x2, curr.y2, 0);
+      } else if (prev && curr) {
+        ball1Pos = new Vector3(
+          prev.x1 + (curr.x1 - prev.x1) * alpha,
+          prev.y1 + (curr.y1 - prev.y1) * alpha,
+          0,
+        );
+        ball2Pos = new Vector3(
+          prev.x2 + (curr.x2 - prev.x2) * alpha,
+          prev.y2 + (curr.y2 - prev.y2) * alpha,
+          0,
+        );
+      } else {
+        ball1Pos = new Vector3(store.x1, store.y1, 0);
+        ball2Pos = new Vector3(store.x2, store.y2, 0);
+      }
     }
 
     lastValidBall1Ref.current.copy(ball1Pos);
