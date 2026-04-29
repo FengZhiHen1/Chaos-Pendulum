@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 from config import LYAPUNOV_GRID, FIXED_PARAMS, INTEGRATION, OUTPUT_DIR, SOLVER_VERSION
-from common import estimate_lyapunov, compute_grid_hash
+from common import estimate_lyapunov, compute_grid_hash, safe_json_dump
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -135,7 +135,7 @@ def main():
         # 每完成一行写入断点文件
         partial_path = output_dir / f"lyapunov_{layer_type.split('_')[-1]}-partial.json"
         with open(partial_path, "w") as f:
-            json.dump({
+            safe_json_dump({
                 "completed_rows": y + 1,
                 "grid": lyap_matrix.tolist(),
                 "nan_mask": nan_mask.tolist(),
@@ -203,7 +203,7 @@ def main():
     out_filename = f"lyapunov_{layer_type.split('_')[-1]}-{grid_hash}.json"
     out_path = output_dir / out_filename
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+        safe_json_dump(output, f, indent=2, ensure_ascii=False)
 
     # 清理断点文件
     if partial_path and partial_path.exists():

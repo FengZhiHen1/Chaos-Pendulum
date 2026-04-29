@@ -6,6 +6,7 @@
 
 import hashlib
 import json
+import math
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.signal import argrelextrema
@@ -204,3 +205,29 @@ def compute_grid_hash(
     canonical = json.dumps(metadata_dict, sort_keys=True, ensure_ascii=True)
     full_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return full_hash[:16]
+
+
+# ---- JSON 安全序列化 ----
+
+def sanitize_for_json(obj):
+    """递归替换 float('nan')/inf/-inf 为 None，确保输出合法 JSON。
+
+    Python 的 json.dump 默认 allow_nan=True，会将 NaN/Infinity
+    输出为裸标识符，违反 RFC 8259。JavaScript 的 JSON.parse 拒绝这些 token。
+    此函数在序列化前递归清洗所有非法浮点数。
+    """
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(v) for v in obj]
+    return obj
+
+
+def safe_json_dump(obj, fp, **kwargs):
+    """json.dump 的安全封装：自动清洗 NaN/Infinity 并强制 allow_nan=False。"""
+    clean = sanitize_for_json(obj)
+    json.dump(clean, fp, allow_nan=False, **kwargs)

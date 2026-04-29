@@ -18,7 +18,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from config import BIFURCATION_SCAN, FIXED_PARAMS, INTEGRATION, OUTPUT_DIR, SOLVER_VERSION
-from common import double_pendulum_ode, detect_local_maxima, compute_grid_hash
+from common import double_pendulum_ode, detect_local_maxima, compute_grid_hash, safe_json_dump
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -217,7 +217,7 @@ def main():
     out_filename = f"bifurcation-{grid_hash}.json"
     out_path = output_dir / out_filename
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+        safe_json_dump(output, f, indent=2, ensure_ascii=False)
 
     empty_count = sum(1 for s in samples if len(s) == 0)
     print(f"\n[完成] 输出: {out_filename}, gridHash={grid_hash}, 空采样 {empty_count}/{control_points} 个参数值")
