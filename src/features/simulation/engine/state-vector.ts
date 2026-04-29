@@ -82,6 +82,42 @@ export function ball2Position(
   };
 }
 
+/**
+ * 能量投影：等比缩放角速度使总能量回到目标值。
+ * 仅适用于保守系统 (damping=0)。原地修改 state[1] 和 state[3]。
+ * @returns 校正量 (J) — 正值表示补充了能量，负值表示移除了能量
+ */
+export function projectEnergy(
+  state: Float64Array,
+  p: PendulumParams,
+  targetEnergy: number,
+): number {
+  const t1 = state[0]!, w1 = state[1]!;
+  const t2 = state[2]!, w2 = state[3]!;
+  const { L1, L2, m1, m2, g } = p;
+
+  // 势能（仅依赖于位置）
+  const y1 = -L1 * Math.cos(t1);
+  const y2 = y1 - L2 * Math.cos(t2);
+  const V = m1 * g * y1 + m2 * g * y2;
+
+  // 动能（齐二次型于 ω）
+  const v1x = L1 * w1 * Math.cos(t1);
+  const v1y = L1 * w1 * Math.sin(t1);
+  const v2x = v1x + L2 * w2 * Math.cos(t2);
+  const v2y = v1y + L2 * w2 * Math.sin(t2);
+  const K = 0.5 * m1 * (v1x * v1x + v1y * v1y)
+          + 0.5 * m2 * (v2x * v2x + v2y * v2y);
+
+  const Ktarget = targetEnergy - V;
+  if (K < 1e-14 || Ktarget < 1e-14) return 0;
+
+  const scale = Math.sqrt(Ktarget / K);
+  state[1] = w1 * scale;
+  state[3] = w2 * scale;
+  return Ktarget - K;
+}
+
 /** 检查状态是否包含 NaN 或 Infinity */
 export function hasInvalidValue(state: Float64Array): boolean {
   for (let i = 0; i < state.length; i++) {

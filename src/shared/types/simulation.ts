@@ -185,6 +185,8 @@ export interface WorkerBatchReadyResponse {
   forceData?: Float64Array;
   /** 仿真全程力极值（computeForces 激活时非空） */
   forceExtrema?: ForceExtrema;
+  /** 本批次能量投影累积校正量 (J)，仅 damping=0 时非零 */
+  energyCorrection?: number;
 }
 
 export type ErrorCode = "DIVERGED" | "TIMEOUT" | "INVALID_STATE";

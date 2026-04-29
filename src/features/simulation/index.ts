@@ -5,7 +5,7 @@ export type { SimulationFrame } from "./store";
 // Engine
 export { odeRhs, angularAcceleration } from "./engine/derivatives";
 export { integratorStep } from "./engine/integrators";
-export { computeDerived, normalizeAngle, hasInvalidValue, ball2Position } from "./engine/state-vector";
+export { computeDerived, normalizeAngle, hasInvalidValue, ball2Position, projectEnergy } from "./engine/state-vector";
 export type { DerivedValues } from "./engine/state-vector";
 
 // History (EXP-05 时间反演消费)

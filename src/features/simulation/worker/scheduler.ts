@@ -297,6 +297,10 @@ export class SimulationScheduler {
 
         this.pendingBatch = false;
 
+        if (resp.energyCorrection !== undefined) {
+          useSimulationStore.setState({ energyCorrection: resp.energyCorrection });
+        }
+
         // 双缓冲：若 activeBuffer 仍在消费中，新批次暂存到 nextBuffer
         if (this.activeBuffer !== null && this.activeIndex < FRAMES_PER_BATCH) {
           // 旧批次仍有未消费帧 → 暂存新批次，不覆盖

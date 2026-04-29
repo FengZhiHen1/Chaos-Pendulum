@@ -9,7 +9,7 @@ import type {
 } from "@/shared/types";
 import { FRAME_STRIDE, FRAMES_PER_BATCH, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
 import { integratorStep } from "../engine/integrators";
-import { computeDerived, normalizeAngle, hasInvalidValue } from "../engine/state-vector";
+import { computeDerived, normalizeAngle, hasInvalidValue, projectEnergy } from "../engine/state-vector";
 
 // ─── Worker 内部状态 ──────────────────────────────
 
@@ -24,6 +24,12 @@ let _simTime = 0;
 let _batchIndex = 0;
 let _computeForces = false;
 let _forceExtrema: ForceExtrema | null = null;
+/** 仿真启动时的初始总能量（J），供保守系统能量投影使用。 */
+let _initialEnergy = 0;
+/** 能量投影是否启用（仅 damping=0 时启用，与初始能量是否为 0 解耦） */
+let _projectionEnabled = false;
+/** 本批次累积的能量投影校正量 (J) */
+let _batchEnergyCorrection = 0;
 
 // ─── 消息循环入口 ────────────────────────────────
 
@@ -79,6 +85,9 @@ function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: 
   _batchIndex = 0;
   _computeForces = false;
   _forceExtrema = null;
+  _projectionEnabled = params.damping === 0;
+  _initialEnergy = _projectionEnabled ? computeDerived(_state, params).totalEnergy : 0;
+  _batchEnergyCorrection = 0;
   _phase = "idle";
 
   postResponse({ type: "ready" });
@@ -116,6 +125,7 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
   const dt = 1 / 60;
   const startTime = performance.now();
   let frame = 0;
+  _batchEnergyCorrection = 0;
 
   // 保存积分前状态，用于穿越检测插值
   const stateBefore = new Float64Array(_state);
@@ -141,6 +151,11 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     }
 
     _simTime += dt * _direction;
+
+    // 能量投影：保守系统 (damping=0) 每帧校正能量回初始值
+    if (_projectionEnabled) {
+      _batchEnergyCorrection += projectEnergy(_state, _params, _initialEnergy);
+    }
 
     // ── 穿越检测 ──
     if (poincareConfig && varPrev !== null) {
@@ -231,6 +246,13 @@ function handleUpdateParams(cmd: { params: Partial<PendulumParams> }): void {
   }
 
   _params = merged;
+  // 阻尼状态变化 → 重算能量投影基线
+  _projectionEnabled = _params.damping === 0;
+  if (_projectionEnabled && _state) {
+    _initialEnergy = computeDerived(_state, _params).totalEnergy;
+  } else {
+    _initialEnergy = 0;
+  }
 }
 
 // ─── 步骤 8：方向切换 ───────────────────────────
@@ -271,6 +293,9 @@ function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: numb
   _direction = 1;
   _batchIndex = 0;
   _forceExtrema = null;
+  _projectionEnabled = _params!.damping === 0;
+  _initialEnergy = _projectionEnabled ? computeDerived(_state, _params!).totalEnergy : 0;
+  _batchEnergyCorrection = 0;
   _phase = "idle";
   postResponse({ type: "ready" });
 }
@@ -437,6 +462,7 @@ function transferBuffer(
     poincarePoints,
     forceData: forceBuffer ?? undefined,
     forceExtrema: _computeForces ? (_forceExtrema ?? undefined) : undefined,
+    energyCorrection: _batchEnergyCorrection,
   };
   const transfers: Transferable[] = [buffer.buffer as ArrayBuffer];
   if (forceBuffer) {
