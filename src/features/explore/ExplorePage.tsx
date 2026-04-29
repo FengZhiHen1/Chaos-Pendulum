@@ -1,4 +1,3 @@
-import { useState, useCallback } from "react";
 import { Play, Pause, RotateCcw, GitCompare, X } from "lucide-react";
 import { Scene3D } from "./components/Scene3D";
 import { TimeReversal } from "./components/TimeReversal";
@@ -6,46 +5,27 @@ import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajecto
 import { SonificationToggle } from "./components/SonificationToggle";
 import { ButterflySplit } from "./components/ButterflySplit";
 import { TrailControls } from "./components/TrailControls";
-import { useSimulationStore, getScheduler } from "@/features/simulation";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
+import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
+import { useButterflyMode } from "./hooks/useButterflyMode";
 import { useAppStore } from "@/stores/useAppStore";
 import { Button } from "@/shared/components/ui/button";
 
-/**
- * 探索模式根页面 — 桌面端三栏布局。
- *
- * 左 (280px): ParamPanel + TrailControls + 视角 / 材质 / 环境 / 声效
- * 中 (flex-1): Scene3D + 叠加控件
- * 右 (300px): EnergyMonitorPanel + PhaseSpacePanel
- * 底: 播放控制工具栏
- */
 export function ExplorePage() {
-  const [butterflyActive, setButterflyActive] = useState(false);
-  const deviceType = useAppStore((s) => s.deviceType);
-  const isDesktop = deviceType === "desktop";
+  const {
+    butterflyActive,
+    enterButterfly,
+    exitButterfly,
+  } = useButterflyMode();
 
-  const isRunning = useSimulationStore((s) => s.isRunning);
-  const engineError = useSimulationStore((s) => s.engineError);
-  const setRunning = useSimulationStore((s) => s.setRunning);
-  const resetToDefaults = useSimulationStore((s) => s.resetToDefaults);
+  const {
+    isRunning,
+    disabled,
+    setRunning,
+    resetToDefaults,
+  } = useSimulationControls();
 
-  const enterButterfly = useCallback(() => {
-    const store = useSimulationStore.getState();
-    if (store.isRunning) {
-      getScheduler().pause();
-    }
-    setButterflyActive(true);
-  }, []);
-
-  const exitButterfly = useCallback(() => {
-    setButterflyActive(false);
-    const store = useSimulationStore.getState();
-    if (!store.isRunning) {
-      getScheduler().resume();
-    }
-  }, []);
-
-  const disabled = engineError !== null && !isRunning;
+  const isDesktop = useAppStore((s) => s.deviceType === "desktop");
 
   if (butterflyActive) {
     return (

@@ -1,24 +1,9 @@
-import { useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useButterflyStore } from "../butterfly-store";
-import { ButterflyScheduler } from "../butterfly-scheduler";
+import { useButterflySimulation } from "../hooks/useButterflySimulation";
 import { Scene3D } from "./Scene3D";
 import { SeparationAlert, DeltaPanel } from "./ButterflyUI";
-
-// ─── 全局调度器（组件卸载时销毁） ─────────────────
-
-let globalButterflyScheduler: ButterflyScheduler | null = null;
-
-function getButterflyScheduler(): ButterflyScheduler {
-  if (!globalButterflyScheduler) {
-    globalButterflyScheduler = new ButterflyScheduler();
-  }
-  return globalButterflyScheduler;
-}
-
-// ─── CSS 动画注入 ────────────────────────────────
 
 const PULSE_STYLE = `
 @keyframes pulse-alert {
@@ -27,8 +12,6 @@ const PULSE_STYLE = `
 }
 `;
 
-// ─── 主组件 ──────────────────────────────────────
-
 interface ButterflySplitProps {
   className?: string;
 }
@@ -36,58 +19,10 @@ interface ButterflySplitProps {
 export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitProps) {
   const deviceType = useAppStore((s) => s.deviceType);
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
-  const setButterflyDelta = useExploreStore((s) => s.setButterflyDelta);
 
   const store = useButterflyStore();
-  const schedulerRef = useRef(getButterflyScheduler());
-
-  // ── 初始化 ──
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    const simStore = useSimulationStore.getState();
-    const baseParams = simStore.params;
-    const baseState = simStore.state;
-
-    schedulerRef.current.start(baseParams, baseState, butterflyDelta);
-  }, [butterflyDelta]);
-
-  // ── Delta 变化时重建 ──
-  const prevDeltaRef = useRef(butterflyDelta);
-  useEffect(() => {
-    if (prevDeltaRef.current === butterflyDelta) return;
-    prevDeltaRef.current = butterflyDelta;
-
-    const simStore = useSimulationStore.getState();
-    schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
-  }, [butterflyDelta]);
-
-  // ── 卸载清理 ──
-  useEffect(() => {
-    return () => {
-      schedulerRef.current.destroy();
-      globalButterflyScheduler = null;
-    };
-  }, []);
-
-  // ── 控制回调 ──
-  const handlePlay = useCallback(() => schedulerRef.current.play(), []);
-  const handlePause = useCallback(() => schedulerRef.current.pause(), []);
-  const handleReset = useCallback(() => {
-    const simStore = useSimulationStore.getState();
-    schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
-  }, [butterflyDelta]);
-
-  const handleDeltaChange = useCallback(
-    (deltaDeg: number) => {
-      const clamped = Math.max(0, Math.min(10.0, deltaDeg));
-      setButterflyDelta(clamped);
-    },
-    [setButterflyDelta],
-  );
+  const { handlePlay, handlePause, handleReset, handleDeltaChange } =
+    useButterflySimulation();
 
   const isDesktop = deviceType === "desktop";
 
