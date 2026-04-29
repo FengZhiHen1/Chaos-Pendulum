@@ -35,16 +35,16 @@ export function ParamPanel() {
   const disabled = engineError !== null && !isRunning;
 
   return (
-    <div className="flex flex-col h-full bg-lab-panel border-l border-lab-border">
+    <div className="flex flex-col h-full bg-surface-container-low">
       {/* 头部 */}
-      <div className="shrink-0 p-3 border-b border-lab-border space-y-2">
+      <div className="shrink-0 p-3 border-b border-white/5 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-white tracking-wider">
+          <span className="text-xs font-semibold text-on-surface tracking-wider">
             参数控制
           </span>
           <div className="flex items-center gap-1">
             <Button
-              variant="ghost"
+              variant="icon"
               size="icon"
               onClick={resetToDefaults}
               title="恢复默认"
@@ -52,7 +52,7 @@ export function ParamPanel() {
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant={isRunning ? "default" : "outline"}
+              variant={isRunning ? "secondary" : "primary"}
               size="sm"
               disabled={disabled}
               onClick={() => setRunning(!isRunning)}
@@ -68,12 +68,12 @@ export function ParamPanel() {
         </div>
 
         {isSceneFrozen && (
-          <Badge variant="outline" className="text-red-500 border-red-500/30 text-[10px]">
+          <Badge variant="outline" className="text-separation-alert border-separation-alert/30 text-[10px]">
             场景已冻结 — 参数非法
           </Badge>
         )}
         {engineError && (
-          <Badge variant="outline" className="text-red-500 border-red-500/30 text-[10px]">
+          <Badge variant="outline" className="text-separation-alert border-separation-alert/30 text-[10px]">
             {engineError}
           </Badge>
         )}
@@ -104,10 +104,10 @@ export function ParamPanel() {
       </Tabs>
 
       {/* 底部 */}
-      <div className="shrink-0 p-3 border-t border-lab-border space-y-2">
-        <span className="text-[10px] text-lab-border">积分方法</span>
+      <div className="shrink-0 p-3 border-t border-white/5 space-y-2">
+        <span className="text-[10px] text-on-surface-variant">积分方法</span>
         <MethodSelector />
-        <span className="text-[10px] text-lab-border">预设</span>
+        <span className="text-[10px] text-on-surface-variant">预设</span>
         <PresetButtons />
       </div>
     </div>

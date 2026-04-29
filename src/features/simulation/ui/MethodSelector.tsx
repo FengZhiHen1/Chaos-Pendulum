@@ -32,7 +32,7 @@ export function MethodSelector() {
           <SelectItem key={opt.value} value={opt.value}>
             <div className="flex flex-col">
               <span className="text-xs">{opt.label}</span>
-              <span className="text-[10px] text-lab-border">{opt.description}</span>
+              <span className="text-[10px] text-on-surface-variant">{opt.description}</span>
             </div>
           </SelectItem>
         ))}

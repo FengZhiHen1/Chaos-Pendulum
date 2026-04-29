@@ -56,7 +56,7 @@ export function ParamSlider({ meta }: ParamSliderProps) {
           )}
           step={meta.sliderStep}
         />
-        <span className="text-[10px] text-lab-border w-10 shrink-0">{meta.unit}</span>
+        <span className="text-[10px] text-on-surface-variant w-10 shrink-0">{meta.unit}</span>
         {error?.message && (
           <Tooltip>
             <TooltipTrigger asChild>

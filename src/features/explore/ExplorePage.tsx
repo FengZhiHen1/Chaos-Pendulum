@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { GitCompare, X } from "lucide-react";
+import { Play, Pause, RotateCcw, GitCompare, X } from "lucide-react";
 import { Scene3D } from "./components/Scene3D";
 import { TimeReversal } from "./components/TimeReversal";
 import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajectory";
@@ -7,21 +7,29 @@ import { SonificationToggle } from "./components/SonificationToggle";
 import { ButterflySplit } from "./components/ButterflySplit";
 import { TrailControls } from "./components/TrailControls";
 import { useSimulationStore, getScheduler } from "@/features/simulation";
+import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
+import { useAppStore } from "@/stores/useAppStore";
+import { Button } from "@/shared/components/ui/button";
 
 /**
- * 探索模式根页面。
+ * 探索模式根页面 — 桌面端三栏布局。
  *
- * 包含：
- * - EXP-01: 3D 仿真场景（主视觉区）
- * - EXP-02: 运动尾迹渲染（Scene3D 内集成）
- * - EXP-04: 蝴蝶效应对比器（分屏双摆对比 + DeltaPanel）
- * - EXP-05: 时间反演实验（控制栏 + 漂移曲线 + 教学注释 + 3D 轨迹叠加）
+ * 左 (280px): ParamPanel + TrailControls + 视角 / 材质 / 环境 / 声效
+ * 中 (flex-1): Scene3D + 叠加控件
+ * 右 (300px): EnergyMonitorPanel + PhaseSpacePanel
+ * 底: 播放控制工具栏
  */
 export function ExplorePage() {
   const [butterflyActive, setButterflyActive] = useState(false);
+  const deviceType = useAppStore((s) => s.deviceType);
+  const isDesktop = deviceType === "desktop";
+
+  const isRunning = useSimulationStore((s) => s.isRunning);
+  const engineError = useSimulationStore((s) => s.engineError);
+  const setRunning = useSimulationStore((s) => s.setRunning);
+  const resetToDefaults = useSimulationStore((s) => s.resetToDefaults);
 
   const enterButterfly = useCallback(() => {
-    // 暂停主仿真，让蝴蝶效应的独立 Worker 接管
     const store = useSimulationStore.getState();
     if (store.isRunning) {
       getScheduler().pause();
@@ -31,30 +39,48 @@ export function ExplorePage() {
 
   const exitButterfly = useCallback(() => {
     setButterflyActive(false);
-    // 恢复主仿真（如果之前在运行）
     const store = useSimulationStore.getState();
     if (!store.isRunning) {
       getScheduler().resume();
     }
   }, []);
 
+  const disabled = engineError !== null && !isRunning;
+
+  if (butterflyActive) {
+    return (
+      <div className="w-full h-full relative">
+        <ButterflySplit className="w-full h-full" />
+        <button
+          type="button"
+          onClick={exitButterfly}
+          className="absolute top-3 right-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-separation-alert/20 text-separation-alert hover:bg-separation-alert/30 border border-separation-alert/30 transition-all"
+        >
+          <X className="w-3.5 h-3.5" />
+          退出蝴蝶效应
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full relative">
-      {butterflyActive ? (
-        <>
-          <ButterflySplit className="w-full h-full" />
-          {/* 退出蝴蝶效应按钮 */}
-          <button
-            type="button"
-            onClick={exitButterfly}
-            className="absolute top-3 right-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all"
-          >
-            <X className="w-3.5 h-3.5" />
-            退出蝴蝶效应
-          </button>
-        </>
-      ) : (
-        <>
+    <div className="w-full h-full flex flex-col">
+      {/* 主内容区 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左侧控制面板 (280px) — 桌面端 */}
+        {isDesktop && (
+          <aside className="w-[280px] shrink-0 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
+              <ParamPanel />
+            </div>
+            <div className="shrink-0 border-t border-on-surface-variant/10 p-3">
+              <TrailControls />
+            </div>
+          </aside>
+        )}
+
+        {/* 中部 3D 场景 */}
+        <section className="flex-1 relative overflow-hidden bg-surface">
           <Scene3D
             pendulumMaterial="metal"
             environment="dark-lab"
@@ -62,20 +88,68 @@ export function ExplorePage() {
             enableShadows
             canvasChildren={<TimeReversalTrajectoryOverlay />}
           />
-          <TrailControls />
-          <TimeReversal />
-          {/* 声音化开关 */}
+
+          {/* 叠加控件 */}
           <SonificationToggle className="absolute top-3 left-3 z-20" />
-          {/* 蝴蝶效应入口按钮 */}
+          <TimeReversal />
+
+          {/* 蝴蝶效应入口 */}
           <button
             type="button"
             onClick={enterButterfly}
-            className="absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30 transition-all"
+            className="absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 border border-violet-500/30 transition-all"
           >
             <GitCompare className="w-3.5 h-3.5" />
             蝴蝶效应
           </button>
-        </>
+        </section>
+
+        {/* 右侧图表面板 (300px) — 桌面端 */}
+        {isDesktop && (
+          <aside className="w-[300px] shrink-0 flex flex-col overflow-y-auto bg-surface-container-low">
+            <EnergyMonitorPanel width={284} height={160} />
+            <PhaseSpacePanel size={284} />
+          </aside>
+        )}
+      </div>
+
+      {/* 底部工具栏 */}
+      <div className="h-10 shrink-0 flex items-center justify-center gap-3 bg-surface-container-lowest border-t border-on-surface-variant/10 px-4">
+        <Button
+          variant={isRunning ? "secondary" : "primary"}
+          size="sm"
+          disabled={disabled}
+          onClick={() => setRunning(!isRunning)}
+        >
+          {isRunning ? (
+            <><Pause className="h-3.5 w-3.5 mr-1" />暂停</>
+          ) : (
+            <><Play className="h-3.5 w-3.5 mr-1" />播放</>
+          )}
+        </Button>
+        <Button
+          variant="tertiary"
+          size="sm"
+          onClick={resetToDefaults}
+        >
+          <RotateCcw className="h-3.5 w-3.5 mr-1" />
+          重置
+        </Button>
+        <Button
+          variant="tertiary"
+          size="sm"
+          onClick={enterButterfly}
+        >
+          <GitCompare className="h-3.5 w-3.5 mr-1" />
+          蝴蝶效应
+        </Button>
+      </div>
+
+      {/* 平板 / 手机：控制面板以底部 Sheet 形式 (占位) */}
+      {!isDesktop && (
+        <div className="h-10 shrink-0 flex items-center justify-center bg-surface-container-low border-t border-on-surface-variant/10 text-xs text-on-surface-variant">
+          参数控制面板 (上滑展开) — 平板适配开发中
+        </div>
       )}
     </div>
   );

@@ -56,24 +56,24 @@ export function EnergyMonitorPanel({
   const showCanvas = width >= 100;
 
   return (
-    <div className="flex flex-col border-t border-lab-border bg-lab-panel">
+    <div className="flex flex-col border-t border-white/5 bg-surface-container-low">
       {/* 标题行 */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
-        <span className="text-xs font-semibold text-white tracking-wider">
+        <span className="text-xs font-semibold text-on-surface tracking-wider">
           能量监控
         </span>
         {isSimulationActive ? (
           showAlarm ? (
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-separation-alert/15 text-separation-alert animate-pulse">
               超阈值
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-lab-accent/20 text-lab-accent border border-lab-accent/30">
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary-container text-primary">
               正常
             </span>
           )
         ) : (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-slate-700/50 text-slate-400 border border-slate-600/30">
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-surface-container text-on-surface-variant">
             待机
           </span>
         )}
@@ -81,7 +81,7 @@ export function EnergyMonitorPanel({
 
       {/* 指标行 */}
       <div className="flex items-center gap-2 px-3 pb-1 text-xs flex-wrap">
-        <span className="text-lab-border shrink-0">漂移:</span>
+        <span className="text-on-surface-variant shrink-0">漂移:</span>
         <span className={cn("font-mono tabular-nums text-xs", driftColorClass)}>
           {driftPercent}%
         </span>
@@ -91,7 +91,7 @@ export function EnergyMonitorPanel({
             {showClearButton && (
               <button
                 onClick={handleClear}
-                className="text-[10px] text-lab-border hover:text-white underline shrink-0"
+                className="text-[10px] text-on-surface-variant hover:text-on-surface underline shrink-0"
               >
                 清除
               </button>
@@ -100,12 +100,12 @@ export function EnergyMonitorPanel({
         )}
 
         {damping > 0 && (
-          <span className="text-[10px] text-lab-border shrink-0">
+          <span className="text-[10px] text-on-surface-variant shrink-0">
             (阻尼开启)
           </span>
         )}
 
-        <span className="text-[10px] text-lab-border ml-auto">
+        <span className="text-[10px] text-on-surface-variant ml-auto">
           {isSimulationActive
             ? `[${energyMin.toFixed(2)}, ${energyMax.toFixed(2)}] J`
             : "数据不可用"}

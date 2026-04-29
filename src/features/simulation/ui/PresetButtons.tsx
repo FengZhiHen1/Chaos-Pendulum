@@ -11,7 +11,7 @@ export function PresetButtons() {
       {PRESETS.map((preset) => (
         <Button
           key={preset.id}
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={engineError !== null}
           onClick={() => {

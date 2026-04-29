@@ -51,10 +51,10 @@ export function PhaseSpacePanel({
   const show = size >= 100;
 
   return (
-    <div className="flex flex-col border-t border-lab-border bg-lab-panel">
+    <div className="flex flex-col border-t border-white/5 bg-surface-container-low">
       {/* 标题行 + Toggle */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
-        <span className="text-xs font-semibold text-white tracking-wider">
+        <span className="text-xs font-semibold text-on-surface tracking-wider">
           相空间图
         </span>
         <div className="flex gap-0.5">
@@ -64,8 +64,8 @@ export function PhaseSpacePanel({
               onClick={() => handleToggle(opt.value)}
               className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors ${
                 activeVariable === opt.value
-                  ? "bg-lab-accent/20 text-lab-accent border-lab-accent/40"
-                  : "text-lab-border border-transparent hover:border-lab-border"
+                  ? "bg-primary-container text-primary border-primary/40"
+                  : "text-on-surface-variant border-transparent hover:border-white/5"
               }`}
             >
               {opt.label}
@@ -89,11 +89,11 @@ export function PhaseSpacePanel({
       )}
 
       {/* 数值标签 */}
-      <div className="flex gap-4 px-3 pb-2 text-[10px] font-mono text-lab-border">
+      <div className="flex gap-4 px-3 pb-2 text-[10px] font-mono text-on-surface-variant">
         <span>θ = {thetaStr} rad</span>
         <span>θ̇ = {thetaDotStr} rad/s</span>
         {!isRunning && (
-          <span className="text-lab-border/50 ml-auto">已暂停</span>
+          <span className="text-on-surface-variant/50 ml-auto">已暂停</span>
         )}
       </div>
     </div>
