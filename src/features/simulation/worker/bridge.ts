@@ -21,7 +21,6 @@ const DEBOUNCE_MS = 16;
 
 let lastSyncedParams: PendulumParams = { ...useSimulationStore.getState().params };
 let lastRunning = false;
-let lastResetTrigger = useSimulationStore.getState().resetTrigger;
 let lastActiveView = useAnalyzeStore.getState().activeView;
 let lastPoincareCondition = useAnalyzeStore.getState().poincareSection.condition;
 let lastPoincareIsActive = useAnalyzeStore.getState().poincareSection.isActive;
@@ -92,6 +91,9 @@ export function setupSimulationBridge(): () => void {
   });
 
   const unsubSim = useSimulationStore.subscribe((state, prevState) => {
+    // 本次订阅触发是否包含 resetTrigger 递增（意味着 resetToDefaults / injectParams）
+    const isResetAction = state.resetTrigger !== prevState.resetTrigger;
+
     // ── params 变更 ──
     if (state.params !== prevState.params) {
       const diff: Partial<PendulumParams> = {};
@@ -118,7 +120,8 @@ export function setupSimulationBridge(): () => void {
     }
 
     // ── initialConditions 变更 → Worker reset ──
-    if (state.initialConditions !== prevState.initialConditions) {
+    // 若 resetTrigger 同时递增，由 resetTrigger 分支统一处理，此处跳过防抖
+    if (state.initialConditions !== prevState.initialConditions && !isResetAction) {
       pendingResetIC = state.initialConditions;
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => {
@@ -142,6 +145,24 @@ export function setupSimulationBridge(): () => void {
       }
     }
 
+    // ── resetTrigger 递增 → 完整重启仿真 ──
+    // 必须在 isRunning 之前执行。覆盖两种场景：
+    //   A) 暂停中点击重置 → isRunning 变为 true，后续 isRunning 分支补充 start()（no-op）
+    //   B) 运行中点击重置 → isRunning 未变，isRunning 分支不触发，此处显式 start()
+    if (isResetAction) {
+      // 取消任何待处理的 IC 防抖（由本次重置全权处理）
+      if (resetTimer) { clearTimeout(resetTimer); resetTimer = null; }
+      pendingResetIC = null;
+      const s = getScheduler();
+      if (s.isRunning) s.pause();
+      s.reset(state.initialConditions);
+      useAnalyzeStore.getState().poincareSection.clearPoints();
+      // 显式启动：pause() 已将 running 置 false，start() 的 if-guard 会通过
+      if (state.isRunning) {
+        s.start(state.params, state.initialConditions, state.method);
+      }
+    }
+
     // ── isRunning 变更 ──
     if (state.isRunning !== lastRunning) {
       lastRunning = state.isRunning;
@@ -151,12 +172,6 @@ export function setupSimulationBridge(): () => void {
       } else if (!state.isRunning && s.isRunning) {
         s.pause();
       }
-    }
-
-    // ── resetTrigger 增加 → 新仿真运行，清空庞加莱截面点 ──
-    if (state.resetTrigger !== lastResetTrigger) {
-      lastResetTrigger = state.resetTrigger;
-      useAnalyzeStore.getState().poincareSection.clearPoints();
     }
   });
 

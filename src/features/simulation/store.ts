@@ -17,7 +17,15 @@ import {
 import { FRAME_STRIDE, FRAMES_PER_BATCH, FrameField } from "@/shared/types";
 
 const DRIFT_THRESHOLD = 0.005;
+/** 总能量绝对值低于此阈值时，改用绝对漂移判定 */
+const LOW_ENERGY_THRESHOLD = 1.0; // J
+/** 低能量区绝对漂移容忍值 */
+const ABS_DRIFT_THRESHOLD = 0.05; // J
 const MAX_NAN_FRAMES = 60;
+/** 双摆静止判定：角速度绝对值低于此阈值视为静止 (rad/s) */
+const STOPPED_OMEGA_THRESHOLD = 1e-6;
+/** 连续静止帧数阈值（120 帧 ≈ 2 秒 @60fps） */
+const STOPPED_FRAME_COUNT = 120;
 
 // ─── 帧数据 ─────────────────────────────────────
 
@@ -101,12 +109,18 @@ interface SimulationState extends SimulationFrame {
   isSimulationActive: boolean;
   /** 当前消耗的帧索引 (0..FRAMES_PER_BATCH-1)，供 LAB-01 力数据对齐 */
   consumedFrameIndex: number;
+  /** 最近批次能量投影累积校正量 (J)，仅 damping=0 时有意义 */
+  energyCorrection: number;
 
   // ── 内部状态（从模块级变量迁移至 store，避免测试污染）──
   _nanSkipCount: number;
   _lastDamping: number;
   /** 上次能量基线建立时的 resetTrigger 值，用于检测仿真重置 */
   _energyResetGeneration: number;
+  /** 连续静止帧计数器（仅阻尼 > 0 时递增） */
+  _stoppedFrameCount: number;
+  /** 摆已静止（阻尼耗尽动能），供 UI 展示提示 */
+  isPendulumStopped: boolean;
 
   // ── SIM-02 Actions ──
   setParam: (key: keyof PendulumParams, value: number) => void;
@@ -192,9 +206,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   energyMax: 0,
   isSimulationActive: false,
   consumedFrameIndex: 0,
+  energyCorrection: 0,
   _nanSkipCount: 0,
   _lastDamping: NaN,
   _energyResetGeneration: 0,
+  _stoppedFrameCount: 0,
+  isPendulumStopped: false,
 
   // ── SIM-01 Actions ──
 
@@ -232,6 +249,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     let nsc = prev._nanSkipCount;
     let ld = prev._lastDamping;
     let erg = prev._energyResetGeneration;
+    let sfc = prev._stoppedFrameCount;
+    let ips = prev.isPendulumStopped;
 
     // 检测仿真重置：resetTrigger 变化意味着新一轮仿真已启动
     const genChanged = prev.resetTrigger !== erg;
@@ -244,7 +263,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       const damp = prev.params.damping;
       if (!isNaN(ld) && ld !== damp) {
         de = false;
-        if (damp === 0 && ld > 0) { ei = e; emin = e; emax = e; }
+        if (damp === 0 && ld > 0) { ei = e; emin = e; emax = e; ips = false; sfc = 0; }
       }
       ld = damp;
 
@@ -252,13 +271,32 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         // 仿真重置：重新建立能量基线
         ei = e; ed = 0; de = false; emin = e; emax = e; sa = true;
         erg = prev.resetTrigger;
+        sfc = 0; ips = false;
       } else if (ei === null || !sa) {
         ei = e; ed = 0; emin = e; emax = e; sa = true;
       } else {
         emin = Math.min(prev.energyMin, e);
         emax = Math.max(prev.energyMax, e);
-        ed = Math.abs(e - ei) / Math.max(Math.abs(ei), 1e-10);
-        if (damp === 0 && ed > DRIFT_THRESHOLD) de = true;
+        const absDrift = Math.abs(e - ei);
+        if (Math.abs(ei) < LOW_ENERGY_THRESHOLD) {
+          ed = absDrift; // 直接使用绝对漂移值 (J)
+          if (damp === 0 && absDrift > ABS_DRIFT_THRESHOLD) de = true;
+        } else {
+          ed = absDrift / Math.abs(ei);
+          if (damp === 0 && ed > DRIFT_THRESHOLD) de = true;
+        }
+      }
+
+      // 检测摆静止（仅阻尼系统，动能被耗散殆尽）
+      if (damp > 0 && !ips) {
+        const o1 = buffer[offset + FrameField.THETA1_DOT]!;
+        const o2 = buffer[offset + FrameField.THETA2_DOT]!;
+        if (Math.abs(o1) < STOPPED_OMEGA_THRESHOLD && Math.abs(o2) < STOPPED_OMEGA_THRESHOLD) {
+          sfc++;
+          if (sfc >= STOPPED_FRAME_COUNT) ips = true;
+        } else {
+          sfc = 0;
+        }
       }
     }
 
@@ -277,6 +315,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMin: emin, energyMax: emax, isSimulationActive: sa,
       consumedFrameIndex: frameIndex,
       _nanSkipCount: nsc, _lastDamping: ld, _energyResetGeneration: erg,
+      _stoppedFrameCount: sfc, isPendulumStopped: ips,
+      ...(ips !== prev.isPendulumStopped ? { isRunning: !ips } as const : {}),
       state: {
         theta1: buffer[offset + FrameField.THETA1]!,
         omega1: buffer[offset + FrameField.THETA1_DOT]!,
@@ -287,7 +327,11 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   },
 
   clearDriftAlarm: () => {
-    if (get().energyDrift < DRIFT_THRESHOLD) set({ driftExceeded: false });
+    const s = get();
+    const cleared = Math.abs(s.energyInitial!) < LOW_ENERGY_THRESHOLD
+      ? s.energyDrift < ABS_DRIFT_THRESHOLD
+      : s.energyDrift < DRIFT_THRESHOLD;
+    if (cleared) set({ driftExceeded: false });
   },
 
   // ── SIM-02 Actions ──
@@ -431,8 +475,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   },
 
   resetToDefaults: () => {
-    set((s) => ({
-      params: { ...DEFAULT_PARAMS },
+    const s = get();
+    const t1 = DEFAULT_INITIAL_CONDITIONS.theta1;
+    const t2 = DEFAULT_INITIAL_CONDITIONS.theta2;
+    // 用当前用户设置的 L1/L2 计算默认初始角对应的笛卡尔位置
+    const L1 = s.params.L1;
+    const L2 = s.params.L2;
+    const nx1 = L1 * Math.sin(t1);
+    const ny1 = -L1 * Math.cos(t1);
+    const nx2 = nx1 + L2 * Math.sin(t2);
+    const ny2 = ny1 - L2 * Math.cos(t2);
+
+    set({
+      // params 保留用户设置，不覆盖
       initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
       method: DEFAULT_METHOD,
       fieldErrors: {},
@@ -445,17 +500,27 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       energyMax: 0,
       isSimulationActive: false,
       consumedFrameIndex: 0,
+      energyCorrection: 0,
       _nanSkipCount: 0,
       _lastDamping: NaN,
       _energyResetGeneration: s.resetTrigger + 1,
+      _stoppedFrameCount: 0,
+      isPendulumStopped: false,
+      isRunning: false,
       resetTrigger: s.resetTrigger + 1,
+      // 同步更新笛卡尔坐标以立即反映默认位置（Scene3D 暂停时直接消费）
+      x1: nx1, y1: ny1, x2: nx2, y2: ny2,
+      theta1: t1, theta1Dot: 0,
+      theta2: t2, theta2Dot: 0,
+      kineticEnergy: 0, potentialEnergy: 0, totalEnergy: 0,
+      alpha1: 0, alpha2: 0,
       state: {
-        theta1: defaultFrame.theta1,
-        omega1: defaultFrame.theta1Dot,
-        theta2: defaultFrame.theta2,
-        omega2: defaultFrame.theta2Dot,
+        theta1: t1,
+        omega1: 0,
+        theta2: t2,
+        omega2: 0,
       },
-    }));
+    });
   },
 
   clearFieldErrors: () => set({ fieldErrors: {}, isSceneFrozen: false }),

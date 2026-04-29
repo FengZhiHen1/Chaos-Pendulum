@@ -441,7 +441,7 @@ function SceneContent({
     const store = useSimulationStore.getState();
     const p = bfSide ? bfSide.params : store.params;
     const sv = bfSide ? bfSide.state : store.state;
-    const effectiveRunning = bfStore ? bfStore.isRunning : isRunning;
+    const effectiveRunning = bfStore ? bfStore.isRunning : store.isRunning;
 
     // ── 参数合法性检查 ──
     const isInvalid = p.L1 <= 0.001 || p.L2 <= 0.001 || p.m1 <= 0 || p.m2 <= 0;
@@ -493,18 +493,15 @@ function SceneContent({
       nanFrameCountRef.current = 0;
     }
 
-    // 仿真暂停时保持当前位置
-    if (!effectiveRunning) return;
-
     // ── 计算 3D 位置 ──
-    // 普通模式：用 scheduler 提供的 prev/curr 快照做线性插值，
-    // 消除 burst 消费多帧导致的可见跳变（方案二：渲染层插值）
+    // 运行中：用 scheduler 提供的 prev/curr 快照做线性插值
+    // 暂停中：直接用 store 的笛卡尔坐标（重置后立即反映默认位置）
     let ball1Pos: Vector3;
     let ball2Pos: Vector3;
     if (bfSide) {
       ball1Pos = new Vector3(bfSide.x1, bfSide.y1, 0);
       ball2Pos = new Vector3(bfSide.x2, bfSide.y2, 0);
-    } else {
+    } else if (effectiveRunning) {
       const scheduler = getScheduler();
       const { prev, curr } = scheduler.getInterpolationFrames();
       const dt = 1 / 60;
@@ -531,17 +528,23 @@ function SceneContent({
         ball1Pos = new Vector3(store.x1, store.y1, 0);
         ball2Pos = new Vector3(store.x2, store.y2, 0);
       }
+    } else {
+      // 暂停/停止：直接用 store 笛卡尔坐标
+      ball1Pos = new Vector3(store.x1, store.y1, 0);
+      ball2Pos = new Vector3(store.x2, store.y2, 0);
     }
 
     lastValidBall1Ref.current.copy(ball1Pos);
     lastValidBall2Ref.current.copy(ball2Pos);
 
-    // ── 追加尾迹点（EXP-02） ──
-    appendTrailPoint(
-      { position: ball2Pos.clone(), velocity: p.L2 * Math.abs(omega2) },
-      p,
-      sv,
-    );
+    // ── 追加尾迹点（EXP-02，仅运行中）──
+    if (effectiveRunning) {
+      appendTrailPoint(
+        { position: ball2Pos.clone(), velocity: p.L2 * Math.abs(omega2) },
+        p,
+        sv,
+      );
+    }
 
     // ── 更新摆球位置 ──
     if (ball1Ref.current) ball1Ref.current.position.copy(ball1Pos);
