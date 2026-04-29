@@ -1,14 +1,29 @@
 import { getAudioContext } from "./audio-context";
 
-export function createNoiseGenerator(durationSec = 2) {
+export interface NoiseGenerator {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+  start(): void;
+  setLevel(level: number): void;
+  dispose(): void;
+}
+
+/**
+ * 创建白噪声发生器。
+ * 生成 2 秒立体声白噪声 buffer，loop 播放。
+ * 在声音化引擎中通过 ConvolverNode 实现混沌"声音碎裂"效果。
+ */
+export function createNoiseGenerator(durationSec = 2): NoiseGenerator {
   const ac = getAudioContext();
   const sampleRate = ac.sampleRate;
-  const length = sampleRate * durationSec;
-  const buffer = ac.createBuffer(1, length, sampleRate);
-  const data = buffer.getChannelData(0);
+  const length = Math.floor(sampleRate * durationSec);
+  const buffer = ac.createBuffer(2, length, sampleRate);
 
-  for (let i = 0; i < length; i++) {
-    data[i] = Math.random() * 2 - 1;
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
   }
 
   const source = ac.createBufferSource();
@@ -26,10 +41,11 @@ export function createNoiseGenerator(durationSec = 2) {
       source.start();
     },
     setLevel(level: number) {
-      gain.gain.value = clamp(level, 0, 0.1);
+      const target = clamp(level, 0, 0.1);
+      gain.gain.setTargetAtTime(target, ac.currentTime, 0.3);
     },
     dispose() {
-      source.stop();
+      try { source.stop(); } catch { /* 已停止则忽略 */ }
       gain.disconnect();
     },
   };
