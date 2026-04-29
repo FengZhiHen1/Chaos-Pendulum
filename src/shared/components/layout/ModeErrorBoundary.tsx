@@ -36,12 +36,12 @@ export class ModeErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center h-full gap-4 text-lab-border">
+        <div className="flex flex-col items-center justify-center h-full gap-4 text-on-surface-variant">
           <p className="text-sm">当前模式加载失败</p>
-          <p className="text-xs text-lab-border/60 max-w-md text-center">
+          <p className="text-xs text-on-surface-variant/60 max-w-md text-center">
             {this.state.error?.message ?? "未知错误"}
           </p>
-          <Button variant="outline" size="sm" onClick={this.handleReset}>
+          <Button variant="secondary" size="sm" onClick={this.handleReset}>
             返回探索模式
           </Button>
         </div>

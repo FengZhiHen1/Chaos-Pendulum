@@ -11,9 +11,8 @@ const ICON_MAP: Record<ModeDefinition["iconName"], LucideIcon> = {
   Play,
 };
 
-/** 模式 → 指示条颜色 */
 const INDICATOR_COLORS: Record<AppMode, string> = {
-  explore: "bg-blue-500",
+  explore: "bg-primary",
   analyze: "bg-emerald-500",
   lab: "bg-amber-500",
   story: "bg-violet-500",
@@ -35,8 +34,8 @@ export function GlobalNavBar() {
       <TabsList
         className={
           isDesktop
-            ? "gap-1"
-            : "w-full justify-around gap-0"
+            ? "gap-1 bg-transparent"
+            : "w-full justify-around gap-0 bg-transparent"
         }
       >
         {modeRegistry.map((mode) => {
@@ -47,17 +46,17 @@ export function GlobalNavBar() {
             <TabsTrigger
               key={mode.id}
               value={mode.id}
-              className="relative gap-1.5 transition-all duration-200 data-[state=active]:text-white"
+              className="relative gap-1.5 transition-all duration-200 data-[state=active]:text-primary data-[state=inactive]:text-on-surface-variant"
             >
               <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">
+              <span className="hidden sm:inline text-[13px]">
                 {isDesktop ? mode.label : mode.shortLabel}
               </span>
 
-              {/* 激活态底部色条 */}
+              {/* 激活态指示条 */}
               {isActive && (
                 <span
-                  className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full ${INDICATOR_COLORS[mode.id]} transition-all duration-200`}
+                  className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full ${INDICATOR_COLORS[mode.id]} transition-all duration-300`}
                 />
               )}
             </TabsTrigger>

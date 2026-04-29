@@ -1,6 +1,5 @@
 import { useEffect, useCallback, type ReactNode } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
 import { setupSimulationBridge } from "@/features/simulation";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import type { AppMode } from "@/shared/types";
@@ -60,42 +59,32 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="h-screen w-screen flex flex-col bg-lab-dark text-white">
+      <div className="h-screen w-screen flex flex-col bg-surface text-on-surface">
+        {/* 桌面端顶部导航 48px */}
         {isDesktop && (
-          <nav className="h-12 flex items-center px-4 border-b border-lab-border bg-lab-panel shrink-0">
-            <span className="text-sm font-mono tracking-wider text-lab-accent mr-6 shrink-0">
+          <nav className="h-12 flex items-center px-6 bg-surface-container-lowest shrink-0">
+            <span className="text-sm font-semibold tracking-wider text-on-surface mr-8 shrink-0">
               双摆混沌实验室
             </span>
             <GlobalNavBar />
           </nav>
         )}
 
-        <div className="flex-1 flex overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <ModeErrorBoundary>
-              {activeContent ?? (
-                <div className="absolute inset-0 flex items-center justify-center text-lab-border">
-                  <p className="text-lg">模式「{activeMode}」— 待实现</p>
-                </div>
-              )}
-            </ModeErrorBoundary>
-          </main>
-
-          {isDesktop && (
-            <aside className="w-72 shrink-0 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto">
-                <ParamPanel />
+        {/* 主内容区：各模式页面自行管理内部布局 */}
+        <main className="flex-1 overflow-hidden">
+          <ModeErrorBoundary>
+            {activeContent ?? (
+              <div className="h-full flex items-center justify-center text-on-surface-variant">
+                <p className="text-lg">模式「{activeMode}」— 待实现</p>
               </div>
-              <div className="shrink-0">
-                <EnergyMonitorPanel />
-                <PhaseSpacePanel />
-              </div>
-            </aside>
-          )}
-        </div>
+            )}
+          </ModeErrorBoundary>
+        </main>
 
+        {/* 平板/手机端底部导航 */}
         {!isDesktop && (
-          <nav className="h-12 flex items-center border-t border-lab-border bg-lab-panel shrink-0"
+          <nav
+            className="h-12 flex items-center bg-surface-container-lowest shrink-0"
             style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
           >
             <GlobalNavBar />
