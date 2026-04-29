@@ -1,18 +1,11 @@
-import { useState, useCallback } from "react";
-import { useSimulationStore } from "../store";
+import { usePhaseSpace } from "../hooks/usePhaseSpace";
 import { PhaseSpaceCanvas } from "./PhaseSpaceCanvas";
 import type { PhaseVariable } from "./PhaseSpaceCanvas";
 
-// ─── 类型 ──────────────────────────────────────
-
 interface PhaseSpacePanelProps {
-  /** Canvas 尺寸 (px)，默认 296（侧栏适配） */
   size?: number;
-  /** 轨迹点上限，默认 3000 */
   maxTrailPoints?: number;
-  /** 当前点高亮半径，默认 4 */
   cursorRadius?: number;
-  /** 轨迹点大小，默认 1.5 */
   trailWidth?: number;
 }
 
@@ -21,32 +14,19 @@ const VAR_OPTIONS: { value: PhaseVariable; label: string }[] = [
   { value: "theta2", label: "θ₂-θ̇₂" },
 ];
 
-// ─── 组件 ──────────────────────────────────────
-
 export function PhaseSpacePanel({
   size = 296,
   maxTrailPoints = 3000,
   cursorRadius = 4,
   trailWidth = 1.5,
 }: PhaseSpacePanelProps) {
-  const [activeVariable, setActiveVariable] = useState<PhaseVariable>("theta1");
-
-  // 读取当前数值
-  const theta1 = useSimulationStore((s) => s.theta1);
-  const theta1Dot = useSimulationStore((s) => s.theta1Dot);
-  const theta2 = useSimulationStore((s) => s.theta2);
-  const theta2Dot = useSimulationStore((s) => s.theta2Dot);
-  const isRunning = useSimulationStore((s) => s.isRunning);
-
-  const theta = activeVariable === "theta1" ? theta1 : theta2;
-  const thetaDot = activeVariable === "theta1" ? theta1Dot : theta2Dot;
-
-  const thetaStr = isNaN(theta) ? "--" : theta.toFixed(3);
-  const thetaDotStr = isNaN(thetaDot) ? "--" : thetaDot.toFixed(3);
-
-  const handleToggle = useCallback((v: PhaseVariable) => {
-    setActiveVariable(v);
-  }, []);
+  const {
+    thetaStr,
+    thetaDotStr,
+    activeVariable,
+    setActiveVariable,
+    isRunning,
+  } = usePhaseSpace();
 
   const show = size >= 100;
 
@@ -61,7 +41,7 @@ export function PhaseSpacePanel({
           {VAR_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => handleToggle(opt.value)}
+              onClick={() => setActiveVariable(opt.value)}
               className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors ${
                 activeVariable === opt.value
                   ? "bg-primary-container text-primary border-primary/40"

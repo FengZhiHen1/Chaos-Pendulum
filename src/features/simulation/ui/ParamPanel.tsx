@@ -4,7 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { RotateCcw, Play, Pause } from "lucide-react";
 import { PARAM_META } from "@/shared/types";
 import type { ParamGroup } from "@/shared/types";
-import { useSimulationStore } from "../store";
+import { useSimulationControls } from "../hooks/useSimulationControls";
 import { ParamSlider } from "./ParamSlider";
 import { MethodSelector } from "./MethodSelector";
 import { PresetButtons } from "./PresetButtons";
@@ -26,13 +26,14 @@ for (const m of PARAM_META) {
 }
 
 export function ParamPanel() {
-  const isRunning = useSimulationStore((s) => s.isRunning);
-  const engineError = useSimulationStore((s) => s.engineError);
-  const isSceneFrozen = useSimulationStore((s) => s.isSceneFrozen);
-  const setRunning = useSimulationStore((s) => s.setRunning);
-  const resetToDefaults = useSimulationStore((s) => s.resetToDefaults);
-
-  const disabled = engineError !== null && !isRunning;
+  const {
+    isRunning,
+    engineError,
+    isSceneFrozen,
+    disabled,
+    setRunning,
+    resetToDefaults,
+  } = useSimulationControls();
 
   return (
     <div className="flex flex-col h-full bg-surface-container-low">
