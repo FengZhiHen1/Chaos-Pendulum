@@ -3,7 +3,9 @@ import { useSimulationStore, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "../store";
 import { useAppStore } from "@/stores/useAppStore";
 import { useChaosIndicator } from "./useChaosIndicator";
+import { notify } from "@/features/system/error-handling/notify";
 import {
+  getAudioContext,
   createSonificationEngine,
   resumeAudioContext,
   closeAudioContext,
@@ -14,6 +16,7 @@ import type { SonificationEngine } from "@/shared/audio";
 
 const MAX_ENERGY_EMA_ALPHA = 0.0005; // 半衰期 ≈ 33 秒
 const MAX_ENERGY_MIN = 0.1;
+const MAX_ENGINE_REBUILDS = 1;
 
 // ─── Hook 返回类型 ─────────────────────────────────
 
@@ -40,6 +43,7 @@ export function useSonification(): UseSonificationAPI {
   const maxObservedEnergyRef = useRef(MAX_ENERGY_MIN);
   const initializedRef = useRef(false);
   const chaosIndicator = useChaosIndicator();
+  const rebuildCountRef = useRef(0);
 
   // ── 惰性初始化引擎 ──
   const initEngine = useCallback(() => {
@@ -47,6 +51,7 @@ export function useSonification(): UseSonificationAPI {
     try {
       engineRef.current = createSonificationEngine();
       initializedRef.current = true;
+      rebuildCountRef.current = 0;
     } catch (err) {
       console.error("EXP-03: Failed to create sonification engine", err);
     }
@@ -60,14 +65,32 @@ export function useSonification(): UseSonificationAPI {
       // 开启：恢复 AudioContext + 初始化/启用引擎
       resumeAudioContext()
         .then(() => {
+          const ctx = getAudioContext();
+          if (ctx.state === "suspended") {
+            console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
+            notify({
+              title: "浏览器阻止了音频播放",
+              description: "请再次点击按钮",
+              variant: "warning",
+              durationMs: 3000,
+            });
+            return;
+          }
           initEngine();
-          if (engineRef.current) {
-            engineRef.current.setEnabled(true);
+          const newEngine = engineRef.current;
+          if (newEngine) {
+            newEngine.setEnabled(true);
           }
           setSonificationEnabled(true);
         })
         .catch(() => {
           console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
+          notify({
+            title: "浏览器阻止了音频播放",
+            description: "请点击页面后再试",
+            variant: "warning",
+            durationMs: 3000,
+          });
         });
     } else {
       // 关闭：静音但不销毁引擎
@@ -95,12 +118,6 @@ export function useSonification(): UseSonificationAPI {
     if (!store.isRunning) return;
 
     const { state, kineticEnergy } = store;
-
-    // NaN 保护
-    if (isNaN(state.omega2) || isNaN(state.theta1) || isNaN(state.theta2) || isNaN(kineticEnergy)) {
-      return;
-    }
-
     const angleBetween = Math.abs(normalizeAngle(state.theta2 - state.theta1));
 
     // 更新 maxObservedEnergy（EMA 衰减避免历史峰值永久拉高归一化上限）
@@ -113,15 +130,49 @@ export function useSonification(): UseSonificationAPI {
     // 混沌检测
     const { variance } = chaosIndicator.pushAndGet(state.omega2);
 
-    // 更新引擎
-    engineRef.current.update({
-      omega2: state.omega2,
-      angleBetween,
-      kineticEnergy,
-      omega2Variance: variance,
-      maxObservedEnergy: maxObservedEnergyRef.current,
-    });
-  }, [simTime, sonificationEnabled, deviceType, chaosIndicator]);
+    // 更新引擎（带 InvalidStateError 捕获与自动重建）
+    try {
+      engineRef.current.update({
+        omega2: state.omega2,
+        angleBetween,
+        kineticEnergy,
+        omega2Variance: variance,
+        maxObservedEnergy: maxObservedEnergyRef.current,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "InvalidStateError") {
+        console.error("EXP-03: Oscillator stopped unexpectedly, reinitializing engine");
+        const engine = engineRef.current;
+        if (rebuildCountRef.current >= MAX_ENGINE_REBUILDS) {
+          engine?.setEnabled(false);
+          setSonificationEnabled(false);
+          notify({
+            title: "音频引擎故障",
+            description: "请刷新页面后重试",
+            variant: "error",
+            durationMs: 3000,
+          });
+          return;
+        }
+        try {
+          engine?.dispose();
+          engineRef.current = null;
+          initializedRef.current = false;
+          rebuildCountRef.current++;
+          initEngine();
+          const rebuiltEngine = engineRef.current as SonificationEngine | null;
+          if (rebuiltEngine) {
+            rebuiltEngine.setEnabled(true);
+          }
+        } catch (rebuildErr) {
+          console.error("EXP-03: Engine rebuild failed", rebuildErr);
+          setSonificationEnabled(false);
+        }
+      } else {
+        throw err;
+      }
+    }
+  }, [simTime, sonificationEnabled, deviceType, chaosIndicator, initEngine, setSonificationEnabled]);
 
   // ── 卸载清理 ──
   useEffect(() => {
