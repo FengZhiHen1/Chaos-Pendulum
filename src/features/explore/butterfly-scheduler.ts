@@ -3,8 +3,9 @@ import type { WorkerResponse } from "@/shared/types";
 import { FRAME_STRIDE } from "@/shared/types";
 import { Float64Pool } from "@/features/simulation/worker/float64-pool";
 import { notify } from "@/features/system/error-handling/notify";
-import { useButterflyStore } from "./butterfly-store";
-import type { EnergySnapshot } from "./butterfly-store";
+import { commandBus } from "@/stores/commandBus";
+import { useRootStore } from "@/stores/rootStore";
+import type { EnergySnapshot } from "@/stores/slices/butterflySlice";
 
 const TIMEOUT_MS = 2000;
 const INIT_TIMEOUT_MS = 5000;
@@ -36,9 +37,6 @@ export class ButterflyScheduler {
   start(baseParams: PendulumParams, baseState: StateVector, deltaDeg: number): void {
     if (this.running) return;
 
-    const store = useButterflyStore.getState();
-    store.init(baseParams, baseState, deltaDeg);
-
     const deltaRad = deltaDeg * (Math.PI / 180);
     const icA: InitialConditions = {
       theta1: baseState.theta1, theta1Dot: baseState.omega1,
@@ -58,13 +56,13 @@ export class ButterflyScheduler {
   play(): void {
     if (this.running) return;
     this.running = true;
-    useButterflyStore.getState().play();
+    commandBus.emit({ type: "butterfly:play" });
     this.rafId = requestAnimationFrame(() => this.loop());
   }
 
   pause(): void {
     this.running = false;
-    useButterflyStore.getState().pause();
+    commandBus.emit({ type: "butterfly:pause" });
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
       this.rafId = 0;
@@ -84,9 +82,6 @@ export class ButterflyScheduler {
     this.sideA?.worker.terminate();
     this.sideB?.worker.terminate();
 
-    const store = useButterflyStore.getState();
-    store.reset();
-
     const deltaRad = deltaDeg * (Math.PI / 180);
     const icA: InitialConditions = {
       theta1: baseState.theta1, theta1Dot: baseState.omega1,
@@ -102,7 +97,7 @@ export class ButterflyScheduler {
   }
 
   updateParams(patch: Partial<PendulumParams>): void {
-    const editMode = useButterflyStore.getState().editMode;
+    const editMode = useRootStore.getState().editMode;
     const cmd = { type: "updateParams" as const, params: patch };
     if (editMode === "synced" || editMode === "a-only") {
       this.sideA?.worker.postMessage(cmd);
@@ -153,7 +148,7 @@ export class ButterflyScheduler {
     // 初始化超时检测
     const initTimeout = setTimeout(() => {
       if (sw.initRetries >= 1) {
-        useButterflyStore.getState()._setWorkerReady(side, false);
+        commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
         notify({
           title: `摆 ${side} 仿真引擎启动失败`,
           description: "请刷新页面后重试",
@@ -189,14 +184,12 @@ export class ButterflyScheduler {
   // ── Worker 消息处理 ──
 
   private handleMessage(resp: WorkerResponse, sw: SideWorker, side: "A" | "B"): void {
-    const store = useButterflyStore.getState();
-
     switch (resp.type) {
       case "ready": {
         // 清除初始化超时
         const timeout = (sw as any).__initTimeout;
         if (timeout) { clearTimeout(timeout); (sw as any).__initTimeout = null; }
-        store._setWorkerReady(side, true);
+        commandBus.emit({ type: "butterfly:workerReady", side, ready: true });
         this.tryRequestBatch(sw, side);
         break;
       }
@@ -229,7 +222,14 @@ export class ButterflyScheduler {
           y2: buf[offset + 8]!,
         };
 
-        store._updateSide(side, stateVec, energy, derived);
+        commandBus.emit({
+          type: "butterfly:frame",
+          side,
+          state: stateVec,
+          energy,
+          derived,
+          simTime: buf[offset]!,
+        });
         sw.currentSimTime = buf[offset]!; // t 在第一列
 
         // 归还 buffer
@@ -243,8 +243,8 @@ export class ButterflyScheduler {
 
       case "error": {
         sw.pendingBatch = false;
-        store._setWorkerReady(side, false);
-        useButterflyStore.getState().pause();
+        commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
+        commandBus.emit({ type: "butterfly:pause" });
         this.running = false;
         console.error(`EXP-04: Worker ${side} error`, resp);
         notify({
@@ -268,9 +268,9 @@ export class ButterflyScheduler {
     console.error(`EXP-04: Worker ${side} crash`, _event);
 
     if (sw.crashCount >= MAX_CRASH_RECOVERY) {
-      useButterflyStore.getState()._setWorkerReady(side, false);
+      commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
       this.running = false;
-      useButterflyStore.getState().pause();
+      commandBus.emit({ type: "butterfly:pause" });
       notify({
         title: `摆 ${side} 仿真引擎崩溃`,
         description: `于 t≈${sw.currentSimTime.toFixed(2)}s，请调整参数后重试`,

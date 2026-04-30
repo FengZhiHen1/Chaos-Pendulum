@@ -2,8 +2,92 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SimulationScheduler } from "../scheduler";
 import { useSimulationStore } from "../../store";
 import { useLabStore } from "@/features/lab/store";
+import { useRootStore } from "@/stores/rootStore";
 import { FRAMES_PER_BATCH, FRAME_STRIDE, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
 import type { ForceExtrema, PoincarePoint } from "@/shared/types";
+import { commandBus } from "@/stores/commandBus";
+
+// ─── Command Bus 测试处理器 ─────────────────────
+
+let unsubCommands: Array<() => void> = [];
+
+function setupTestCommandBus(): void {
+  // 清理旧的
+  unsubCommands.forEach((u) => u());
+  unsubCommands = [];
+
+  unsubCommands.push(
+    commandBus.on("worker:batchReady", (payload) => {
+      if (payload.energyCorrection !== undefined) {
+        useSimulationStore.setState({ energyCorrection: payload.energyCorrection });
+      }
+      if (payload.lyapunovExponent !== undefined) {
+        useSimulationStore.setState({ lyapunovExponent: payload.lyapunovExponent });
+      }
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("lab:forceData", (payload) => {
+      if (payload.data) {
+        useLabStore.getState().setLastForceData(payload.data);
+      }
+      if (payload.extrema) {
+        useLabStore.getState().setForceExtrema(payload.extrema);
+      }
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("worker:error", (payload) => {
+      useSimulationStore.setState({ engineError: payload.message });
+      if (payload.code === "DIVERGED") {
+        useSimulationStore.setState({ isRunning: false });
+      }
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("worker:crash", () => {
+      useSimulationStore.setState({
+        engineError: "仿真引擎崩溃，请刷新页面",
+        isRunning: false,
+      });
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("engine:recovered", (payload) => {
+      useSimulationStore.setState({
+        engineError: null,
+        engineEvent: { type: "recovered", message: payload.message },
+      });
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("frame:consume", (payload) => {
+      useSimulationStore.getState().consumeFrameFromBuffer(payload.buffer, payload.frameIndex);
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("history:push", (payload) => {
+      useRootStore.getState().pushHistory(payload.state);
+    }),
+  );
+
+  unsubCommands.push(
+    commandBus.on("history:clear", () => {
+      useRootStore.getState().clearHistory();
+    }),
+  );
+}
+
+function teardownTestCommandBus(): void {
+  unsubCommands.forEach((u) => u());
+  unsubCommands = [];
+}
 
 // ─── 全局 Worker mock（jsdom 中不可用）─────────────
 
@@ -133,6 +217,9 @@ beforeEach(() => {
   // 清理 mock Worker 实例
   mockWorkerInstances.length = 0;
 
+  // 设置 Command Bus 测试处理器
+  setupTestCommandBus();
+
   // 重置所有涉及的 Zustand store
   useSimulationStore.setState({
     params: { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
@@ -154,6 +241,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  teardownTestCommandBus();
   vi.restoreAllMocks();
 });
 

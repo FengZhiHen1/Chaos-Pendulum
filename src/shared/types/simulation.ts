@@ -9,6 +9,9 @@ export const FRAMES_PER_BATCH = 120;
 /** 单批次 buffer 长度 */
 export const BUFFER_LENGTH = FRAMES_PER_BATCH * FRAME_STRIDE; // = 1680
 
+/** 预取阈值：activeBuffer 消费到此比例时开始请求下一批 */
+export const BATCH_PREFETCH_THRESHOLD = 0.5 * FRAMES_PER_BATCH;
+
 /** 每帧力数据占用的 float64 数（20 个力字段，含 ball 2 完整方向角 + 4 保留） */
 export const FORCE_STRIDE = 20;
 /** 单批次力数据 buffer 长度 */

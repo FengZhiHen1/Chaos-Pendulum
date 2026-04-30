@@ -1,25 +1,19 @@
-import { create } from "zustand";
+import { useRootStore } from "@/stores/rootStore";
+import type { DataSlice } from "@/stores/slices/dataSlice";
 
-interface DataState {
-  snapshots: { id: string; label: string; timestamp: string }[];
-  replayTime: number;
-  isReplaying: boolean;
-  forkActive: boolean;
-
-  setSnapshots: (snapshots: DataState["snapshots"]) => void;
-  setReplayTime: (t: number) => void;
-  setReplaying: (replaying: boolean) => void;
-  setForkActive: (active: boolean) => void;
+function useDataStore(): DataSlice;
+function useDataStore<T>(selector: (state: DataSlice) => T): T;
+function useDataStore<T>(selector?: (state: DataSlice) => T): DataSlice | T {
+  if (selector) {
+    return useRootStore(selector as (state: unknown) => T);
+  }
+  return useRootStore() as DataSlice;
 }
 
-export const useDataStore = create<DataState>((set) => ({
-  snapshots: [],
-  replayTime: 0,
-  isReplaying: false,
-  forkActive: false,
+useDataStore.getState = () => useRootStore.getState() as DataSlice;
+useDataStore.setState = (partial: Partial<DataSlice> | ((state: DataSlice) => Partial<DataSlice>), replace?: boolean) =>
+  useRootStore.setState(partial as any, replace);
+useDataStore.subscribe = (listener: (state: DataSlice, prevState: DataSlice) => void) =>
+  useRootStore.subscribe(listener as any);
 
-  setSnapshots: (snapshots) => set({ snapshots }),
-  setReplayTime: (replayTime) => set({ replayTime }),
-  setReplaying: (isReplaying) => set({ isReplaying }),
-  setForkActive: (forkActive) => set({ forkActive }),
-}));
+export { useDataStore };

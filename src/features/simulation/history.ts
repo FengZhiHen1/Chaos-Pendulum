@@ -1,41 +1,34 @@
-import { RingBuffer } from "@/features/data";
 import type { StateVector } from "@/shared/types";
-import { useSimulationStore } from "./store";
-
-const HISTORY_CAPACITY = 6000; // 100s @ 60fps
-
-const historyBuffer = new RingBuffer<StateVector>(HISTORY_CAPACITY);
-let recordingPaused = false;
+import { useRootStore } from "@/stores/rootStore";
 
 /** 追加正向轨迹历史帧（由调度器每帧调用） */
 export function pushSimulationHistory(state: StateVector): void {
-  if (recordingPaused) return;
-  historyBuffer.push({ ...state });
+  useRootStore.getState().pushHistory(state);
 }
 
 /** 暂停历史记录（反演期间调用，防止反向帧污染正向历史） */
 export function pauseHistoryRecording(): void {
-  recordingPaused = true;
+  useRootStore.getState().pauseHistory();
 }
 
 /** 恢复历史记录 */
 export function resumeHistoryRecording(): void {
-  recordingPaused = false;
+  useRootStore.getState().resumeHistory();
 }
 
 /** 获取完整正向轨迹历史（按时间顺序） */
 export function getSimulationHistory(): StateVector[] {
-  return historyBuffer.toArray();
+  return useRootStore.getState().getHistoryArray();
 }
 
 /** 获取历史长度 */
 export function getHistoryLength(): number {
-  return historyBuffer.length;
+  return useRootStore.getState().getHistoryLength();
 }
 
 /** 清空历史（仿真重置时调用） */
 export function clearSimulationHistory(): void {
-  historyBuffer.clear();
+  useRootStore.getState().clearHistory();
 }
 
 /**
@@ -45,12 +38,12 @@ export function clearSimulationHistory(): void {
  */
 export function useSimulationHistory() {
   // 每帧仿真更新时触发重渲染
-  useSimulationStore((s) => s.t);
+  useRootStore((s) => s.t);
 
   return {
     /** 返回时间顺序的完整历史副本 */
-    toArray: () => historyBuffer.toArray(),
+    toArray: () => useRootStore.getState().getHistoryArray(),
     /** 当前历史帧数 */
-    length: historyBuffer.length,
+    length: useRootStore.getState().getHistoryLength(),
   } as const;
 }

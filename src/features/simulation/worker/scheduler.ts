@@ -6,11 +6,10 @@ import type {
   PoincareSectionCondition,
   PoincarePoint,
 } from "@/shared/types";
-import { FRAMES_PER_BATCH } from "@/shared/types";
+import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/types";
 import { Float64Pool } from "./float64-pool";
-import { useSimulationStore, BATCH_PREFETCH_THRESHOLD } from "../store";
-import { pushSimulationHistory, clearSimulationHistory } from "../history";
-import { useLabStore } from "@/features/lab/store";
+import { commandBus } from "@/stores/commandBus";
+import { useRootStore } from "@/stores/rootStore";
 import { observabilityCoordinator } from "@/shared/lib/observability";
 
 const TIMEOUT_MS = 2000;
@@ -41,7 +40,7 @@ export class SimulationScheduler {
   private nextFrameCount = 0;
   /** nextBuffer 对应的池槽位索引 */
   private nextPoolIndex = -1;
-  /** nextBuffer 关联的力数据（延迟转发到 labStore） */
+  /** nextBuffer 关联的力数据（延迟转发） */
   private nextForceData: Float64Array | null = null;
   /** nextBuffer 关联的庞加莱截面点（延迟转发） */
   private nextPoincarePoints: PoincarePoint[] | null = null;
@@ -150,7 +149,7 @@ export class SimulationScheduler {
       this.pendingPoolIndex = -1;
     }
 
-    clearSimulationHistory();
+    commandBus.emit({ type: "history:clear" });
     this.prevSnapshot = null;
     this.currSnapshot = null;
     this.send({
@@ -315,8 +314,6 @@ export class SimulationScheduler {
   }
 
   private handleWorkerMessage(resp: WorkerResponse): void {
-    const store = useSimulationStore.getState();
-
     switch (resp.type) {
       case "ready": {
         for (const cb of this.readyCallbacks) cb();
@@ -357,11 +354,12 @@ export class SimulationScheduler {
         const completedPoolIndex = this.pendingPoolIndex;
         this.pendingPoolIndex = -1;
 
+        // 元数据可立即更新（不依赖双缓冲状态）
         if (resp.energyCorrection !== undefined) {
-          useSimulationStore.setState({ energyCorrection: resp.energyCorrection });
+          commandBus.emit({ type: "worker:batchReady", energyCorrection: resp.energyCorrection });
         }
         if (resp.lyapunovExponent !== undefined) {
-          useSimulationStore.setState({ lyapunovExponent: resp.lyapunovExponent });
+          commandBus.emit({ type: "worker:batchReady", lyapunovExponent: resp.lyapunovExponent });
         }
 
         // 双缓冲：若 activeBuffer 仍在消费中，新批次暂存到 nextBuffer
@@ -385,24 +383,30 @@ export class SimulationScheduler {
           this.activeFrameCount = resp.frameCount;
           this.activePoolIndex = completedPoolIndex;
 
-          // 转发力数据到 labStore
+          // 转发力数据（直接激活的新批次）
           if (resp.forceData) {
-            const labStore = useLabStore.getState();
-            labStore.setLastForceData(resp.forceData);
-            if (resp.forceExtrema) {
-              labStore.setForceExtrema(resp.forceExtrema);
-            }
+            commandBus.emit({ type: "lab:forceData", data: resp.forceData, extrema: resp.forceExtrema });
           }
 
-          // 转发庞加莱截面点
+          // 转发庞加莱截面点（直接激活的新批次）
           if (resp.poincarePoints && resp.poincarePoints.length > 0) {
             for (const cb of this.poincareCallbacks) cb(resp.poincarePoints);
           }
-        }
 
-        // 力极值是全局累积值，无论哪个批次都立即更新
-        if (resp.forceExtrema && !resp.forceData) {
-          useLabStore.getState().setForceExtrema(resp.forceExtrema);
+          // 转发延迟的力数据
+          if (this.nextForceData) {
+            commandBus.emit({
+              type: "lab:forceData",
+              data: this.nextForceData,
+            });
+            this.nextForceData = null;
+          }
+
+          // 转发延迟的庞加莱截面点
+          if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
+            for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);
+            this.nextPoincarePoints = null;
+          }
         }
 
         if (resp.frameCount < FRAMES_PER_BATCH) {
@@ -432,10 +436,15 @@ export class SimulationScheduler {
             performance.clearMarks("worker-step-end");
           } catch { /* 静默 */ }
         }
-        useSimulationStore.setState({ engineError: resp.message });
+
+        commandBus.emit({
+          type: "worker:error",
+          code: resp.code,
+          message: resp.message,
+          simTime: resp.simTime,
+        });
 
         if (resp.code === "DIVERGED") {
-          store.setRunning(false);
           this.running = false;
         }
         break;
@@ -448,16 +457,16 @@ export class SimulationScheduler {
 
     if (this.crashCount >= MAX_CRASH_RECOVERY) {
       console.error("[scheduler] 连续崩溃，停止重建");
-      useSimulationStore.setState({
-        engineError: "仿真引擎崩溃，请刷新页面",
-        isRunning: false,
+      commandBus.emit({
+        type: "worker:crash",
+        event,
       });
       this.running = false;
       return;
     }
 
     this.crashCount++;
-    const store = useSimulationStore.getState();
+    const store = useRootStore.getState();
 
     if (this.activeBuffer) {
       this.pool.release(this.activePoolIndex);
@@ -485,17 +494,17 @@ export class SimulationScheduler {
       type: "init",
       params: store.params,
       initialConditions: {
-        theta1: store.theta1,
-        theta1Dot: store.theta1Dot,
-        theta2: store.theta2,
-        theta2Dot: store.theta2Dot,
+        theta1: store.state.theta1,
+        theta1Dot: store.state.omega1,
+        theta2: store.state.theta2,
+        theta2Dot: store.state.omega2,
       },
       method: store.method,
     });
 
-    useSimulationStore.setState({
-      engineError: null,
-      engineEvent: { type: "recovered", message: "仿真引擎已自动恢复" },
+    commandBus.emit({
+      type: "engine:recovered",
+      message: "仿真引擎已自动恢复",
     });
   }
 
@@ -509,26 +518,31 @@ export class SimulationScheduler {
   /** 消费一帧数据（内部 rAF 和外部 tick 共用）。
    * @returns 是否实际消费了一帧 */
   private consumeOneFrame(): boolean {
-    const store = useSimulationStore.getState();
-
     if (this.activeBuffer) {
       // 将当前快照降级为前一帧快照
       if (this.currSnapshot) {
         this.prevSnapshot = { ...this.currSnapshot };
       }
 
-      store.consumeFrameFromBuffer(this.activeBuffer, this.activeIndex);
-      pushSimulationHistory(useSimulationStore.getState().state);
-      this.activeIndex++;
-
-      // 从更新后的 store 读取新的当前快照
-      const s = useSimulationStore.getState();
-      this.currSnapshot = {
-        x1: s.x1,
-        y1: s.y1,
-        x2: s.x2,
-        y2: s.y2,
+      const frameOffset = this.activeIndex * FRAME_STRIDE;
+      const state = {
+        theta1: this.activeBuffer[frameOffset + FrameField.THETA1]!,
+        omega1: this.activeBuffer[frameOffset + FrameField.THETA1_DOT]!,
+        theta2: this.activeBuffer[frameOffset + FrameField.THETA2]!,
+        omega2: this.activeBuffer[frameOffset + FrameField.THETA2_DOT]!,
       };
+
+      commandBus.emit({ type: "frame:consume", buffer: this.activeBuffer, frameIndex: this.activeIndex });
+      commandBus.emit({ type: "history:push", state });
+
+      this.currSnapshot = {
+        x1: this.activeBuffer[frameOffset + FrameField.X1]!,
+        y1: this.activeBuffer[frameOffset + FrameField.Y1]!,
+        x2: this.activeBuffer[frameOffset + FrameField.X2]!,
+        y2: this.activeBuffer[frameOffset + FrameField.Y2]!,
+      };
+
+      this.activeIndex++;
 
       if (this.activeIndex >= BATCH_PREFETCH_THRESHOLD && !this.pendingBatch && !this.nextBuffer) {
         this.requestNextBatch();
@@ -549,8 +563,10 @@ export class SimulationScheduler {
 
           // 转发延迟的力数据
           if (this.nextForceData) {
-            const labStore = useLabStore.getState();
-            labStore.setLastForceData(this.nextForceData);
+            commandBus.emit({
+              type: "lab:forceData",
+              data: this.nextForceData,
+            });
             this.nextForceData = null;
           }
 

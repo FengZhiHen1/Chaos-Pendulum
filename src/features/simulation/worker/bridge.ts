@@ -1,6 +1,6 @@
 import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/types";
-import { useSimulationStore } from "../store";
-import { useAnalyzeStore } from "@/features/analyze/store";
+import { useRootStore } from "@/stores/rootStore";
+import { commandBus } from "@/stores/commandBus";
 import { getScheduler } from "./scheduler";
 
 let workerReady = false;
@@ -19,25 +19,25 @@ const DEBOUNCE_MS = 16;
 
 // ─── 追踪上次同步值 ────────────────────────────
 
-let lastSyncedParams: PendulumParams = { ...useSimulationStore.getState().params };
+let lastSyncedParams: PendulumParams = { ...useRootStore.getState().params };
 let lastRunning = false;
 /** 标记 scheduler 下次启动时是否需要发送 init（首次启动 / reset 后为 true） */
 let needsInit = true;
-let lastActiveView = useAnalyzeStore.getState().activeView;
-let lastPoincareCondition = useAnalyzeStore.getState().poincareSection.condition;
-let lastPoincareIsActive = useAnalyzeStore.getState().poincareSection.isActive;
+let lastActiveView = useRootStore.getState().activeView;
+let lastPoincareCondition = useRootStore.getState().poincareSection.condition;
+let lastPoincareIsActive = useRootStore.getState().poincareSection.isActive;
 
 // ─── Worker 就绪标记 ───────────────────────────
 
 export function setWorkerReady(): void {
   workerReady = true;
-  useSimulationStore.setState({ isWorkerReady: true });
+  useRootStore.setState({ isWorkerReady: true });
   flushPending();
 }
 
 export function setWorkerNotReady(): void {
   workerReady = false;
-  useSimulationStore.setState({ isWorkerReady: false });
+  useRootStore.setState({ isWorkerReady: false });
 }
 
 function flushPending(): void {
@@ -72,10 +72,87 @@ function enqueue(type: string, data: unknown): void {
 
 function syncPoincareCondition(): void {
   const sched = getScheduler();
-  const analyze = useAnalyzeStore.getState();
-  const active = analyze.activeView === "poincare" && analyze.poincareSection.isActive;
-  const cond = active ? analyze.poincareSection.condition : null;
+  const root = useRootStore.getState();
+  const active = root.activeView === "poincare" && root.poincareSection.isActive;
+  const cond = active ? root.poincareSection.condition : null;
   sched.setPoincareCondition(cond);
+}
+
+// ─── Command Bus 处理器 ────────────────────────
+
+function setupCommandBusHandlers(): () => void {
+  const unsubBatchReady = commandBus.on("worker:batchReady", (payload) => {
+    if (payload.energyCorrection !== undefined) {
+      useRootStore.setState({ energyCorrection: payload.energyCorrection });
+    }
+    if (payload.lyapunovExponent !== undefined) {
+      useRootStore.setState({ lyapunovExponent: payload.lyapunovExponent });
+    }
+  });
+
+  const unsubError = commandBus.on("worker:error", (payload) => {
+    useRootStore.setState({ engineError: payload.message });
+    if (payload.code === "DIVERGED") {
+      useRootStore.setState({ isRunning: false, runPhase: "idle" });
+    }
+  });
+
+  const unsubCrash = commandBus.on("worker:crash", () => {
+    useRootStore.setState({
+      engineError: "仿真引擎崩溃，请刷新页面",
+      isRunning: false,
+      runPhase: "idle",
+    });
+  });
+
+  const unsubRecovered = commandBus.on("engine:recovered", (payload) => {
+    useRootStore.setState({
+      engineError: null,
+      engineEvent: { type: "recovered", message: payload.message },
+    });
+  });
+
+  const unsubFrameConsume = commandBus.on("frame:consume", (payload) => {
+    useRootStore.getState().consumeFrameFromBuffer(payload.buffer, payload.frameIndex);
+  });
+
+  const unsubHistoryPush = commandBus.on("history:push", (payload) => {
+    useRootStore.getState().pushHistory(payload.state);
+  });
+
+  const unsubHistoryClear = commandBus.on("history:clear", () => {
+    useRootStore.getState().clearHistory();
+  });
+
+  const unsubButterflyFrame = commandBus.on("butterfly:frame", (payload) => {
+    useRootStore.getState()._updateSide(payload.side, payload.state, payload.energy, payload.derived);
+  });
+
+  const unsubButterflyWorkerReady = commandBus.on("butterfly:workerReady", (payload) => {
+    useRootStore.getState()._setWorkerReady(payload.side, payload.ready);
+  });
+
+  const unsubButterflyPlay = commandBus.on("butterfly:play", () => {
+    useRootStore.getState().play();
+  });
+
+  const unsubButterflyPause = commandBus.on("butterfly:pause", () => {
+    useRootStore.getState().pause();
+  });
+
+  return () => {
+    unsubBatchReady();
+    unsubError();
+    unsubCrash();
+    unsubRecovered();
+    unsubFrameConsume();
+    unsubHistoryPush();
+    unsubHistoryClear();
+    unsubButterflyFrame();
+    unsubButterflyWorkerReady();
+    unsubButterflyPlay();
+    unsubButterflyPause();
+  };
 }
 
 // ─── Store 订阅 ────────────────────────────────
@@ -89,12 +166,15 @@ export function setupSimulationBridge(): () => void {
   // Worker ready → 清空待发送队列
   sched.onReady(() => setWorkerReady());
 
-  // 庞加莱截面点到达 → 写入分析 store
+  // 庞加莱截面点到达 → 写入分析 store（保留回调以兼容 scheduler 内部的双缓冲延迟转发）
   const unsubPoincare = sched.onPoincarePoints((pts) => {
-    useAnalyzeStore.getState().poincareSection.addPoints(pts);
+    useRootStore.getState().poincareSection.addPoints(pts);
   });
 
-  const unsubSim = useSimulationStore.subscribe((state, prevState) => {
+  // Command Bus 处理器
+  const unsubCommands = setupCommandBusHandlers();
+
+  const unsubRoot = useRootStore.subscribe((state, prevState) => {
     // 本次订阅触发是否包含 resetTrigger 递增（意味着 resetToDefaults / injectParams）
     const isResetAction = state.resetTrigger !== prevState.resetTrigger;
 
@@ -114,7 +194,7 @@ export function setupSimulationBridge(): () => void {
           const d = { ...pendingUpdateDiff };
           pendingUpdateDiff = {};
           if (Object.keys(d).length === 0) return;
-          lastSyncedParams = { ...useSimulationStore.getState().params };
+          lastSyncedParams = { ...useRootStore.getState().params };
           if (workerReady) {
             getScheduler().updateParams(d);
           } else {
@@ -162,7 +242,7 @@ export function setupSimulationBridge(): () => void {
       const s = getScheduler();
       if (s.isRunning) s.pause();
       s.reset(state.initialConditions);
-      useAnalyzeStore.getState().poincareSection.clearPoints();
+      useRootStore.getState().poincareSection.clearPoints();
       needsInit = true;
       // 显式启动：pause() 已将 running 置 false，start() 的 if-guard 会通过
       if (state.isRunning) {
@@ -192,7 +272,7 @@ export function setupSimulationBridge(): () => void {
   syncPoincareCondition();
 
   // 分析 store 订阅：视图切换 / 条件变更 / 采集开关 → 同步庞加莱条件
-  const unsubAnalyze = useAnalyzeStore.subscribe((state) => {
+  const unsubAnalyze = useRootStore.subscribe((state) => {
     const poincare = state.poincareSection;
     let needSync = false;
 
@@ -222,9 +302,10 @@ export function setupSimulationBridge(): () => void {
   });
 
   return () => {
-    unsubSim();
+    unsubRoot();
     unsubAnalyze();
     unsubPoincare();
+    unsubCommands();
     if (updateParamsTimer) clearTimeout(updateParamsTimer);
     if (resetTimer) clearTimeout(resetTimer);
   };

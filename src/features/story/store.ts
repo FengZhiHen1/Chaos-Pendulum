@@ -1,27 +1,19 @@
-import { create } from "zustand";
+import { useRootStore } from "@/stores/rootStore";
+import type { StorySlice } from "@/stores/slices/storySlice";
 
-interface StoryState {
-  isPlaying: boolean;
-  currentStage: number;
-  isInterrupted: boolean;
-  demoMode: boolean;
-
-  play: () => void;
-  pause: () => void;
-  reset: () => void;
-  setStage: (stage: number) => void;
-  setDemoMode: (on: boolean) => void;
+function useStoryStore(): StorySlice;
+function useStoryStore<T>(selector: (state: StorySlice) => T): T;
+function useStoryStore<T>(selector?: (state: StorySlice) => T): StorySlice | T {
+  if (selector) {
+    return useRootStore(selector as (state: unknown) => T);
+  }
+  return useRootStore() as StorySlice;
 }
 
-export const useStoryStore = create<StoryState>((set) => ({
-  isPlaying: false,
-  currentStage: 0,
-  isInterrupted: false,
-  demoMode: false,
+useStoryStore.getState = () => useRootStore.getState() as StorySlice;
+useStoryStore.setState = (partial: Partial<StorySlice> | ((state: StorySlice) => Partial<StorySlice>), replace?: boolean) =>
+  useRootStore.setState(partial as any, replace);
+useStoryStore.subscribe = (listener: (state: StorySlice, prevState: StorySlice) => void) =>
+  useRootStore.subscribe(listener as any);
 
-  play: () => set({ isPlaying: true, isInterrupted: false }),
-  pause: () => set({ isPlaying: false, isInterrupted: true }),
-  reset: () => set({ isPlaying: false, currentStage: 0, isInterrupted: false }),
-  setStage: (currentStage) => set({ currentStage }),
-  setDemoMode: (demoMode) => set({ demoMode }),
-}));
+export { useStoryStore };

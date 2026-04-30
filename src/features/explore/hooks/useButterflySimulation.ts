@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
+import { useRootStore } from "@/stores/rootStore";
 import { ButterflyScheduler } from "../butterfly-scheduler";
 
 // ─── 全局单例管理 ──────────────────────────────
@@ -43,6 +44,7 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
     initializedRef.current = true;
 
     const simStore = useSimulationStore.getState();
+    useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
     schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
@@ -53,6 +55,7 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
     prevDeltaRef.current = butterflyDelta;
 
     const simStore = useSimulationStore.getState();
+    useRootStore.getState().reset();
     schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
@@ -68,6 +71,7 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
   const handlePause = useCallback(() => schedulerRef.current.pause(), []);
   const handleReset = useCallback(() => {
     const simStore = useSimulationStore.getState();
+    useRootStore.getState().reset();
     schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
