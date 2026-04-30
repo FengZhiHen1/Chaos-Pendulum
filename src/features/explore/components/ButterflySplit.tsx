@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useExploreStore } from "@/features/explore";
 import { useButterflyStore } from "../butterfly-store";
@@ -12,6 +13,9 @@ const PULSE_STYLE = `
 }
 `;
 
+const BALL_COLOR_A = "#f0c040"; // 金色
+const BALL_COLOR_B = "#a855f7"; // 紫色
+
 interface ButterflySplitProps {
   className?: string;
 }
@@ -25,6 +29,12 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
     useButterflySimulation();
 
   const isDesktop = deviceType === "desktop";
+
+  // ── 非桌面端：活跃视口切换 ──
+  const [activeSide, setActiveSide] = useState<"A" | "B">("A");
+
+  const switchToA = useCallback(() => setActiveSide("A"), []);
+  const switchToB = useCallback(() => setActiveSide("B"), []);
 
   return (
     <div className={`relative ${className} flex flex-col`}>
@@ -72,6 +82,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
               </div>
               <Scene3D
                 pendulumMaterial="metal"
+                ballColor={BALL_COLOR_A}
                 environment="dark-lab"
                 showGrid
                 enableShadows
@@ -87,6 +98,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
               </div>
               <Scene3D
                 pendulumMaterial="metal"
+                ballColor={BALL_COLOR_B}
                 environment="dark-lab"
                 showGrid
                 enableShadows
@@ -101,25 +113,35 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             <div className="absolute top-2 left-4 z-10 flex gap-2">
               <button
                 type="button"
-                onClick={() => {}}
-                className="px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50"
+                onClick={switchToA}
+                className={`px-2 py-0.5 rounded text-xs font-bold transition-opacity ${
+                  activeSide === "A"
+                    ? "text-amber-300 bg-black/70 ring-1 ring-amber-500/50"
+                    : "text-amber-300/50 bg-black/30"
+                }`}
               >
                 摆 A
               </button>
               <button
                 type="button"
-                onClick={() => {}}
-                className="px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50"
+                onClick={switchToB}
+                className={`px-2 py-0.5 rounded text-xs font-bold transition-opacity ${
+                  activeSide === "B"
+                    ? "text-purple-300 bg-black/70 ring-1 ring-purple-500/50"
+                    : "text-purple-300/50 bg-black/30"
+                }`}
               >
                 摆 B
               </button>
             </div>
             <Scene3D
               pendulumMaterial="metal"
+              ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
               environment="dark-lab"
               showGrid
               enableShadows
               className="w-full h-full"
+              butterflySide={activeSide}
             />
           </div>
         )}

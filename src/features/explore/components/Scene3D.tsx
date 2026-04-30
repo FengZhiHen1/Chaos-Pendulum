@@ -32,6 +32,8 @@ export interface Scene3DProps {
   className?: string;
   /** 蝴蝶效应模式下的分侧标识。非 butterfly 模式下不传 */
   butterflySide?: "A" | "B";
+  /** 覆盖球体材质颜色（蝴蝶效应模式下 A=金色 #f0c040 / B=紫色 #a855f7） */
+  ballColor?: string;
   /** Canvas 内的附加子节点（EXP-05 轨迹叠加层等） */
   canvasChildren?: React.ReactNode;
 }
@@ -70,6 +72,7 @@ interface SceneContentProps {
   appendTrailPoint: (point: TrailPoint, params: PendulumParams, state: StateVector) => void;
   onTrailClear: () => void;
   butterflySide?: "A" | "B";
+  ballColor?: string;
 }
 
 // ─── 常量配置表 ──────────────────────────────────
@@ -160,6 +163,7 @@ export function Scene3D({
   enableShadows = true,
   className = "w-full h-full",
   butterflySide,
+  ballColor,
   canvasChildren,
 }: Scene3DProps) {
   const {
@@ -178,6 +182,19 @@ export function Scene3D({
   } = useSceneController(showGrid, enableShadows);
 
   const { trailPoints, appendPoint, clear: clearTrail } = useTrailBuffer();
+
+  // ── 蝴蝶模式：监听尾迹清空信号 ──
+  useEffect(() => {
+    if (!butterflySide) return;
+    let prev = useButterflyStore.getState().trailClearSignal;
+    const unsub = useButterflyStore.subscribe((s) => {
+      if (s.trailClearSignal !== prev) {
+        prev = s.trailClearSignal;
+        clearTrail();
+      }
+    });
+    return unsub;
+  }, [butterflySide, clearTrail]);
 
   const envConfig = ENVIRONMENT_CONFIGS[environment];
 
@@ -245,6 +262,7 @@ export function Scene3D({
           appendTrailPoint={appendPoint}
           onTrailClear={clearTrail}
           butterflySide={butterflySide}
+          ballColor={ballColor}
         />
         {canvasChildren}
       </Canvas>
@@ -305,6 +323,7 @@ function SceneContent({
   appendTrailPoint,
   onTrailClear,
   butterflySide,
+  ballColor,
 }: SceneContentProps) {
   const { camera } = useThree();
   const orbitRef = useRef<any>(null);
@@ -334,6 +353,7 @@ function SceneContent({
   const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   const materialConfig = MATERIAL_CONFIGS[pendulumMaterial];
+  const ballMaterialColor = ballColor ?? materialConfig.color;
   const envConfig = ENVIRONMENT_CONFIGS[environment];
 
   // ── viewPreset 变化 → 启动相机过渡 ──
@@ -642,7 +662,7 @@ function SceneContent({
         <sphereGeometry args={[0.08, sphereSegments, sphereSegments]} />
         {pendulumMaterial === "glass" ? (
           <meshPhysicalMaterial
-            color={materialConfig.color}
+            color={ballMaterialColor}
             metalness={materialConfig.metalness}
             roughness={materialConfig.roughness}
             transparent
@@ -651,7 +671,7 @@ function SceneContent({
           />
         ) : (
           <meshStandardMaterial
-            color={materialConfig.color}
+            color={ballMaterialColor}
             metalness={materialConfig.metalness}
             roughness={materialConfig.roughness}
           />
@@ -663,7 +683,7 @@ function SceneContent({
         <sphereGeometry args={[0.08, sphereSegments, sphereSegments]} />
         {pendulumMaterial === "glass" ? (
           <meshPhysicalMaterial
-            color={materialConfig.color}
+            color={ballMaterialColor}
             metalness={materialConfig.metalness}
             roughness={materialConfig.roughness}
             transparent
@@ -672,7 +692,7 @@ function SceneContent({
           />
         ) : (
           <meshStandardMaterial
-            color={materialConfig.color}
+            color={ballMaterialColor}
             metalness={materialConfig.metalness}
             roughness={materialConfig.roughness}
           />

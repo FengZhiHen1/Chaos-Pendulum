@@ -37,6 +37,8 @@ interface ButterflySimStoreState {
   sideB: SimSideState;
   separation: SeparationMetrics;
   isRunning: boolean;
+  /** 递增信号：通知 Scene3D 清空尾迹 */
+  trailClearSignal: number;
 
   init: (baseParams: PendulumParams, baseState: StateVector, deltaDeg: number) => void;
   play: () => void;
@@ -52,6 +54,7 @@ interface ButterflySimStoreState {
   _setWorkerReady: (side: "A" | "B", ready: boolean) => void;
   setEditMode: (mode: DeltaEditMode) => void;
   setDelta: (deltaDeg: number) => void;
+  signalTrailClear: () => void;
 }
 
 // ─── 默认值 ──────────────────────────────────────
@@ -85,6 +88,7 @@ export const useButterflyStore = create<ButterflySimStoreState>((set, get) => ({
   sideB: defaultSideState(),
   separation: defaultSeparation(),
   isRunning: false,
+  trailClearSignal: 0,
 
   init: (baseParams, baseState, deltaDeg) => {
     const deltaRad = deltaDeg * (Math.PI / 180);
@@ -130,6 +134,7 @@ export const useButterflyStore = create<ButterflySimStoreState>((set, get) => ({
       sideB: { ...defaultSideState(), state: stateB, params: { ...sideA.params } },
       separation: defaultSeparation(),
       isRunning: false,
+      trailClearSignal: get().trailClearSignal + 1,
     });
   },
 
@@ -198,4 +203,5 @@ export const useButterflyStore = create<ButterflySimStoreState>((set, get) => ({
     const clamped = Math.max(0, Math.min(10.0, deltaDeg));
     set({ deltaDeg: clamped });
   },
+  signalTrailClear: () => set((s) => ({ trailClearSignal: s.trailClearSignal + 1 })),
 }));

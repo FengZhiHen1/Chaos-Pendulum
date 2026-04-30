@@ -1,5 +1,34 @@
+import { useState, useEffect, useRef } from "react";
 import { useButterflyStore } from "../butterfly-store";
+import { useExploreStore } from "@/features/explore";
+import { createNoiseGenerator, type NoiseGenerator } from "@/shared/audio/noise-generator";
+import { getAudioContext } from "@/shared/audio/audio-context";
 import type { DeltaEditMode } from "../butterfly-store";
+
+// ─── 全局噪声实例（跨组件生命周期共享） ──────────
+
+let alertNoise: NoiseGenerator | null = null;
+
+function startAlertNoise(): void {
+  if (alertNoise) return;
+  try {
+    alertNoise = createNoiseGenerator(2);
+    alertNoise.source.connect(getAudioContext().destination);
+    alertNoise.start();
+    alertNoise.setLevel(0.02);
+  } catch {
+    alertNoise = null;
+  }
+}
+
+function stopAlertNoise(): void {
+  if (!alertNoise) return;
+  try {
+    alertNoise.source.disconnect();
+    alertNoise.dispose();
+  } catch { /* 忽略 */ }
+  alertNoise = null;
+}
 
 // ─── 类型 ────────────────────────────────────────
 
@@ -16,19 +45,44 @@ export function SeparationAlert({
   separationRad,
   message = "完全失相关",
 }: SeparationAlertProps) {
-  if (!triggered) return null;
+  const [dismissLevel, setDismissLevel] = useState(0);
+  const sonificationEnabled = useExploreStore((s) => s.sonificationEnabled);
+
+  // triggered 从 false→true 时重置 dismiss + 触发噪声
+  const prevTriggered = useRef(triggered);
+  useEffect(() => {
+    if (triggered && !prevTriggered.current) {
+      setDismissLevel(0);
+      if (sonificationEnabled) startAlertNoise();
+    }
+    if (!triggered) {
+      stopAlertNoise();
+    }
+    prevTriggered.current = triggered;
+  }, [triggered, sonificationEnabled]);
+
+  // 卸载时清理噪声
+  useEffect(() => {
+    return () => stopAlertNoise();
+  }, []);
+
+  if (!triggered || dismissLevel >= 2) return null;
 
   const separationDeg = (separationRad * 180) / Math.PI;
+  const opacity = dismissLevel === 0 ? 1 : 0.3;
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
       <div
-        className="flex flex-col items-center gap-2 px-6 py-4 rounded-lg pointer-events-auto cursor-pointer"
+        className="flex flex-col items-center gap-2 px-6 py-4 rounded-lg pointer-events-auto cursor-pointer transition-opacity duration-300"
         style={{
           background: "rgba(255, 0, 0, 0.15)",
           border: "1px solid rgba(255, 0, 0, 0.3)",
-          animation: "pulse-alert 1.5s ease-in-out infinite",
+          animation: dismissLevel === 0 ? "pulse-alert 1.5s ease-in-out infinite" : undefined,
+          opacity,
         }}
+        onClick={() => setDismissLevel((l) => l + 1)}
+        title="点击半透明，再次点击关闭"
       >
         <span className="text-lg font-bold" style={{ color: "#ff4444" }}>
           ⚠ {message} — |Δθ| 已超过 90°

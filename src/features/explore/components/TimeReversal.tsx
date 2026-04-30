@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useSimulationStore, useSimulationHistory, getSimulationHistory, ball2Position, pauseHistoryRecording, resumeHistoryRecording } from "@/features/simulation";
 import { getScheduler } from "@/features/simulation/worker/scheduler";
 import { useExploreStore } from "../store";
-import { updateTrajectoryData, clearTrajectoryData } from "./TimeReversalTrajectory";
+import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
+import { notify } from "@/features/system/error-handling/notify";
 import type { DriftSample, ReversalMode } from "../store";
 
 // ═══════════════════════════════════════════════════
@@ -36,10 +37,12 @@ interface DriftCurvePanelProps {
   maxReversalTime: number;
   mode: ReversalMode;
   visible: boolean;
+  engineError: boolean;
 }
 
-function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: DriftCurvePanelProps) {
+function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible, engineError }: DriftCurvePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [logScale, setLogScale] = useState(false);
   const W = 320;
   const H = 200;
 
@@ -77,7 +80,17 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
     const maxTime = Math.max(1, maxReversalTime);
 
     const xS = (t: number) => pad.left + (t / maxTime) * pw;
-    const yS = (d: number) => pad.top + ph - (d / maxDrift) * ph;
+
+    const yLinear = (d: number) => pad.top + ph - (d / maxDrift) * ph;
+    const yLog = (d: number) => {
+      if (d <= 0) return pad.top + ph;
+      const logMax = Math.log10(maxDrift);
+      const logMin = Math.log10(Math.max(1e-6, maxDrift * 1e-5));
+      const logD = Math.log10(Math.max(d, 1e-6));
+      const ratio = (logD - logMin) / (logMax - logMin);
+      return pad.top + ph - Math.max(0, Math.min(1, ratio)) * ph;
+    };
+    const yS = logScale ? yLog : yLinear;
 
     // 坐标轴
     ctx.strokeStyle = "#555";
@@ -113,7 +126,7 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
     ctx.save();
     ctx.translate(12, pad.top + ph / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("漂移距离 (m)", 0, 0);
+    ctx.fillText(logScale ? "漂移距离 (m, log)" : "漂移距离 (m)", 0, 0);
     ctx.restore();
 
     // 模式标题
@@ -131,7 +144,10 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
     ctx.font = "9px sans-serif";
     ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
-      const d = (maxDrift * i) / 4;
+      const ratio = i / 4;
+      const d = logScale
+        ? Math.pow(10, Math.log10(Math.max(1e-6, maxDrift * 1e-5)) + ratio * (Math.log10(maxDrift) - Math.log10(Math.max(1e-6, maxDrift * 1e-5))))
+        : (maxDrift * ratio);
       const y = yS(d);
       ctx.fillText(d < 0.01 ? d.toExponential(1) : d.toFixed(3), pad.left - 4, y + 3);
     }
@@ -149,9 +165,9 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
     }
     ctx.stroke();
 
-    // 发散标记
-    const last = driftHistory[driftHistory.length - 1]!;
-    if (last.driftDistance > 1.0) {
+    // 发散标记 — 基于 engineError 而非硬编码阈值
+    if (engineError && driftHistory.length > 0) {
+      const last = driftHistory[driftHistory.length - 1]!;
       const lx = xS(last.reversalTime);
       const ly = yS(last.driftDistance);
       ctx.fillStyle = "#ff4444";
@@ -159,7 +175,7 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
       ctx.textAlign = "center";
       ctx.fillText("✕", lx + 8, ly + 4);
     }
-  }, [driftHistory, maxReversalTime, mode]);
+  }, [driftHistory, maxReversalTime, mode, logScale, engineError]);
 
   if (!visible) return null;
 
@@ -169,6 +185,14 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible }: Drift
       style={{ border: "1px solid rgba(255,255,255,0.1)" }}
     >
       <canvas ref={canvasRef} style={{ display: "block" }} />
+      {/* Y 轴缩放切换 */}
+      <button
+        type="button"
+        onClick={() => setLogScale((v) => !v)}
+        className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+      >
+        {logScale ? "线性" : "对数"}
+      </button>
     </div>
   );
 }
@@ -245,6 +269,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   const history = useSimulationHistory();
   const simTime = useSimulationStore((s) => s.t);
   const params = useSimulationStore((s) => s.params);
+  const engineError = useSimulationStore((s) => s.engineError);
 
   // ── 本地 ref ──
   const reversalStartRef = useRef<{
@@ -395,7 +420,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       scheduler.setDirection(1);
     }
 
-    clearTrajectoryData();
+    // 10 秒淡出而非立即清除
+    startTrajectoryFadeOut();
     setPhase("completed");
     setActive(false);
   }, [mode, setPhase, setActive]);
@@ -422,6 +448,12 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
     // Worker 发散错误
     if (store.engineError) {
+      notify({
+        title: "数值反演发散",
+        description: `于反演时间 t≈${(startSimTimeRef.current - currentSimTime).toFixed(2)}s — 误差已远超可追踪范围`,
+        variant: "error",
+        durationMs: 5000,
+      });
       stopReversal();
       return;
     }
@@ -492,7 +524,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
             } ${active ? "opacity-50 cursor-not-allowed" : ""}`}
             title="精确反演（对照）— 仅视觉回放，无误差"
           >
-            精确
+            精确反演
           </button>
           <button
             type="button"
@@ -505,7 +537,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
             } ${active ? "opacity-50 cursor-not-allowed" : ""}`}
             title="数值反演（实验）— 真实反向积分，展示浮点误差指数放大"
           >
-            数值
+            数值反演
           </button>
         </div>
 
@@ -547,7 +579,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           driftHistory={driftHistory}
           maxReversalTime={startTime > 0 ? startTime : 10}
           mode={mode}
-          visible={driftHistory.length > 0}
+          visible={phase === "reversing" || (phase === "completed" && driftHistory.length > 0)}
+          engineError={engineError !== null}
         />
       </div>
 
@@ -557,7 +590,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           className="absolute bottom-2 left-2 z-20 pointer-events-auto px-3 py-1.5 rounded text-xs text-gray-400"
           style={{ background: "rgba(10, 10, 15, 0.85)" }}
         >
-          最近一次反演（{mode === "exact" ? "精确" : "数值"}）— 漂移曲线已保留
+          最近一次反演（{mode === "exact" ? "精确反演" : "数值反演"}）— 漂移曲线已保留
         </div>
       )}
     </div>
