@@ -12,20 +12,19 @@ import type { DriftSample, ReversalMode } from "../store";
 // ═══════════════════════════════════════════════════
 
 const MIN_HISTORY_FRAMES = 120; // 2s @ 60fps
-const TEACHING_THRESHOLD = 0.05; // 首次漂移 > 0.05m 弹出教学注释
+const TEACHING_THRESHOLD = 0.05; // 首次相空间漂移 > 0.05 弹出教学注释
 const REVERSAL_FPS = 60;
 
-/** 两个状态向量在 3D 空间中的漂移距离 */
+/** 两个状态向量的相空间距离（含角速度），角速度散度远早于位置散度 */
 function computeDrift(
-  stateA: { theta1: number; theta2: number },
-  stateB: { theta1: number; theta2: number },
-  params: { L1: number; L2: number },
+  stateA: { theta1: number; omega1: number; theta2: number; omega2: number },
+  stateB: { theta1: number; omega1: number; theta2: number; omega2: number },
 ): number {
-  const a = ball2Position(stateA, params);
-  const b = ball2Position(stateB, params);
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return Math.sqrt(dx * dx + dy * dy);
+  const d1 = stateA.theta1 - stateB.theta1;
+  const w1 = stateA.omega1 - stateB.omega1;
+  const d2 = stateA.theta2 - stateB.theta2;
+  const w2 = stateA.omega2 - stateB.omega2;
+  return Math.sqrt(d1 * d1 + w1 * w1 + d2 * d2 + w2 * w2);
 }
 
 // ═══════════════════════════════════════════════════
@@ -114,7 +113,7 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible, engineE
         ctx.setLineDash([]);
         ctx.fillStyle = "rgba(255,255,255,0.4)";
         ctx.font = "9px sans-serif";
-        ctx.fillText("0.05m", pad.left + pw - 26, thY - 4);
+        ctx.fillText("0.05", pad.left + pw - 26, thY - 4);
       }
     }
 
@@ -126,7 +125,7 @@ function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible, engineE
     ctx.save();
     ctx.translate(12, pad.top + ph / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText(logScale ? "漂移距离 (m, log)" : "漂移距离 (m)", 0, 0);
+    ctx.fillText(logScale ? "相空间距离 (log)" : "相空间距离", 0, 0);
     ctx.restore();
 
     // 模式标题
@@ -464,7 +463,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
     let drift = 0;
     if (fwdIdx >= 0 && fwdIdx < fwdArray.length) {
-      drift = computeDrift(store.state, fwdArray[fwdIdx]!, params);
+      drift = computeDrift(store.state, fwdArray[fwdIdx]!);
     }
 
     useExploreStore.getState().appendDriftSample({

@@ -5,6 +5,7 @@
 > | 版本 | 时间 | 修改人 | 变更摘要 |
 > |------|------|--------|----------|
 > | v1.0 | `2026-04-28 20:00:00` | AI Assistant | 初始版本 |
+> | v1.1 | `2026-04-30 14:10:00` | AI Assistant | 三角形带方案实现更新：独立矩形 → 连续 indexed triangle strip + round cap；新增 viewport 像素→世界单位动态转换；maxWidth 默认值 3.0 → 15.0 |
 
 > **冲突核查指引**：若发现与已有规格文档冲突，优先以时间戳更新的版本为准，并在版本记录中追加冲突解决条目。
 
@@ -182,12 +183,12 @@ interface TrailRendererProps {
   opacity?: number;
 
   /**
-   * 尾迹最大线宽（像素）。默认 3.0。
-   * 实际线宽 = maxWidth × (velocity / maxObservedVelocity)，clamp 至 [1.0, maxWidth]。
-   * 注意：WebGL 的 lineWidth 在多数平台上被限制为 1.0。
-   * 本组件使用可变宽度模拟：将尾迹渲染为多条平行线（2-5 条，条数随速度增加），
-   * 或使用三角形带（triangle strip）实现真正可变宽度。
-   * 移动端自动降级为固定 1px 宽度以节省性能。
+   * 尾迹最大线宽（像素）。默认 15.0。
+   * 实际线宽（屏幕像素）= maxWidth × (velocity / maxObservedVelocity)，clamp 至 [1px, maxWidth]。
+   * 组件内部通过 R3F viewport 将像素宽度实时转换为世界单位，确保无论相机远近，
+   * 尾迹视觉粗细始终恒定。
+   * 桌面端/平板端使用三角形带（triangle strip）+ 圆角端帽实现真正可变宽度；
+   * 移动端自动降级为固定 1px 宽度的 `<Line>` 以节省性能。
    */
   maxWidth?: number;
 
@@ -231,8 +232,8 @@ const deviceType: "desktop" | "tablet" | "mobile" = useAppStore((s) => s.deviceT
 | 尾迹路径 | `THREE.BufferGeometry` 的 `position` 属性（Float32Array，N×3） | 每帧追加新顶点，移除超出持久度的旧顶点 |
 | 顶点颜色（速度模式） | `THREE.BufferGeometry` 的 `color` 属性（Float32Array，N×3），通过 `vertexColors: true` 启用 | 每帧根据最新的 velocity 更新新顶点的颜色；已有顶点颜色不变 |
 | 顶点颜色（单色模式） | `THREE.LineBasicMaterial({ color })`，不启用 vertexColors | 全尾迹统一颜色 |
-| 线条粗细 | 三角形带（triangle strip）模拟宽度：速度越高，带越宽。桌面端 1-5px 等效宽度，平板 1-3px，手机固定 1px | 每帧根据新顶点的 velocity 计算局部宽度 |
-| 透明度 | `THREE.LineBasicMaterial({ transparent: true, opacity })` | props 变化时更新 Material |
+| 线条粗细 | 连续三角形带（indexed triangle strip）+ 圆角端帽（round cap）：速度越高，带越宽。桌面端/平板端 1-15px 等效宽度，手机固定 1px | 每帧通过 R3F viewport 将像素宽度转为世界单位，再根据 velocity 计算局部宽度 |
+| 透明度 | `THREE.MeshBasicMaterial({ transparent: true, opacity })` | props 变化时更新 Material |
 | 顶点数量上限 | desktop: 6000, tablet: 2000, mobile: 500 | 超限时最旧点被覆盖 |
 
 ### 输出 2：数据输出（useTrailBuffer hook 返回值）
@@ -339,30 +340,21 @@ const { trailPoints, appendPoint, clear, persistence } = useTrailBuffer();
 
 - **操作对象**：`THREE.BufferGeometry` 实例（通过 `useMemo` 或 `useRef` 持有，避免每帧重建）
 - **具体操作**：
-  1. 组件挂载时，创建空的 `THREE.BufferGeometry`：
-     ```typescript
-     const geometry = useMemo(() => {
-       const geo = new THREE.BufferGeometry();
-       geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(maxPoints * 3), 3));
-       geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(maxPoints * 3), 3));
-       return geo;
-     }, [maxPoints]);
-     ```
+  1. 组件挂载时创建 `THREE.BufferGeometry`，预分配 `position`、`color` 属性数组和 `index` 索引数组：
+     - `position` / `color`：`Float32Array`，容量 = `(2 × maxPoints + 16) × 3`
+     - `index`：`Uint16Array`，容量 = `6 × (maxPoints - 1) + 48`
      其中 `maxPoints` = desktop 6000 / tablet 2000 / mobile 500
   2. 每帧 `useFrame` 中，根据 `props.points` 更新 BufferGeometry：
-     - 若 `points.length < 2`：设置 `geometry.setDrawRange(0, 0)`（不绘制任何线段），return
-     - 获取 position 和 color 的底层 Float32Array（通过 `geometry.attributes.position.array` 和 `geometry.attributes.color.array`）
-     - 遍历 `points`（索引 i = 0 到 points.length - 1）：
-       - `position[i * 3] = points[i].position.x`
-       - `position[i * 3 + 1] = points[i].position.y`
-       - `position[i * 3 + 2] = points[i].position.z`
-       - 若 `colorMode === "velocity"`：调用 `velocityToColor(points[i].velocity, colorGradient)`，将返回的 `{r, g, b}` 写入 `color[i * 3]` / `color[i * 3 + 1]` / `color[i * 3 + 2]`
-     - `geometry.attributes.position.needsUpdate = true`
-     - `geometry.attributes.color.needsUpdate = true`
-     - `geometry.setDrawRange(0, points.length)`（绘制 points.length 个顶点 → points.length - 1 条线段）
-  3. 使用 drei `<Line>` 组件或自建 `<line>` + `<bufferGeometry>` 渲染
+     - 若 `points.length < 2`：设置 `geometry.setDrawRange(0, 0)`，return
+     - **第一遍**：遍历每个原始点，计算角平分线切线、法线、半宽，生成左右两个边界顶点，写入 `position` / `color` 数组
+     - **第二遍**：生成索引：
+       - strip 段：每段 2 个三角形（6 个索引），复用相邻段共享顶点
+       - 起点 / 终点圆帽：各 8 个扇形三角形（24 个索引），以端点为圆心、半宽为半径生成半圆弧
+     - 设置 `geometry.attributes.position.needsUpdate = true`、`geometry.attributes.color.needsUpdate = true`、`geometry.index.needsUpdate = true`
+     - `geometry.setDrawRange(0, indexCount)`
+  4. 使用 `<mesh>` + `<bufferGeometry>` + `<meshBasicMaterial>` 渲染（桌面/平板端）；移动端降级为 drei's `<Line>`
 - **输入来源**：`props.points: TrailPoint[]`、`props.colorMode`、`props.colorGradient`、`props.opacity`、`props.maxWidth`
-- **输出去向**：Three.js 渲染管线中的 Line 图元
+- **输出去向**：Three.js 渲染管线中的 Triangle 图元（桌面/平板端）或 Line 图元（移动端）
 - **失败行为**：
   - `points` 中某点位置为 NaN：跳过该顶点的写入，保留上一帧的旧值（不主动清零，避免闪烁）
 
@@ -389,24 +381,31 @@ const { trailPoints, appendPoint, clear, persistence } = useTrailBuffer();
 - **输出去向**：RGB 三分量 → 写入 BufferGeometry color 属性
 - **失败行为**：velocity 为 NaN 时，返回灰色 `{ r: 0.5, g: 0.5, b: 0.5 }`，标记数据异常
 
-### 步骤 7：线条粗细模拟（三角形带方案）
+### 步骤 7：线条粗细模拟（圆角粗线三角形带方案）
 
-- **操作对象**：`THREE.BufferGeometry` 的三角形带模式（替换步骤 5 的 Line 模式）
+- **操作对象**：`THREE.BufferGeometry` 的索引三角形带模式（替换步骤 5 的 Line 模式）
 - **具体操作**：
-  1. 对于每个相邻点对 `(points[i], points[i+1])`，生成垂直于运动方向的偏移顶点：
-     - 计算方向向量 `dir = points[i+1].position.clone().sub(points[i].position).normalize()`
-     - 计算垂直向量 `perp = new Vector3(-dir.y, dir.x, 0)`（在 XY 平面内旋转 90°）
-     - 计算该段的线宽 `width = maxWidth * (avgVelocity / MAX_OBSERVED_VELOCITY)`，clamp 至 `[1.0, maxWidth]`
-     - 生成 4 个顶点（两段之间）：`left1 = points[i] + perp * width/2`、`right1 = points[i] - perp * width/2`、`left2 = points[i+1] + perp * width/2`、`right2 = points[i+1] - perp * width/2`
-     - 按三角形带顺序写入 position 数组：`[left1, right1, left2, right1, right2, left2]`（每个四边形 = 2 个三角形 = 6 个顶点）
-  2. 颜色同样按 6 个顶点复制对应段的速度颜色
-  3. 三角形带方案下，每个四边形 2 个三角形 × (N-1) 段 = 最多约 36000 个顶点（6000 点 × 6），桌面端 GPU 轻松处理
-  4. **降级方案**（`deviceType === "mobile"`）：使用简单 `<Line>` 替代三角形带（`lineWidth = 1` 强制 1px），省去三角形带的计算开销
-  5. 使用 `<mesh>` + `<bufferGeometry>` 而非 `<Line>` 渲染三角形带，Material 为 `MeshBasicMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity })`
-- **输入来源**：`points` 数组、`maxWidth` props、`MAX_OBSERVED_VELOCITY`
-- **输出去向**：三角形带的 BufferGeometry + 对应的 MeshBasicMaterial → GPU 渲染
+  1. **像素到世界单位转换**：在 `useFrame` 中通过 `state.viewport.height / state.size.height` 计算每像素对应的世界单位长度 `pixelToWorld`。将 `maxWidth`（像素）转换为世界单位：`targetWorldW = maxWidth × pixelToWorld`，保底宽度 `minWorldW = 1 × pixelToWorld`。
+  2. **切线计算**：对每个原始点 `points[i]` 计算角平分线切线：
+     - 端点：取相邻线段的方向向量
+     - 内部点：取前后两段归一化方向向量之和，再归一化（miter / 角平分线）
+     - 若相邻点重合（段长 `< 1e-6`）：fallback 到邻近有效方向
+  3. **边界顶点生成**：根据切线计算 XY 平面法线 `normal = (-tangent.y, tangent.x, 0)`，按该点速度计算半宽 `hw = width / 2`，生成左右边界顶点：
+     - `left[i] = points[i] + normal × hw`
+     - `right[i] = points[i] - normal × hw`
+  4. **索引构建（连续 strip）**：
+     - 每段（i → i+1）使用 4 个顶点（`left[i]`, `right[i]`, `left[i+1]`, `right[i+1]`）和 6 个索引构成 2 个三角形
+     - 总顶点数 ≈ `2N + 16`（含两端圆帽），总索引数 ≈ `6(N-1) + 48`
+  5. **圆角端帽（Round Cap）**：
+     - 起点：以 `points[0]` 为圆心、`hw[0]` 为半径，在垂直于切线的平面上生成半圆（8 段扇形）
+     - 终点：同理，以 `points[N-1]` 为圆心生成半圆
+     - 颜色使用端点对应的速度颜色
+  6. **降级方案**（`deviceType === "mobile"`）：使用 drei's `<Line>` 替代三角形带（`lineWidth = 1` 强制 1px）
+  7. 使用 `<mesh>` + `<bufferGeometry>` + `MeshBasicMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity, depthWrite: false })` 渲染
+- **输入来源**：`points` 数组、`maxWidth` props、`MAX_OBSERVED_VELOCITY`、R3F `viewport` / `size`
+- **输出去向**：带索引的三角形带 BufferGeometry + MeshBasicMaterial → GPU 渲染
 - **失败行为**：
-  - 连续两个点完全重合（`dir.length < 0.0001`）：跳过该段，不生成三角形带顶点
+  - 连续两个点完全重合（段长 `< 1e-6`）：该段切线 fallback 到邻近有效方向，不跳过（保持尾迹连续性）
 
 ### 步骤 8：暂停冻结与重置
 
@@ -432,7 +431,7 @@ const { trailPoints, appendPoint, clear, persistence } = useTrailBuffer();
 | `useExploreStore` | `useExploreStore((s) => s.trailLength)` | 读取尾迹持久度配置 |
 | `useAppStore` | `useAppStore((s) => s.deviceType)` | 设备类型 → 降级渲染参数 |
 | `RingBuffer<TrailPoint>` | `new RingBuffer(6000)`、`.push()`、`.at()`、`.toArray()`、`.clear()`、`.length` | 尾迹点循环存储 |
-| R3F | `useFrame((state, delta) => { ... })` | 每帧在 rAF 中追加尾迹点并更新 Geometry |
+| R3F | `useFrame((state, delta) => { ... })` | 每帧在 rAF 中追加尾迹点并更新 Geometry；通过 `state.viewport` / `state.size` 进行像素→世界单位转换 |
 | drei | `<Line points={...} color={...} lineWidth={...} />` | 移动端降级方案（简单线段，无宽度变化） |
 | three | `THREE.BufferGeometry` + `THREE.Float32BufferAttribute` | 尾迹顶点缓冲（位置 + 颜色） |
 | three | `THREE.MeshBasicMaterial({ vertexColors: true, transparent: true })` | 三角形带材质（桌面/平板端可变宽度方案） |
@@ -623,7 +622,7 @@ const { trailPoints, appendPoint, clear, persistence } = useTrailBuffer();
    ```
    若 Scene3D 和 TrailRenderer 使用不同公式，尾迹点会与摆球位置不重合。**推荐**：将坐标计算公式提取到 `src/features/simulation/engine/state-vector.ts` 中导出为 `ball2Position(state, params): Vector3` 公共函数，EXP-01 和 EXP-02 均调用此函数。
 
-4. **[三角形带与 Line 的选择]** `deviceType === "desktop"` 时必须使用三角形带方案实现可变线宽（视觉上速度越高尾迹越宽）。`deviceType === "mobile"` 时必须使用简单 `<Line>` 方案（`lineWidth = 1`），因为在手机 GPU 上三角形带的顶点着色器开销过大。
+4. **[三角形带与 Line 的选择]** `deviceType === "desktop"` / `"tablet"` 时使用连续三角形带 + 圆角端帽方案实现可变线宽，通过 R3F viewport 实时将像素宽度转为世界单位，保证相机缩放时视觉粗细恒定。`deviceType === "mobile"` 时使用 drei's `<Line>` 方案（`lineWidth = 1`），省去三角形带的几何计算开销。
 
 5. **[Color Gradient 透明度独立]** 顶点颜色（RGB）仅编码速度信息，全局透明度（alpha）由 `MeshBasicMaterial.opacity` 统一控制。禁止在顶点颜色中混入透明度分量，否则无法独立调节尾迹整体可见度。
 
@@ -631,7 +630,7 @@ const { trailPoints, appendPoint, clear, persistence } = useTrailBuffer();
 
 7. **[周期检测仅在 persistence === -1 时启用]** 周期检测的 `phaseDistance` 计算和 `cycleStartState` 维护有一定开销。仅在用户明确选择"仅保留当前周期"模式时才执行周期检测逻辑。
 
-8. **[TrailRenderer 必须在 Canvas 内]** 该组件使用 R3F 的 `useThree()` 和 drei 的 `<Line>`，必须嵌套在 R3F `<Canvas>` 节点树内。若在 Canvas 外渲染，组件应立即返回空 `<group />` 并打印错误日志。
+8. **[TrailRenderer 必须在 Canvas 内]** 该组件使用 R3F 的 `useThree()`（桌面端配合 `useFrame` 操作 mesh + BufferGeometry，移动端配合 drei's `<Line>`），必须嵌套在 R3F `<Canvas>` 节点树内。若在 Canvas 外渲染，组件应立即返回空 `<group />` 并打印错误日志。
 
 ---
 
