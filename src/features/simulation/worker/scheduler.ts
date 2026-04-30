@@ -324,9 +324,9 @@ export class SimulationScheduler {
       }
 
       case "batchReady": {
-        // 丢弃过期批次：reset() 清空了 pendingBatch 和 timeoutId，旧 Worker 计算中的批次
-        // 在 reset 之后到达时不应被激活，否则会导致场景闪现旧摆位
-        if (!this.pendingBatch && !this.timeoutId) {
+        // 丢弃过期批次：reset() 清空了 pendingBatch / timeoutId / activeBuffer，
+        // 旧 Worker 残余批次在 activeBuffer===null 时到达说明调度器已重置，不应激活
+        if (!this.pendingBatch && !this.timeoutId && this.activeBuffer === null) {
           return;
         }
 

@@ -680,13 +680,16 @@ describe("SimulationScheduler pause / resume / destroy / reset", () => {
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },
       "RKF45",
     );
-    scheduler.pause();
 
+    // 先获取第一批数据
     worker.dispatchMessage({ type: "ready" });
     const buffer = makeFrameBuffer();
     worker.dispatchMessage({
       type: "batchReady", buffer, frameCount: FRAMES_PER_BATCH, simTime: 2.0,
     });
+
+    scheduler.pause();
+    expect(scheduler.isRunning).toBe(false);
 
     scheduler.resume();
     expect(scheduler.isRunning).toBe(true);
