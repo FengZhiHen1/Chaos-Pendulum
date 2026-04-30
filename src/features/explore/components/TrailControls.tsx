@@ -16,10 +16,7 @@ export function TrailControls() {
   const setTrailLength = useExploreStore((s) => s.setTrailLength);
 
   return (
-    <div
-      className="absolute left-3 top-3 z-20 flex items-center gap-1 px-2 py-1.5 rounded-lg"
-      style={{ background: "rgba(10, 10, 20, 0.85)", border: "1px solid #1a1a2e" }}
-    >
+    <div className="flex items-center gap-1">
       <span className="text-[10px] text-on-surface-variant mr-1 shrink-0">尾迹</span>
       {OPTIONS.map((opt) => (
         <button

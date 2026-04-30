@@ -5,6 +5,8 @@ import { getScheduler } from "@/features/simulation/worker/scheduler";
 import { useExploreStore } from "../store";
 import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
 import { notify } from "@/features/system/error-handling/notify";
+import { Dialog } from "@/shared/components/ui/dialog";
+import { Button } from "@/shared/components/ui/button";
 import type { DriftSample, ReversalMode } from "../store";
 
 // ═══════════════════════════════════════════════════
@@ -269,6 +271,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   const simTime = useSimulationStore((s) => s.t);
   const params = useSimulationStore((s) => s.params);
   const engineError = useSimulationStore((s) => s.engineError);
+  const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   // ── 本地 ref ──
   const reversalStartRef = useRef<{
@@ -284,11 +287,19 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   const isReversingRef = useRef(false);
   const fwdSnapshotRef = useRef<ReturnType<typeof getSimulationHistory>>([]);
   const reversalTrailRef = useRef<THREE.Vector3[]>([]);
+  const awaitingConfirmRef = useRef(false);
+
+  // ── 本地 UI 状态 ──
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [dialogPhase, setDialogPhase] = useState<"loading" | "ready">("loading");
+  const [completedOpen, setCompletedOpen] = useState(false);
 
   // ── 派生状态 ──
   const historyInsufficient = history.length < MIN_HISTORY_FRAMES;
-  const buttonDisabled = historyInsufficient || phase === "reversing";
-  const tooltipText = historyInsufficient
+  const buttonDisabled = historyInsufficient || phase === "reversing" || phase === "awaitingConfirm";
+  const tooltipText = phase === "awaitingConfirm"
+    ? "反向积分数据准备中…"
+    : historyInsufficient
     ? `需要至少运行 2 秒才能反演（当前已运行 ${(history.length / 60).toFixed(1)} 秒）`
     : mode === "exact"
       ? "精确反演（对照）— 仅视觉回放，无误差"
@@ -372,7 +383,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     // 保存正向历史快照（防止反向帧污染后续 drift 计算）
     fwdSnapshotRef.current = getSimulationHistory();
 
-    // 初始化 3D 轨迹叠加：正向虚线（白色半透明）
+    // 初始化 3D 轨迹叠加：先清空旧轨迹再设置新数据
+    clearTrajectoryData();
     const fwdPts = fwdArray.map((sv) => {
       const p = ball2Position(sv, store.params);
       return new THREE.Vector3(p.x, p.y, p.z);
@@ -382,6 +394,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       reversalPoints: [],
       reversalColor: mode === "exact" ? "#ffd700" : "#00ffff",
       visible: true,
+      fadeOutAt: null,
     });
 
     if (mode === "exact") {
@@ -390,13 +403,45 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       scheduler.pause();
       exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
     } else {
-      setPhase("reversing");
+      // 数值反演：暂停 → 弹窗 → prefetchBatch 获取反向数据 → 就绪后确认
+      awaitingConfirmRef.current = true;
+      setPhase("awaitingConfirm");
       pauseHistoryRecording();
+      scheduler.pause();
       scheduler.setDirection(-1);
+      setDialogPhase("loading");
+      setConfirmOpen(true);
+      // 通过 prefetchBatch 获取反向数据，不恢复仿真
+      scheduler.prefetchBatch(() => {
+        if (!awaitingConfirmRef.current) return;
+        awaitingConfirmRef.current = false;
+        setDialogPhase("ready");
+      });
     }
   }, [mode, history, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
 
-  // ── 停止反演 ──
+  // ── 确认开始反演 / 取消 ──
+
+  const handleConfirmReversal = useCallback(() => {
+    setConfirmOpen(false);
+    setPhase("reversing");
+    // 直接恢复 scheduler，反演正式开始
+    getScheduler().resume();
+  }, [setPhase]);
+
+  const handleCancelReversal = useCallback(() => {
+    setConfirmOpen(false);
+    getScheduler().setDirection(1);
+    getScheduler().resume();
+    resumeHistoryRecording();
+    setPhase("idle");
+    setActive(false);
+    isReversingRef.current = false;
+    clearTrajectoryData();
+    clearDriftHistory();
+  }, [setPhase, setActive, clearDriftHistory]);
+
+  // ── 停止反演（反演自然结束或用户手动停止）──
   const stopReversal = useCallback(() => {
     const scheduler = getScheduler();
     isReversingRef.current = false;
@@ -414,16 +459,44 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       }
       scheduler.setDirection(1);
       scheduler.resume();
+      startTrajectoryFadeOut();
+      setPhase("completed");
+      setActive(false);
     } else {
+      // 数值反演：停止仿真 + 恢复正向方向 + 弹窗（轨迹保持，由用户选择淡化或清除）
       resumeHistoryRecording();
       scheduler.setDirection(1);
+      useSimulationStore.setState({ isRunning: false });
+      setPhase("completed");
+      setActive(false);
+      setCompletedOpen(true);
     }
-
-    // 10 秒淡出而非立即清除
-    startTrajectoryFadeOut();
-    setPhase("completed");
-    setActive(false);
   }, [mode, setPhase, setActive]);
+
+  // ── 反演完成后：恢复 / 重置 ──
+
+  const handleRestoreState = useCallback(() => {
+    setCompletedOpen(false);
+    const start = reversalStartRef.current;
+    if (start) {
+      const sched = getScheduler();
+      sched.setDirection(1);
+      sched.reset({
+        theta1: start.theta1,
+        theta1Dot: start.omega1,
+        theta2: start.theta2,
+        theta2Dot: start.omega2,
+      });
+      // 反演轨迹快速淡化消失
+      startTrajectoryFadeOut();
+    }
+  }, []);
+
+  const handleResetAfterComplete = useCallback(() => {
+    setCompletedOpen(false);
+    clearTrajectoryData();
+    useSimulationStore.getState().applyCurrentSettings();
+  }, []);
 
   // ── 数值反演逐帧漂移检测 ──
   useEffect(() => {
@@ -485,6 +558,23 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       prevSimTimeRef.current = useSimulationStore.getState().t;
     }
   }, [phase]);
+
+  // ── 仿真重置 → 同步清空反演状态 ──
+
+  const prevResetTriggerRef = useRef(resetTrigger);
+  useEffect(() => {
+    if (resetTrigger !== prevResetTriggerRef.current) {
+      prevResetTriggerRef.current = resetTrigger;
+      // 仿真已重置，关闭反演
+      if (isReversingRef.current && mode === "numerical") {
+        getScheduler().setDirection(1);
+      }
+      isReversingRef.current = false;
+      cancelAnimationFrame(exactRafRef.current);
+      clearTrajectoryData();
+      useExploreStore.getState().resetReversalState();
+    }
+  }, [resetTrigger, mode]);
 
   // ── 卸载清理 ──
   useEffect(() => {
@@ -554,7 +644,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           }`}
           title={tooltipText}
         >
-          {active ? "停止反演" : "⌛ 时间倒流"}
+          {phase === "awaitingConfirm" ? "准备中…" : active ? "停止反演" : "⌛ 时间倒流"}
         </button>
 
         {/* 历史帧数指示 */}
@@ -583,8 +673,67 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
         />
       </div>
 
+      {/* 反演确认对话框 */}
+      <div className="pointer-events-auto">
+        <Dialog
+          open={confirmOpen}
+          onClose={dialogPhase === "ready" ? handleCancelReversal : () => {}}
+          title={dialogPhase === "loading" ? "准备反演数据…" : "开始反演？"}
+          description={
+            dialogPhase === "loading"
+              ? "正在请求反向积分批次，请稍候…"
+              : "反向积分数据已就绪。确认后将开始数值反演，展示误差指数放大过程。"
+          }
+        >
+          {dialogPhase === "loading" ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-xs text-on-surface-variant">等待 Worker 反向积分…</span>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="tertiary" size="sm" onClick={handleCancelReversal}>
+                取消
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleConfirmReversal}>
+                开始反演
+              </Button>
+            </div>
+          )}
+        </Dialog>
+      </div>
+
+      {/* 反演完成对话框 */}
+      <div className="pointer-events-auto">
+        <Dialog
+          open={completedOpen}
+          onClose={handleRestoreState}
+          title="反演结束"
+          description="数值反演已完成，仿真已停止。请选择后续操作。"
+        >
+          <div className="space-y-2 mt-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleRestoreState}
+              className="w-full justify-start"
+            >
+              ① 恢复时间倒流前的状态
+            </Button>
+            <Button
+              variant="tertiary"
+              size="sm"
+              onClick={handleResetAfterComplete}
+              className="w-full justify-start"
+            >
+              ② 重置 — 以当前面板参数重新开始
+            </Button>
+          </div>
+        </Dialog>
+      </div>
+
       {/* 完成标注 */}
-      {phase === "completed" && driftHistory.length > 0 && (
+      {phase === "completed" && driftHistory.length > 0 && !completedOpen && (
         <div
           className="absolute bottom-2 left-2 z-20 pointer-events-auto px-3 py-1.5 rounded text-xs text-gray-400"
           style={{ background: "rgba(10, 10, 15, 0.85)" }}

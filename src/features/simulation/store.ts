@@ -84,6 +84,8 @@ interface SimulationState extends SimulationFrame {
   fieldErrors: Record<string, ValidationResult>;
   isSceneFrozen: boolean;
   isPanelExpanded: boolean;
+  /** 参数面板有未应用更改（重置后才生效） */
+  paramsDirty: boolean;
 
   // ── SIM-01 Actions ──
   setParams: (patch: Partial<PendulumParams>) => void;
@@ -136,6 +138,8 @@ interface SimulationState extends SimulationFrame {
   ) => void;
   setActiveField: (field: string | null) => void;
   resetToDefaults: () => void;
+  /** 以面板当前值重置仿真（不改动滑块），同步关闭时间反演面板 */
+  applyCurrentSettings: () => void;
   clearFieldErrors: () => void;
   setPanelExpanded: (expanded: boolean) => void;
   clearDriftAlarm: () => void;
@@ -203,6 +207,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   fieldErrors: {},
   isSceneFrozen: false,
   isPanelExpanded: true,
+  paramsDirty: false,
 
   energyInitial: null,
   energyDrift: 0,
@@ -222,9 +227,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   // ── SIM-01 Actions ──
 
   setParams: (patch) =>
-    set((s) => ({ params: { ...s.params, ...patch } })),
+    set((s) => ({ params: { ...s.params, ...patch }, paramsDirty: true })),
 
-  setMethod: (method) => set({ method }),
+  setMethod: (method) => set({ method, paramsDirty: true }),
 
   setRunning: (isRunning) => set({ isRunning }),
 
@@ -365,6 +370,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         params: newParams,
         fieldErrors: newErrors,
         isSceneFrozen: hasOtherErrors,
+        paramsDirty: true,
       };
     });
   },
@@ -392,6 +398,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         initialConditions: newIC,
         fieldErrors: newErrors,
         isSceneFrozen: hasOtherErrors,
+        paramsDirty: true,
       };
     });
   },
@@ -413,6 +420,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       method: preset.method ?? s.method,
       fieldErrors: {},
       isSceneFrozen: false,
+      paramsDirty: false,
       resetTrigger: s.resetTrigger + 1,
     });
     return null;
@@ -498,6 +506,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       method: DEFAULT_METHOD,
       fieldErrors: {},
       isSceneFrozen: false,
+      paramsDirty: false,
       activeField: null,
       energyInitial: null,
       energyDrift: 0,
@@ -530,7 +539,54 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     });
   },
 
-  clearFieldErrors: () => set({ fieldErrors: {}, isSceneFrozen: false }),
+  /** 以面板当前值重置仿真（不改动滑块），用于"更改后重置"流程 */
+  applyCurrentSettings: () => {
+    const s = get();
+    const t1 = s.initialConditions.theta1;
+    const t2 = s.initialConditions.theta2;
+    const L1 = s.params.L1;
+    const L2 = s.params.L2;
+    const nx1 = L1 * Math.sin(t1);
+    const ny1 = -L1 * Math.cos(t1);
+    const nx2 = nx1 + L2 * Math.sin(t2);
+    const ny2 = ny1 - L2 * Math.cos(t2);
+
+    set({
+      paramsDirty: false,
+      fieldErrors: {},
+      isSceneFrozen: false,
+      activeField: null,
+      energyInitial: null,
+      energyDrift: 0,
+      driftExceeded: false,
+      energyMin: 0,
+      energyMax: 0,
+      isSimulationActive: false,
+      consumedFrameIndex: 0,
+      energyCorrection: 0,
+      lyapunovExponent: 0,
+      _nanSkipCount: 0,
+      _lastDamping: NaN,
+      _energyResetGeneration: s.resetTrigger + 1,
+      _stoppedFrameCount: 0,
+      isPendulumStopped: false,
+      isRunning: false,
+      resetTrigger: s.resetTrigger + 1,
+      x1: nx1, y1: ny1, x2: nx2, y2: ny2,
+      theta1: t1, theta1Dot: 0,
+      theta2: t2, theta2Dot: 0,
+      kineticEnergy: 0, potentialEnergy: 0, totalEnergy: 0,
+      alpha1: 0, alpha2: 0,
+      state: {
+        theta1: t1,
+        omega1: 0,
+        theta2: t2,
+        omega2: 0,
+      },
+    });
+  },
+
+  clearFieldErrors:() => set({ fieldErrors: {}, isSceneFrozen: false }),
 
   setPanelExpanded: (expanded) => set({ isPanelExpanded: expanded }),
 }));

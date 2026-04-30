@@ -99,7 +99,8 @@ export function setupSimulationBridge(): () => void {
     const isResetAction = state.resetTrigger !== prevState.resetTrigger;
 
     // ── params 变更 ──
-    if (state.params !== prevState.params) {
+    // paramsDirty 时跳过即时同步，由 resetTrigger 分支在重置时统一应用
+    if (state.params !== prevState.params && !state.paramsDirty) {
       const diff: Partial<PendulumParams> = {};
       for (const k of Object.keys(state.params) as (keyof PendulumParams)[]) {
         if (state.params[k] !== lastSyncedParams[k]) {
@@ -124,8 +125,8 @@ export function setupSimulationBridge(): () => void {
     }
 
     // ── initialConditions 变更 → Worker reset ──
-    // 若 resetTrigger 同时递增，由 resetTrigger 分支统一处理，此处跳过防抖
-    if (state.initialConditions !== prevState.initialConditions && !isResetAction) {
+    // 若 resetTrigger 同时递增或处于 paramsDirty，由 resetTrigger 分支统一处理，此处跳过
+    if (state.initialConditions !== prevState.initialConditions && !isResetAction && !state.paramsDirty) {
       pendingResetIC = state.initialConditions;
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => {
@@ -141,7 +142,8 @@ export function setupSimulationBridge(): () => void {
     }
 
     // ── method 变更 ──
-    if (state.method !== prevState.method) {
+    // paramsDirty 时跳过即时同步
+    if (state.method !== prevState.method && !state.paramsDirty) {
       if (workerReady) {
         getScheduler().setMethod(state.method);
       } else {

@@ -164,6 +164,7 @@ export function TimeReversalTrajectoryOverlay() {
         <bufferGeometry />
         <lineBasicMaterial
           color={data.reversalColor}
+          transparent
           depthTest
         />
       </line>

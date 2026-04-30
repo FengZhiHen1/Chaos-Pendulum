@@ -101,7 +101,17 @@ export function useSonification(): UseSonificationAPI {
 
   // ── 每帧音频参数更新（订阅仿真时间变化） ──
   const simTime = useSimulationStore((s) => s.t);
+  const isRunning = useSimulationStore((s) => s.isRunning);
   const prevSimTimeRef = useRef(simTime);
+  const wasRunningRef = useRef(isRunning);
+
+  // ── 暂停时同步静音 / 恢复时恢复 ──
+  useEffect(() => {
+    if (!sonificationEnabled || !engineRef.current) return;
+    if (isRunning === wasRunningRef.current) return;
+    wasRunningRef.current = isRunning;
+    engineRef.current.setEnabled(isRunning);
+  }, [isRunning, sonificationEnabled]);
 
   useEffect(() => {
     if (!sonificationEnabled || !engineRef.current || deviceType !== "desktop") return;
@@ -112,7 +122,7 @@ export function useSonification(): UseSonificationAPI {
 
     const store = useSimulationStore.getState();
 
-    // 仿真暂停时保持当前音频参数不变
+    // 仿真暂停时不再更新音频参数
     if (!store.isRunning) return;
 
     const { state, kineticEnergy } = store;

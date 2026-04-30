@@ -4,7 +4,7 @@ type ViewPreset = "side" | "top" | "chaos";
 type TrailLength = 50 | 200 | 1000 | 0 | -1; // 0 = infinite, -1 = cycle-only
 
 export type ReversalMode = "exact" | "numerical";
-export type ReversalPhase = "idle" | "recording" | "reversing" | "completed" | "paused";
+export type ReversalPhase = "idle" | "recording" | "reversing" | "completed" | "paused" | "awaitingConfirm";
 
 /** 漂移距离采样点 */
 export interface DriftSample {

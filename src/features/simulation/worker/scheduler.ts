@@ -56,6 +56,7 @@ export class SimulationScheduler {
   private poincareCondition: PoincareSectionCondition | null = null;
   private poincareCallbacks: Array<(pts: PoincarePoint[]) => void> = [];
   private externalTick = false;
+  private prefetchCallback: (() => void) | null = null;
 
   // 渲染插值用的前后帧快照（由 consumeOneFrame 维护）
   private prevSnapshot: InterpSnapshot | null = null;
@@ -272,6 +273,13 @@ export class SimulationScheduler {
     return this.running;
   }
 
+  /** 暂停态下预取一批数据（绕过 running 检查）。完成后回调 onDone。 */
+  prefetchBatch(onDone: () => void): void {
+    if (!this.worker) { onDone(); return; }
+    this.prefetchCallback = onDone;
+    this.requestNextBatch();
+  }
+
   // ─── 内部实现 ────────────────────────────────
 
   private createWorker(): void {
@@ -401,6 +409,12 @@ export class SimulationScheduler {
           console.warn(
             `[scheduler] 收到部分批次: ${resp.frameCount}/${FRAMES_PER_BATCH} 帧, simTime=${resp.simTime.toFixed(2)}`,
           );
+        }
+
+        if (this.prefetchCallback) {
+          const cb = this.prefetchCallback;
+          this.prefetchCallback = null;
+          cb();
         }
         break;
       }
