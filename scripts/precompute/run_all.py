@@ -10,7 +10,7 @@ from config import OUTPUT_DIR
 def main():
     script_dir = Path(__file__).resolve().parent
     scripts = [
-        ["lyapunov_spectrum.py", "--type", "lyapunov_max"],
+        ["lyapunov_spectrum.py", "--type", "lyapunov_max", "--damping-all", "--quick"],
         ["bifurcation.py"],
     ]
 

@@ -9,7 +9,7 @@ import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
 import { measure } from "@/shared/lib/observability/perf-mark";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Button } from "@/shared/components/ui/button";
-import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData } from "../types";
+import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData, DampingSlice } from "../types";
 import { classifyLambda, resolveStoreParam } from "../types";
 import { ParameterFillDialog } from "./ParameterFillDialog";
 
@@ -21,9 +21,10 @@ interface Props {
     lyapunov_min: string;
     energy_curvature: string;
   };
+  dampingSlices?: DampingSlice[];
 }
 
-export function LyapunovHeatmap({ dataPaths }: Props) {
+export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
@@ -44,6 +45,9 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
   const simInjectParams = useSimulationStore((s) => s.injectParams);
   const simSetRunning = useSimulationStore((s) => s.setRunning);
 
+  const activeDamping = useAnalyzeStore((s) => s.activeDamping);
+  const setActiveDamping = useAnalyzeStore((s) => s.setActiveDamping);
+
   const [gridData, setGridData] = useState<LyapunovGrid | null>(null);
   const [layerCache, setLayerCache] = useState<Map<LyapunovLayerType, LyapunovGrid>>(new Map());
   const [cursor, setCursor] = useState<HeatmapCursor>({ visible: false, x: 0, y: 0, paramXValue: 0, paramYValue: 0 });
@@ -51,7 +55,16 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
   const [dialogCell, setDialogCell] = useState<{ col: number; row: number } | null>(null);
 
   // ── 数据加载（SYS-03 usePrecomputeData）─────────────
-  const activePath = dataPaths[activeLayer] ?? "";
+  // dampingSlices 可用时，从切片列表中查找当前阻尼值对应的文件
+  const resolvedPath = (() => {
+    if (dampingSlices.length > 0 && activeLayer === "lyapunov_max") {
+      const slice = dampingSlices.find((s) => s.value === activeDamping)
+        ?? dampingSlices[0];
+      if (slice) return `/assets/${slice.file}`;
+    }
+    return dataPaths[activeLayer] ?? "";
+  })();
+  const activePath = resolvedPath;
   const activeHash = (activePath.match(/-([a-f0-9]+)\.json$/) ?? [])[1] ?? "";
 
   const precomputeState = usePrecomputeData<LyapunovGrid>({
@@ -246,6 +259,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
       paramYValue,
       paramXName: px.name,
       paramYName: py.name,
+      dampingValue: gridData.metadata.dampingValue ?? activeDamping,
     };
     setHoverTooltip(tooltipData);
   }, [gridData, sizeReady, dpr, setHoverTooltip]);
@@ -260,6 +274,7 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
       paramYValue: 0,
       paramXName: "",
       paramYName: "",
+      dampingValue: undefined,
     });
   }, [setHoverTooltip]);
 
@@ -511,6 +526,31 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
         </TabsList>
       </Tabs>
 
+      {dampingSlices.length > 1 && (
+        <div className="flex items-center gap-3 px-3 py-1.5 rounded-md bg-surface-container-low border border-white/5">
+          <span className="text-xs text-on-surface-variant shrink-0">阻尼</span>
+          <input
+            type="range"
+            min={0}
+            max={dampingSlices.length - 1}
+            step={1}
+            value={dampingSlices.findIndex((s) => s.value === activeDamping)}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value, 10);
+              const slice = dampingSlices[idx];
+              if (slice) setActiveDamping(slice.value);
+            }}
+            className="flex-1 h-1.5 appearance-none bg-surface-container-high rounded-full
+              accent-primary
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
+              [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+          />
+          <span className="text-xs font-mono text-on-surface w-12 text-right">
+            {activeDamping.toFixed(3)}
+          </span>
+        </div>
+      )}
+
       <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden bg-surface border border-white/5">
         {(loadStatus === "loading" || loadStatus === "idle") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
@@ -600,6 +640,11 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
                   {hoverTooltip.paramYName} = {hoverTooltip.paramYValue.toFixed(3)}
                   {hoverTooltip.paramYName.includes("θ") ? " rad" : ""}
                 </div>
+                {hoverTooltip.dampingValue !== undefined && (
+                  <div className="mt-0.5 text-on-surface-variant">
+                    damping = {hoverTooltip.dampingValue.toFixed(3)}
+                  </div>
+                )}
               </div>
             )}
           </>

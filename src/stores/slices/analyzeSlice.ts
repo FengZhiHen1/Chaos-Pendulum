@@ -15,6 +15,9 @@ export interface AnalyzeSlice {
   activeView: AnalysisView;
   activeLayer: LyapunovLayerType;
 
+  // ── 阻尼切片 ──
+  activeDamping: number;
+
   // ── 加载状态 ──
   loadStatus: LoadStatus;
   loadError: string | null;
@@ -44,6 +47,7 @@ export interface AnalyzeSlice {
   // ── Actions ──
   setActiveView: (view: AnalysisView) => void;
   setActiveLayer: (layer: LyapunovLayerType) => void;
+  setActiveDamping: (damping: number) => void;
   setLoadStatus: (status: LoadStatus) => void;
   setLoadError: (error: string | null) => void;
   setHoverTooltip: (data: HoverTooltipData) => void;
@@ -60,11 +64,13 @@ const defaultTooltip: HoverTooltipData = {
   paramYValue: 0,
   paramXName: "",
   paramYName: "",
+  dampingValue: undefined,
 };
 
 export const createAnalyzeSlice: StateCreator<AnalyzeSlice, [], [], AnalyzeSlice> = (set) => ({
   activeView: "lyapunov",
   activeLayer: "lyapunov_max",
+  activeDamping: 0,
 
   loadStatus: "idle",
   loadError: null,
@@ -160,6 +166,8 @@ export const createAnalyzeSlice: StateCreator<AnalyzeSlice, [], [], AnalyzeSlice
       if (s.activeLayer === activeLayer) return s;
       return { activeLayer, loadStatus: "idle", loadError: null };
     }),
+
+  setActiveDamping: (activeDamping) => set({ activeDamping }),
 
   setLoadStatus: (loadStatus) => set({ loadStatus }),
 

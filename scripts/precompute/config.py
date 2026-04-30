@@ -52,6 +52,14 @@ FIXED_PARAMS = {
     "theta2_0": 1.5707963267948966,  # π/2 rad，与 JS DEFAULT_INITIAL_CONDITIONS.theta2 对齐
 }
 
+# ---- 阻尼维度扫描 ----
+# 方案 A：每个 damping 值生成独立的 2D 网格文件
+LYAPUNOV_DAMPING_RANGE = {
+    "min": 0.0,
+    "max": 0.3,
+    "steps": 10,         # 10 个切片，约 0.033 间隔
+}
+
 # ---- 积分参数 ----
 # 与 SIM-01 Worker 完全一致：dt = 1/60，无瞬态舍弃
 INTEGRATION = {

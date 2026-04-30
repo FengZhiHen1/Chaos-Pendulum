@@ -83,7 +83,7 @@ export function AnalysisControls() {
               ["m₁", "1.0 kg"],
               ["m₂", "1.0 kg"],
               ["g", "9.81 m/s²"],
-              ["阻尼", "0"],
+              ["阻尼", "扫描轴"],
             ].map(([label, val]) => (
               <div key={label} className="flex justify-between">
                 <span className="text-on-surface-variant">{label}</span>

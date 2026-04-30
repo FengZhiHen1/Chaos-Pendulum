@@ -29,6 +29,13 @@ export interface FixedParams {
 /** 扫描图层类型（ANL-01） */
 export type LyapunovLayerType = "lyapunov_max" | "lyapunov_min" | "energy_curvature";
 
+/** 阻尼切片条目（ANL-01 damping 扫描） */
+export interface DampingSlice {
+  value: number;
+  file: string;
+  gridHash?: string;
+}
+
 /** 预计算数据文件结构（ANL-01） */
 export interface LyapunovGrid {
   metadata: {
@@ -39,6 +46,7 @@ export interface LyapunovGrid {
     gridHash: string;
     generatedAt: string;
     solverVersion: string;
+    dampingValue?: number;  // 阻尼切片值（多阻尼扫描时存在）
   };
   grid: number[][]; // [row][col] = value; row 0 对应 paramY.max（顶部）
 }
@@ -121,6 +129,7 @@ export interface HoverTooltipData {
   paramYValue: number;
   paramXName: string;
   paramYName: string;
+  dampingValue?: number;
 }
 
 /** 双向联动游标（ANL-01） */

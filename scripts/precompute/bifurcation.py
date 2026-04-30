@@ -31,6 +31,8 @@ def build_argparser() -> argparse.ArgumentParser:
                    default=BIFURCATION_SCAN["control_param"],
                    choices=["theta1", "theta2", "L1", "L2", "m1", "m2", "omega1_0", "omega2_0"],
                    help="扫描参数名（默认：config.BIFURCATION_SCAN['control_param']）")
+    p.add_argument("--force", action="store_true",
+                   help="强制重新计算已存在的文件（默认跳过已有文件）")
     return p
 
 
@@ -84,6 +86,19 @@ def main():
         return
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 检查是否已有计算结果
+    manifest_path = output_dir / "layer_manifest.json"
+    if not args.force and manifest_path.exists():
+        with open(manifest_path, "r") as f:
+            existing_manifest = json.load(f)
+        existing_bif = existing_manifest.get("bifurcation")
+        if existing_bif:
+            existing_path = output_dir / existing_bif
+            if existing_path.exists():
+                print(f"[跳过] bifurcation 已存在: {existing_bif}，使用 --force 强制重新计算")
+                return 0
+
     samples = []
     t_start = time.perf_counter()
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useAnalysisView } from "../hooks/useAnalysisView";
+import type { DampingSlice } from "../types";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
@@ -15,6 +16,9 @@ interface LayerManifest {
   lyapunov_min?: string;
   energy_curvature?: string;
   bifurcation?: string;
+  lyapunov_max_dampingSlices?: DampingSlice[];
+  lyapunov_min_dampingSlices?: DampingSlice[];
+  energy_curvature_dampingSlices?: DampingSlice[];
 }
 
 const FALLBACK_PATHS = {
@@ -27,6 +31,7 @@ const FALLBACK_BIFURCATION = "/assets/bifurcation-missing.json";
 
 function useLayerManifest(): {
   lyapunovPaths: typeof FALLBACK_PATHS;
+  dampingSlices: DampingSlice[];
   bifurcationPath: string;
   ready: boolean;
 } {
@@ -65,12 +70,18 @@ function useLayerManifest(): {
     ? `/assets/${manifest.bifurcation}`
     : FALLBACK_BIFURCATION;
 
-  return { lyapunovPaths, bifurcationPath, ready };
+  // 提取当前活动图层的阻尼切片
+  const dampingSlices = manifest?.lyapunov_max_dampingSlices
+    ?? manifest?.lyapunov_min_dampingSlices
+    ?? manifest?.energy_curvature_dampingSlices
+    ?? [];
+
+  return { lyapunovPaths, dampingSlices, bifurcationPath, ready };
 }
 
 export function AnalyzeModePage() {
   const { activeView, setActiveView, isDesktop } = useAnalysisView();
-  const { lyapunovPaths, bifurcationPath, ready } = useLayerManifest();
+  const { lyapunovPaths, dampingSlices, bifurcationPath, ready } = useLayerManifest();
 
   return (
     <div className="h-full w-full flex">
@@ -108,7 +119,7 @@ export function AnalyzeModePage() {
             </div>
           )}
           {ready && activeView === "lyapunov" && (
-            <LyapunovHeatmap dataPaths={lyapunovPaths} />
+            <LyapunovHeatmap dataPaths={lyapunovPaths} dampingSlices={dampingSlices} />
           )}
           {ready && activeView === "bifurcation" && (
             <BifurcationPlot dataPath={bifurcationPath} />
