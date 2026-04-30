@@ -6,9 +6,9 @@
 
 from pathlib import Path
 
-# 输出目录（相对于脚本所在目录，指向 src/shared/data/）
-# 示例：scripts/precompute/ → ../../src/shared/data/
-OUTPUT_DIR = Path(__file__).resolve().parents[2] / "src" / "shared" / "data"
+# 输出目录（相对于脚本所在目录，指向 public/assets/ —— 前端 fetch 直接可访问）
+# 示例：scripts/precompute/ → ../../public/assets/
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "public" / "assets"
 
 # ---- Lyapunov 谱扫描参数 ----
 LYAPUNOV_GRID = {
@@ -39,6 +39,7 @@ BIFURCATION_SCAN = {
 }
 
 # ---- 固定物理参数（除扫描参数外）----
+# 与 SIM-01 Worker 默认值完全一致
 FIXED_PARAMS = {
     "m1": 1.0,              # 上摆质量 (kg)。约束：> 0。默认：1.0
     "m2": 1.0,              # 下摆质量 (kg)。约束：> 0。默认：1.0
@@ -47,14 +48,17 @@ FIXED_PARAMS = {
     # Lyapunov 谱扫描时 L2 由 LYAPUNOV_GRID["L2_L1_ratio"] * L1 动态覆盖
     "g": 9.81,              # 重力加速度 (m/s²)。约束：≥ 0。默认：9.81
     "damping": 0.0,         # 阻尼系数 (1/s)。约束：≥ 0。默认：0.0
+    # 初始条件（与 JS DEFAULT_INITIAL_CONDITIONS 对齐）
+    "theta2_0": 1.5707963267948966,  # π/2 rad，与 JS DEFAULT_INITIAL_CONDITIONS.theta2 对齐
 }
 
 # ---- 积分参数 ----
+# 与 SIM-01 Worker 完全一致：dt = 1/60，无瞬态舍弃
 INTEGRATION = {
-    "dt": 0.01,             # 积分步长 (s)。约束：> 0。默认：0.01
+    "dt": 1.0 / 60.0,       # 积分步长 (s)。与 JS Worker dt=1/60 对齐
     "total_time": 100.0,    # 单次仿真总时长 (s)。约束：> 0。Lyapunov 谱使用此值
-    "lyapunov_transient": 50.0,  # Lyapunov 瞬态抛弃时间 (s)。约束：< total_time
+    "lyapunov_transient": 0.0,  # Lyapunov 瞬态抛弃时间 (s)。与 JS 实时计算对齐：无瞬态舍弃
 }
 
 # ---- 元数据 ----
-SOLVER_VERSION = "1.0.0"    # 预计算脚本版本号。JSON metadata.solverVersion 的值
+SOLVER_VERSION = "2.0.0"    # 预计算脚本版本号。v2: RKF45 Fehlberg + 统一 JS 参数

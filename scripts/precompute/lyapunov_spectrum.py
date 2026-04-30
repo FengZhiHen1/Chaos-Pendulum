@@ -117,7 +117,9 @@ def main():
 
             theta1_init = theta1_range[x]
             params = {**FIXED_PARAMS, "L2": L2}
-            y0 = np.array([theta1_init, 0.0, 0.0, 0.0])
+            # 初始条件与 JS DEFAULT_INITIAL_CONDITIONS 对齐
+            theta2_0 = FIXED_PARAMS.get("theta2_0", np.pi / 2)
+            y0 = np.array([theta1_init, 0.0, theta2_0, 0.0])
 
             lam = estimate_lyapunov(params, y0, total_time, lyapunov_transient, dt)
 
@@ -166,12 +168,17 @@ def main():
             "m2": FIXED_PARAMS["m2"],
             "L1": FIXED_PARAMS["L1"],
             "L2": L2_display,
+            "theta1_0": "scanned",
             "omega1_0": 0.0,
+            "theta2_0": FIXED_PARAMS.get("theta2_0", np.pi / 2),
             "omega2_0": 0.0,
             "g": FIXED_PARAMS["g"],
             "damping": FIXED_PARAMS["damping"],
             "integrationTime": total_time,
             "dt": dt,
+            "lyapunovTransient": lyapunov_transient,
+            "integrator": "RKF45-Fehlberg",
+            "renormInterval": 60,
         },
     }
 
@@ -209,8 +216,33 @@ def main():
     if partial_path and partial_path.exists():
         partial_path.unlink()
 
+    # 更新 layer_manifest.json
+    update_manifest(output_dir, layer_type, out_filename)
+
     print(f"\n[完成] 输出: {out_filename}, gridHash={grid_hash}, 积分失败 {nan_count}/{total} 格点")
     return 0
+
+
+def update_manifest(output_dir: Path, layer_type: str, filename: str) -> None:
+    """更新 public/assets/layer_manifest.json，追加/更新图层 → 文件名映射。"""
+    manifest_path = output_dir / "layer_manifest.json"
+    manifest: dict = {}
+    if manifest_path.exists():
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+
+    # layer_type → 仅文件名（前端拼接 /assets/ 前缀）
+    key_map = {
+        "lyapunov_max": "lyapunov_max",
+        "lyapunov_min": "lyapunov_min",
+        "energy_curvature": "energy_curvature",
+    }
+    key = key_map.get(layer_type, layer_type)
+    manifest[key] = filename
+
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2, sort_keys=True)
+    print(f"[manifest] 已更新 {manifest_path} → {key}: {filename}")
 
 
 if __name__ == "__main__":

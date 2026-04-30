@@ -7,6 +7,7 @@
 > | v1.0 | 2026-04-28 15:30:00 | AI Assistant | 初始版本（错误：基于 Pyodide 主线程同步架构） |
 > | v2.0 | 2026-04-28 17:00:00 | AI Assistant | 完全重写：对齐技术栈设计文档 §1.3/§3/ADR-001，改为 JS Worker + Transferable 池 + 批量积分架构 |
 > | v2.1 | 2026-04-28 20:30:00 | AI Assistant | 修正 odeRhs 分母公式：`2*m1+m2-m2*cos(2δ)` → `m1+m2-m2*cos²(δ)`（与标准拉格朗日推导对齐，v2.0 公式多因子 2 导致能量爆炸 9×10¹¹） |
+> | v2.2 | 2026-04-30 10:38:26 | AI Assistant | IntegratorMethod 枚举值 `"RK4"` → `"RKF45"`（Fehlberg 嵌入 4(5) 对自适应步长，含策略模式注册表）；步长控制 + 能量投影；新增 Euler 类 |
 
 > **冲突核查指引**：本版本已与技术栈设计文档 v1.2 全文对齐。若后续技术栈文档更新涉及 ODE 求解器或 Worker 通信方案变更，以时间戳更新的版本为准。
 
@@ -31,7 +32,7 @@
 
 - **必须使用**：
   - TypeScript 5.x（Worker 代码的类型安全）
-  - 纯 JavaScript/TypeScript 实现 ODE 求解器（RK4 固定步长 + RK45 自适应步长），代码量 < 150 行
+  - 纯 JavaScript/TypeScript 实现 ODE 求解器（RKF45 自适应步长 + Velocity Verlet + Euler），代码量 < 250 行
   - Web Worker（`new Worker(new URL('./workers/ode-worker.ts', import.meta.url), { type: 'module' })`）——常驻，不依赖 WASM 初始化
   - 原生 `postMessage` + `Transferable` Float64Array（零拷贝，避免结构化克隆开销）
   - `Float64Array` 池（10 块 × 4000 元素，约 320KB）——主线程 `acquire()` / `release()` 管理
@@ -61,7 +62,7 @@ interface PendulumParams {
   damping: number;  // 阻尼系数 (1/s)，>= 0，默认 0
 }
 
-type IntegratorMethod = "RK4" | "VelocityVerlet" | "Euler";
+type IntegratorMethod = "RKF45" | "VelocityVerlet" | "Euler";
 
 interface WorkerInitCommand {
   type: "init";
@@ -74,7 +75,7 @@ interface WorkerInitCommand {
     theta2: number;       // 下摆初始角度 (rad)，示例：Math.PI / 2
     theta2Dot: number;    // 下摆初始角速度 (rad/s)，默认 0
   };
-  /** 积分方法，默认 "RK4" */
+  /** 积分方法，默认 "RKF45" */
   method: IntegratorMethod;
 }
 
@@ -300,19 +301,23 @@ function consumeFrameToStore(buffer: Float64Array, frameIndex: number, store: Zu
 - **操作对象**：`_state: Float64Array(4)` 原地更新
 - **具体操作**：根据 `_method` 选择对应实现：
 
-  **RK4（默认）**：
+  **RKF45（默认，Fehlberg 嵌入 4(5) 对）**：
+  采用自适应步长控制。每帧以目标步长 `dt = 1/60` 启动，内部子步根据误差估计自动调整：
+  - 使用 6 个 Butcher 表系数（A21…A65）计算 4 阶与 5 阶两个近似解
+  - 误差估计 `err = max|y5 - y4|`，与容差 `tol = 1e-7` 比较
+  - `err < tol`：接受该子步，根据误差比例放大下一步长（最大 5×）
+  - `err >= tol`：拒绝该子步，缩步长重试（最小 0.1×）
+  - 步长坍缩至 `1e-10` 时回退为 Euler 步进，防止死循环
   ```typescript
-  function rk4Step(state: Float64Array, p: PendulumParams, dt: number): void {
-    const k1 = odeRhs(state, p);                          // Float64Array(4)
-    const k2 = odeRhs(addScaled(state, k1, dt / 2), p);
-    const k3 = odeRhs(addScaled(state, k2, dt / 2), p);
-    const k4 = odeRhs(addScaled(state, k3, dt), p);
-    for (let i = 0; i < 4; i++) {
-      state[i] += (dt / 6) * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
-    }
+  // 策略模式：Integrator 接口 + 注册表
+  interface Integrator {
+    readonly method: IntegratorMethod;
+    step(state: Float64Array, p: PendulumParams, dt: number): void;
   }
+  // 注册：registerIntegrator(new RKF45Integrator());
+  // 调度：integratorStep(state, params, dt, method) → registry.get(method).step(...)
   ```
-  其中 `addScaled(base, scaled, factor)` 返回新的 `Float64Array(4)`，每元素 `= base[i] + scaled[i] * factor`。
+  实现位于 `src/features/simulation/engine/integrators.ts`（`RKF45Integrator` 类）。
 
   **Velocity Verlet**（辛积分器）：
   ```typescript
@@ -342,7 +347,7 @@ function consumeFrameToStore(buffer: Float64Array, frameIndex: number, store: Zu
 
 - **输入来源**：`_method` 字段（在 `init` 或 `setMethod` 中设置）
 - **输出去向**：原地更新 `_state`
-- **失败行为**：`_method` 不在 `["RK4", "VelocityVerlet", "Euler"]` → 回退为 RK4
+- **失败行为**：`_method` 不在 `["RKF45", "VelocityVerlet", "Euler"]` → 回退为 RKF45
 
 **步骤 5：ODE 右端函数（odeRhs）——核心物理**
 
@@ -701,7 +706,7 @@ Worker 内部状态机（精简，因为批量积分模式下状态变化比逐�
   {
     "params": { "m1": 1.0, "m2": 1.0, "L1": 1.0, "L2": 1.0, "g": 9.81, "damping": 0.0 },
     "initialConditions": { "theta1": 1.5708, "theta1Dot": 0.0, "theta2": 1.5708, "theta2Dot": 0.0 },
-    "method": "RK4"
+    "method": "RKF45"
   }
   ```
 - **When**：发送 `init` → 收到 `ready` → 连续发送 5 次 `step`（覆盖 10 秒仿真）

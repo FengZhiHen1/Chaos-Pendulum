@@ -220,6 +220,18 @@ def main():
         safe_json_dump(output, f, indent=2, ensure_ascii=False)
 
     empty_count = sum(1 for s in samples if len(s) == 0)
+
+    # 更新 layer_manifest.json
+    manifest_path = output_dir / "layer_manifest.json"
+    manifest: dict = {}
+    if manifest_path.exists():
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+    manifest["bifurcation"] = out_filename
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2, sort_keys=True)
+    print(f"[manifest] 已更新 {manifest_path} → bifurcation: {out_filename}")
+
     print(f"\n[完成] 输出: {out_filename}, gridHash={grid_hash}, 空采样 {empty_count}/{control_points} 个参数值")
     return 0
 

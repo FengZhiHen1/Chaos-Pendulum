@@ -6,6 +6,7 @@
 > |------|------|--------|----------|
 > | v1.0 | 2026-04-28 20:00:00 | AI Assistant | 初始版本，对齐 SIM-01 v2.0 Worker 协议与 EXP-01 的 Zustand store 契约 |
 > | v1.1 | 2026-04-28 21:00:00 | AI Assistant | 修正步骤 8 bridge 代码：Zustand v4.5 subscribe 仅接受单参数 listener(state, prevState)，改用全量 diff 替代 selector 模式 |
+> | v1.2 | 2026-04-30 10:38:26 | AI Assistant | resetToDefaults 语义修正：params 保留用户设置、仅重置 initialConditions + method；IntegratorMethod 枚举值 `"RK4"` → `"RKF45"` |
 
 > **冲突核查指引**：本版本与 SIM-01 v2.0 的 `PendulumParams` / `WorkerUpdateParamsCommand` / `WorkerResetCommand` 接口一致，与 EXP-01 v1.0 的 `useSimulationStore` 消费模式兼容。若上游接口变更，以时间戳更新的版本为准。
 
@@ -26,7 +27,7 @@
 - **兼容性结论**：
   - `PendulumParams` 类型定义与 SIM-01 Worker 接口完全一致，6 个字段名和约束条件对齐
   - `InitialConditions` 类型从 SIM-01 的 `WorkerInitCommand.initialConditions` 中提取为独立类型，字段名和语义一致
-  - `IntegratorMethod` 枚举值 `"RK4" | "VelocityVerlet" | "Euler"` 与 SIM-01 一致
+  - `IntegratorMethod` 枚举值 `"RKF45" | "VelocityVerlet" | "Euler"` 与 SIM-01 一致（v1.2 修正）
   - Zustand store 命名 `useSimulationStore` 与 EXP-01 的引用一致
   - 无冲突，本模块遵循 SIM-01 定义的参数类型作为权威源
 - **复用的已有定义**：`PendulumParams`、`IntegratorMethod`、`InitialConditions`（均来自 SIM-01 的 Worker 消息协议）
@@ -87,7 +88,7 @@ interface InitialConditions {
 }
 
 /** 与 SIM-01 的 IntegratorMethod 一致 */
-type IntegratorMethod = "RK4" | "VelocityVerlet" | "Euler";
+type IntegratorMethod = "RKF45" | "VelocityVerlet" | "Euler";
 
 /**
  * 参数预设定义。
@@ -233,8 +234,17 @@ interface SimulationParamsState {
   setActiveField: (field: string | null) => void;
 
   /**
-   * 重置所有参数为默认值。
-   * 恢复出厂默认参数 + 默认初始条件 + RK4。
+   * 重置仿真运行状态，但保留用户已调整的物理参数。
+   *
+   * 重置内容：
+   * - initialConditions → 恢复默认值（theta1/theta2 回到 π/2，角速度归零）
+   * - method → 恢复默认值（RKF45）
+   * - fieldErrors / isSceneFrozen / activeField → 清除
+   * - 能量基准（energyInitial / energyDrift / driftExceeded 等）→ 重新初始化
+   * - resetTrigger → 递增，触发 Worker 重新启动仿真
+   *
+   * 保留内容（有意为之——用户在探索中调整的参数不应被抹掉）：
+   * - params（m1/m2/L1/L2/g/damping）→ 保持当前值不变
    */
   resetToDefaults: () => void;
 
@@ -267,7 +277,7 @@ const DEFAULT_INITIAL_CONDITIONS: InitialConditions = {
 };
 
 /** 默认积分方法 */
-const DEFAULT_METHOD: IntegratorMethod = "RK4";
+const DEFAULT_METHOD: IntegratorMethod = "RKF45";
 
 /**
  * 所有 10 个参数字段的 UI 元数据。
@@ -364,7 +374,7 @@ const PARAM_META: ParamFieldMeta[] = [
 
 - **操作对象**：`method` 字段
 - **具体操作**：
-  1. 校验 `method in ["RK4", "VelocityVerlet", "Euler"]`
+  1. 校验 `method in ["RKF45", "VelocityVerlet", "Euler"]`
   2. 更新 store：`method = newMethod`
   3. Bridge 层发送 `worker.postMessage({ type: "setMethod", method })`
   4. 不清除历史轨迹（方法切换在当前状态基础上继续积分）
@@ -563,7 +573,7 @@ const PARAM_META: ParamFieldMeta[] = [
 
 - **操作对象**：`method` 字段
 - **具体操作**：渲染 shadcn/ui `Select` 组件，3 个选项：
-  - `"RK4"` — 标签 "RK4（4 阶龙格-库塔）"，副文本 "默认，精度与速度平衡"
+  - `"RKF45"` — 标签 "RKF45（自适应 4(5) 阶）"，副文本 "默认，Fehlberg 嵌入对，自动步长控制"
   - `"VelocityVerlet"` — 标签 "Velocity Verlet"，副文本 "辛积分器，长时间能量守恒佳"
   - `"Euler"` — 标签 "Euler（1 阶）"，副文本 "教育用途，展示数值误差"
 - **输入来源**：用户下拉选择
@@ -583,7 +593,7 @@ const PARAM_META: ParamFieldMeta[] = [
       description: "将两摆设为 3° 以内，验证线性近似",
       params: {},
       initialConditions: { theta1: 0.052, theta1Dot: 0, theta2: 0.034, theta2Dot: 0 },
-      method: "RK4",
+      method: "RKF45",
     },
     {
       id: "single-pendulum",
@@ -757,8 +767,8 @@ const PARAM_META: ParamFieldMeta[] = [
 - **Then**：
   - `initialConditions` 更新为 `{ theta1: 0.052, theta1Dot: 0, theta2: 0.034, theta2Dot: 0 }`
   - Worker 收到 `{ type: "reset", initialConditions: { theta1: 0.052, ... } }`
-  - `method` 变为 `"RK4"`
-  - Worker 收到 `{ type: "setMethod", method: "RK4" }`
+  - `method` 变为 `"RKF45"`
+  - Worker 收到 `{ type: "setMethod", method: "RKF45" }`
   - 3D 场景中小幅度摆动（两个摆角均 < 3°）
   - Toast 显示："已应用预设：小角度线性化"
 
