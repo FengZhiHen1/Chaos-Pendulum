@@ -140,6 +140,41 @@ function setupCommandBusHandlers(): () => void {
     useRootStore.getState().pause();
   });
 
+  // Scheduler 控制命令（解耦 TimeReversal / Scene3D 的直接引用）
+  const unsubRequestTick = commandBus.on("scheduler:requestTick", (payload) => {
+    getScheduler().tickDelta(payload.delta);
+  });
+
+  const unsubSetDirection = commandBus.on("scheduler:setDirection", (payload) => {
+    getScheduler().setDirection(payload.direction);
+  });
+
+  const unsubSchedPause = commandBus.on("scheduler:pause", () => {
+    getScheduler().pause();
+  });
+
+  const unsubSchedResume = commandBus.on("scheduler:resume", () => {
+    getScheduler().resume();
+  });
+
+  const unsubSchedReset = commandBus.on("scheduler:reset", (payload) => {
+    getScheduler().reset(payload.initialConditions);
+  });
+
+  const unsubPrefetchBatch = commandBus.on("scheduler:prefetchBatch", () => {
+    getScheduler().prefetchBatch(() => {
+      commandBus.emit({ type: "scheduler:prefetchReady" });
+    });
+  });
+
+  const unsubSetRunning = commandBus.on("simulation:setRunning", (payload) => {
+    useRootStore.getState().setRunning(payload.isRunning);
+  });
+
+  const unsubOverrideState = commandBus.on("simulation:overrideState", (payload) => {
+    useRootStore.setState({ state: payload.state });
+  });
+
   return () => {
     unsubBatchReady();
     unsubError();
@@ -152,6 +187,14 @@ function setupCommandBusHandlers(): () => void {
     unsubButterflyWorkerReady();
     unsubButterflyPlay();
     unsubButterflyPause();
+    unsubRequestTick();
+    unsubSetDirection();
+    unsubSchedPause();
+    unsubSchedResume();
+    unsubSchedReset();
+    unsubPrefetchBatch();
+    unsubSetRunning();
+    unsubOverrideState();
   };
 }
 

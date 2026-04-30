@@ -33,6 +33,15 @@ export type CommandPayload =
   | { type: "lab:forceData"; data: Float64Array; extrema?: import("@/shared/types").ForceExtrema }
   | { type: "simulation:reset" }
   | { type: "simulation:runningChanged"; isRunning: boolean }
+  | { type: "simulation:setRunning"; isRunning: boolean }
+  | { type: "simulation:overrideState"; state: import("@/shared/types").StateVector }
+  | { type: "scheduler:requestTick"; delta: number }
+  | { type: "scheduler:setDirection"; direction: 1 | -1 }
+  | { type: "scheduler:pause" }
+  | { type: "scheduler:resume" }
+  | { type: "scheduler:reset"; initialConditions: import("@/shared/types").InitialConditions }
+  | { type: "scheduler:prefetchBatch" }
+  | { type: "scheduler:prefetchReady" }
   | { type: "butterfly:frame"; side: "A" | "B"; state: import("@/shared/types").StateVector; energy: { kinetic: number; potential: number; total: number }; derived: { x1: number; y1: number; x2: number; y2: number }; simTime: number }
   | { type: "butterfly:workerReady"; side: "A" | "B"; ready: boolean }
   | { type: "butterfly:error"; side: "A" | "B"; simTime: number }

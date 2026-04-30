@@ -268,6 +268,26 @@ export class SimulationScheduler {
     return this.consumeOneFrame();
   }
 
+  private tickAcc = 0;
+  private readonly TICK_DT = 1 / 60;
+  private readonly MAX_TICKS_PER_FRAME = 3;
+
+  /** 由渲染层调用，传入 delta time，内部做累积并消费多帧 */
+  tickDelta(delta: number): number {
+    if (!this.running) return 0;
+    this.tickAcc += delta;
+    let consumed = 0;
+    while (this.tickAcc >= this.TICK_DT && consumed < this.MAX_TICKS_PER_FRAME) {
+      if (this.consumeOneFrame()) {
+        this.tickAcc -= this.TICK_DT;
+        consumed++;
+      } else {
+        break;
+      }
+    }
+    return consumed;
+  }
+
   get isRunning(): boolean {
     return this.running;
   }

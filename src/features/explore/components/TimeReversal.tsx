@@ -1,8 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useSimulationStore, useSimulationHistory, getSimulationHistory, ball2Position, pauseHistoryRecording, resumeHistoryRecording } from "@/features/simulation";
-import { getScheduler } from "@/features/simulation/worker/scheduler";
 import { useExploreStore } from "../store";
+import { commandBus } from "@/stores/commandBus";
 import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
 import { notify } from "@/features/system/error-handling/notify";
 import { Dialog } from "@/shared/components/ui/dialog";
@@ -323,26 +323,24 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       setActive(false);
       isReversingRef.current = false;
       const firstState = fwdArray[0]!;
-      getScheduler().reset({
+      commandBus.emit({ type: "scheduler:reset", initialConditions: {
         theta1: firstState.theta1,
         theta1Dot: firstState.omega1,
         theta2: firstState.theta2,
         theta2Dot: firstState.omega2,
-      });
-      getScheduler().resume();
+      }});
+      commandBus.emit({ type: "scheduler:resume" });
       return;
     }
 
     const sv = fwdArray[fwdArray.length - 1 - idx]!;
     // 临时覆盖显示状态，驱动 Scene3D 更新
-    useSimulationStore.setState({
-      state: {
-        theta1: sv.theta1,
-        omega1: sv.omega1,
-        theta2: sv.theta2,
-        omega2: sv.omega2,
-      },
-    });
+    commandBus.emit({ type: "simulation:overrideState", state: {
+      theta1: sv.theta1,
+      omega1: sv.omega1,
+      theta2: sv.theta2,
+      omega2: sv.omega2,
+    }});
 
     const reversalTime = idx / REVERSAL_FPS;
     useExploreStore.getState().appendDriftSample({
@@ -365,7 +363,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   // ── 开始反演 ──
   const startReversal = useCallback(() => {
     const store = useSimulationStore.getState();
-    const scheduler = getScheduler();
     const fwdArray = history.toArray();
 
     if (fwdArray.length < MIN_HISTORY_FRAMES) return;
@@ -400,23 +397,27 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     if (mode === "exact") {
       setPhase("reversing");
       exactFrameIdxRef.current = 0;
-      scheduler.pause();
+      commandBus.emit({ type: "scheduler:pause" });
       exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
     } else {
       // 数值反演：暂停 → 弹窗 → prefetchBatch 获取反向数据 → 就绪后确认
       awaitingConfirmRef.current = true;
       setPhase("awaitingConfirm");
       pauseHistoryRecording();
-      scheduler.pause();
-      scheduler.setDirection(-1);
+      commandBus.emit({ type: "scheduler:pause" });
+      commandBus.emit({ type: "scheduler:setDirection", direction: -1 });
       setDialogPhase("loading");
       setConfirmOpen(true);
       // 通过 prefetchBatch 获取反向数据，不恢复仿真
-      scheduler.prefetchBatch(() => {
+      commandBus.emit({ type: "scheduler:prefetchBatch" });
+      void commandBus.once("scheduler:prefetchReady", () => {
         if (!awaitingConfirmRef.current) return;
         awaitingConfirmRef.current = false;
         setDialogPhase("ready");
       });
+      // 如果取消反演，此 once 订阅会在组件卸载或取消时自动释放
+      // 这里不需要显式保存 unsub，因为 once 触发后自动取消，
+      // 且组件卸载时 commandBus 的 handler 会被 GC（无强引用）
     }
   }, [mode, history, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
 
@@ -426,13 +427,13 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     setConfirmOpen(false);
     setPhase("reversing");
     // 直接恢复 scheduler，反演正式开始
-    getScheduler().resume();
+    commandBus.emit({ type: "scheduler:resume" });
   }, [setPhase]);
 
   const handleCancelReversal = useCallback(() => {
     setConfirmOpen(false);
-    getScheduler().setDirection(1);
-    getScheduler().resume();
+    commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
+    commandBus.emit({ type: "scheduler:resume" });
     resumeHistoryRecording();
     setPhase("idle");
     setActive(false);
@@ -443,30 +444,29 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
   // ── 停止反演（反演自然结束或用户手动停止）──
   const stopReversal = useCallback(() => {
-    const scheduler = getScheduler();
     isReversingRef.current = false;
 
     if (mode === "exact") {
       cancelAnimationFrame(exactRafRef.current);
       const start = reversalStartRef.current;
       if (start) {
-        scheduler.reset({
+        commandBus.emit({ type: "scheduler:reset", initialConditions: {
           theta1: start.theta1,
           theta1Dot: start.omega1,
           theta2: start.theta2,
           theta2Dot: start.omega2,
-        });
+        }});
       }
-      scheduler.setDirection(1);
-      scheduler.resume();
+      commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
+      commandBus.emit({ type: "scheduler:resume" });
       startTrajectoryFadeOut();
       setPhase("completed");
       setActive(false);
     } else {
       // 数值反演：停止仿真 + 恢复正向方向 + 弹窗（轨迹保持，由用户选择淡化或清除）
       resumeHistoryRecording();
-      scheduler.setDirection(1);
-      useSimulationStore.setState({ isRunning: false });
+      commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
+      commandBus.emit({ type: "simulation:setRunning", isRunning: false });
       setPhase("completed");
       setActive(false);
       setCompletedOpen(true);
@@ -479,14 +479,13 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     setCompletedOpen(false);
     const start = reversalStartRef.current;
     if (start) {
-      const sched = getScheduler();
-      sched.setDirection(1);
-      sched.reset({
+      commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
+      commandBus.emit({ type: "scheduler:reset", initialConditions: {
         theta1: start.theta1,
         theta1Dot: start.omega1,
         theta2: start.theta2,
         theta2Dot: start.omega2,
-      });
+      }});
       // 反演轨迹快速淡化消失
       startTrajectoryFadeOut();
     }
@@ -567,7 +566,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       prevResetTriggerRef.current = resetTrigger;
       // 仿真已重置，关闭反演
       if (isReversingRef.current && mode === "numerical") {
-        getScheduler().setDirection(1);
+        commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
       }
       isReversingRef.current = false;
       cancelAnimationFrame(exactRafRef.current);
@@ -581,7 +580,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     return () => {
       cancelAnimationFrame(exactRafRef.current);
       if (isReversingRef.current && mode === "numerical") {
-        getScheduler().setDirection(1);
+        commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
       }
       isReversingRef.current = false;
       clearTrajectoryData();

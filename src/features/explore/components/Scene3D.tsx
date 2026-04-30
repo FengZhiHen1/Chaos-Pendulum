@@ -4,6 +4,7 @@ import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
 import { useSimulationStore, getScheduler } from "@/features/simulation";
+import { commandBus } from "@/stores/commandBus";
 import { useExploreStore } from "@/features/explore";
 import { useTrailBuffer } from "../hooks/useTrailBuffer";
 import { useSceneController } from "../hooks/useSceneController";
@@ -426,29 +427,16 @@ function SceneContent({
     }
   }, [params, sphereSegments, cylinderSegments]);
 
+  const isRunning = useSimulationStore((s) => s.isRunning);
+
   // ── 每帧更新 ──
   useFrame((_, delta) => {
     if (!isMountedRef.current) return;
 
     // 外部驱动 scheduler 消费帧（仅普通模式，与渲染严格同步）
-    if (!butterflySide) {
-      const scheduler = getScheduler();
-      if (scheduler.isRunning) {
-        simTimeAccRef.current += delta;
-        const dt = 1 / 60;
-        const maxFrames = 3;
-        let consumed = 0;
-        while (simTimeAccRef.current >= dt && consumed < maxFrames) {
-          const didConsume = scheduler.tick();
-          if (didConsume) {
-            simTimeAccRef.current -= dt;
-            consumed++;
-          } else {
-            // 缓冲区为空且等待批次中，保留累加器等待下一帧
-            break;
-          }
-        }
-      }
+    if (!butterflySide && isRunning) {
+      simTimeAccRef.current += delta;
+      commandBus.emit({ type: "scheduler:requestTick", delta });
     }
 
     // 蝴蝶效应模式：从 ButterflySimStore 读取
