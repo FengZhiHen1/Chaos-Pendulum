@@ -39,7 +39,7 @@ export type CommandPayload =
   | { type: "scheduler:setDirection"; direction: 1 | -1 }
   | { type: "scheduler:pause" }
   | { type: "scheduler:resume" }
-  | { type: "scheduler:reset"; initialConditions: import("@/shared/types").InitialConditions }
+  | { type: "scheduler:reset"; initialConditions: import("@/shared/types").InitialConditions; simTime?: number }
   | { type: "scheduler:prefetchBatch" }
   | { type: "scheduler:prefetchReady" }
   | { type: "butterfly:frame"; side: "A" | "B"; state: import("@/shared/types").StateVector; energy: { kinetic: number; potential: number; total: number }; derived: { x1: number; y1: number; x2: number; y2: number }; simTime: number }

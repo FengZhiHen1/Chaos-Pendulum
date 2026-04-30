@@ -95,6 +95,7 @@ function resetWorkerState(
   ic: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number },
   params: PendulumParams,
   method: IntegratorMethod,
+  simTime = 0,
 ): void {
   ctx.state = new Float64Array([ic.theta1, ic.theta1Dot, ic.theta2, ic.theta2Dot]);
   ctx.state[0] = normalizeAngle(ctx.state[0]!);
@@ -102,7 +103,7 @@ function resetWorkerState(
   ctx.params = { ...params };
   ctx.method = method;
   ctx.direction = 1;
-  ctx.simTime = 0;
+  ctx.simTime = simTime;
   ctx.batchIndex = 0;
   ctx.computeForces = false;
   ctx.forceExtrema = null;
@@ -368,12 +369,12 @@ function handleConfig(cmd: { computeForces?: boolean }): void {
 
 // ─── 重置 ──────────────────────────────────────
 
-function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number } }): void {
+function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number }; simTime?: number }): void {
   if (!ctx.params) {
     postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
     return;
   }
-  resetWorkerState(cmd.initialConditions, ctx.params, ctx.method);
+  resetWorkerState(cmd.initialConditions, ctx.params, ctx.method, cmd.simTime);
   postResponse({ type: "ready" });
 }
 

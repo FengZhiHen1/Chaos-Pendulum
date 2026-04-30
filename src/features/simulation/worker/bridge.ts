@@ -158,7 +158,7 @@ function setupCommandBusHandlers(): () => void {
   });
 
   const unsubSchedReset = commandBus.on("scheduler:reset", (payload) => {
-    getScheduler().reset(payload.initialConditions);
+    getScheduler().reset(payload.initialConditions, payload.simTime);
   });
 
   const unsubPrefetchBatch = commandBus.on("scheduler:prefetchBatch", () => {

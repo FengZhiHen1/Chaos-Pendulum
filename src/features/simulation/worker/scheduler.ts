@@ -56,6 +56,8 @@ export class SimulationScheduler {
   private poincareCallbacks: Array<(pts: PoincarePoint[]) => void> = [];
   private externalTick = false;
   private prefetchCallback: (() => void) | null = null;
+  /** prefetchBatch 调用时若 pendingBatch 为 true，标记到达的旧批次应丢弃 */
+  private discardNextBatch = false;
 
   // 渲染插值用的前后帧快照（由 consumeOneFrame 维护）
   private prevSnapshot: InterpSnapshot | null = null;
@@ -236,8 +238,8 @@ export class SimulationScheduler {
     this.send({ type: "config", computeForces: active });
   }
 
-  /** 重置仿真 */
-  reset(initialConditions: InitialConditions): void {
+  /** 重置仿真。simTime 可选，用于将 Worker 内部时间同步到指定值（如时间反演需要从显示时间开始反向积分）。 */
+  reset(initialConditions: InitialConditions, simTime?: number): void {
     if (this.activeBuffer) {
       this.pool.release(this.activePoolIndex);
       this.activeBuffer = null;
@@ -258,7 +260,7 @@ export class SimulationScheduler {
     this.pendingBatch = false;
     this.prevSnapshot = null;
     this.currSnapshot = null;
-    this.send({ type: "reset", initialConditions });
+    this.send({ type: "reset", initialConditions, simTime });
   }
 
   /** 外部驱动：消费一帧数据（external tick 模式下由 useFrame 调用）。
@@ -292,10 +294,42 @@ export class SimulationScheduler {
     return this.running;
   }
 
-  /** 暂停态下预取一批数据（绕过 running 检查）。完成后回调 onDone。 */
+  /** 暂停态下预取一批数据（绕过 running 检查）。完成后回调 onDone。
+   * 清空所有未消费的旧批次缓冲区，确保反演开始时不会因
+   * 残余正向帧导致小球"闪现"。
+   * 若 Worker 中尚有正向批次正在计算，标记丢弃并在其到达后自动续发反向请求。 */
   prefetchBatch(onDone: () => void): void {
     if (!this.worker) { onDone(); return; }
+
+    // 丢弃 activeBuffer / nextBuffer 中未消费的正向帧
+    if (this.activeBuffer) {
+      this.pool.release(this.activePoolIndex, this.activeBuffer);
+      this.activeBuffer = null;
+      this.activePoolIndex = -1;
+    }
+    if (this.nextBuffer) {
+      this.pool.release(this.nextPoolIndex, this.nextBuffer);
+      this.nextBuffer = null;
+      this.nextPoolIndex = -1;
+    }
+    this.activeIndex = 0;
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
+
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+
     this.prefetchCallback = onDone;
+
+    if (this.pendingBatch) {
+      // 正向批次正在 Worker 中计算 —— 标记丢弃，待其到达后
+      // handleWorkerMessage 会自动续发一次反向请求，确保回调在反向数据就绪后触发
+      this.discardNextBatch = true;
+      return;
+    }
+
     this.requestNextBatch();
   }
 
@@ -373,6 +407,14 @@ export class SimulationScheduler {
         this.pendingBatch = false;
         const completedPoolIndex = this.pendingPoolIndex;
         this.pendingPoolIndex = -1;
+
+        // prefetchBatch 场景：丢弃旧的正向批次，续发反向请求
+        if (this.discardNextBatch) {
+          this.discardNextBatch = false;
+          this.pool.release(completedPoolIndex, resp.buffer);
+          this.requestNextBatch();
+          return;
+        }
 
         // 元数据可立即更新（不依赖双缓冲状态）
         if (resp.energyCorrection !== undefined) {

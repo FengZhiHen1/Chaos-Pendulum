@@ -142,6 +142,7 @@ export interface WorkerUpdateParamsCommand {
 export interface WorkerResetCommand {
   type: "reset";
   initialConditions: InitialConditions;
+  simTime?: number;
 }
 
 export interface WorkerSetDirectionCommand {

@@ -296,7 +296,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
   // ── 派生状态 ──
   const historyInsufficient = history.length < MIN_HISTORY_FRAMES;
-  const buttonDisabled = historyInsufficient || phase === "reversing" || phase === "awaitingConfirm";
+  const buttonDisabled = historyInsufficient || phase === "awaitingConfirm";
   const tooltipText = phase === "awaitingConfirm"
     ? "反向积分数据准备中…"
     : historyInsufficient
@@ -400,11 +400,23 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       commandBus.emit({ type: "scheduler:pause" });
       exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
     } else {
-      // 数值反演：暂停 → 弹窗 → prefetchBatch 获取反向数据 → 就绪后确认
+      // 数值反演：暂停 → 同步 Worker 状态到显示帧 → 反向 → prefetchBatch → 就绪后确认
       awaitingConfirmRef.current = true;
       setPhase("awaitingConfirm");
       pauseHistoryRecording();
       commandBus.emit({ type: "scheduler:pause" });
+      // 将 Worker 内部状态同步到屏幕当前显示的状态与时间，
+      // 避免 Worker 从超前的内部状态开始反向积分导致小球位置跳跃
+      commandBus.emit({
+        type: "scheduler:reset",
+        initialConditions: {
+          theta1: store.state.theta1,
+          theta1Dot: store.state.omega1,
+          theta2: store.state.theta2,
+          theta2Dot: store.state.omega2,
+        },
+        simTime: store.t,
+      });
       commandBus.emit({ type: "scheduler:setDirection", direction: -1 });
       setDialogPhase("loading");
       setConfirmOpen(true);
@@ -479,13 +491,21 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     setCompletedOpen(false);
     const start = reversalStartRef.current;
     if (start) {
-      commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
-      commandBus.emit({ type: "scheduler:reset", initialConditions: {
-        theta1: start.theta1,
-        theta1Dot: start.omega1,
-        theta2: start.theta2,
-        theta2Dot: start.omega2,
-      }});
+      // 将反演开始时的状态写入 store initialConditions，
+      // 再通过 applyCurrentSettings 触发 resetTrigger 递增，
+      // 让 bridge 走 isResetAction → s.start() 路径：
+      //   1. history:clear — 清空旧正向历史
+      //   2. Worker init — 从当前状态完整重新初始化
+      // 避免直接 emit scheduler:reset 造成的 store/worker 状态不一致。
+      useSimulationStore.setState({
+        initialConditions: {
+          theta1: start.theta1,
+          theta1Dot: start.omega1,
+          theta2: start.theta2,
+          theta2Dot: start.omega2,
+        },
+      });
+      useSimulationStore.getState().applyCurrentSettings();
       // 反演轨迹快速淡化消失
       startTrajectoryFadeOut();
     }
