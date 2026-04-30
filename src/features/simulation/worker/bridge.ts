@@ -21,6 +21,8 @@ const DEBOUNCE_MS = 16;
 
 let lastSyncedParams: PendulumParams = { ...useSimulationStore.getState().params };
 let lastRunning = false;
+/** 标记 scheduler 下次启动时是否需要发送 init（首次启动 / reset 后为 true） */
+let needsInit = true;
 let lastActiveView = useAnalyzeStore.getState().activeView;
 let lastPoincareCondition = useAnalyzeStore.getState().poincareSection.condition;
 let lastPoincareIsActive = useAnalyzeStore.getState().poincareSection.isActive;
@@ -29,11 +31,13 @@ let lastPoincareIsActive = useAnalyzeStore.getState().poincareSection.isActive;
 
 export function setWorkerReady(): void {
   workerReady = true;
+  useSimulationStore.setState({ isWorkerReady: true });
   flushPending();
 }
 
 export function setWorkerNotReady(): void {
   workerReady = false;
+  useSimulationStore.setState({ isWorkerReady: false });
 }
 
 function flushPending(): void {
@@ -157,9 +161,11 @@ export function setupSimulationBridge(): () => void {
       if (s.isRunning) s.pause();
       s.reset(state.initialConditions);
       useAnalyzeStore.getState().poincareSection.clearPoints();
+      needsInit = true;
       // 显式启动：pause() 已将 running 置 false，start() 的 if-guard 会通过
       if (state.isRunning) {
         s.start(state.params, state.initialConditions, state.method);
+        needsInit = false;
       }
     }
 
@@ -168,7 +174,12 @@ export function setupSimulationBridge(): () => void {
       lastRunning = state.isRunning;
       const s = getScheduler();
       if (state.isRunning && !s.isRunning) {
-        s.start(state.params, state.initialConditions, state.method);
+        if (needsInit) {
+          s.start(state.params, state.initialConditions, state.method);
+          needsInit = false;
+        } else {
+          s.resume();
+        }
       } else if (!state.isRunning && s.isRunning) {
         s.pause();
       }

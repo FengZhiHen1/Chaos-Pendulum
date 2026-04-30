@@ -126,6 +126,29 @@ export class SimulationScheduler {
     if (!this.worker) {
       this.createWorker();
     }
+
+    // 丢弃 reset 阶段预取的旧批次，避免与 init 后的新批次产生位置跳跃
+    if (this.activeBuffer) {
+      this.pool.release(this.activePoolIndex, this.activeBuffer);
+      this.activeBuffer = null;
+      this.activePoolIndex = -1;
+    }
+    if (this.nextBuffer) {
+      this.pool.release(this.nextPoolIndex, this.nextBuffer);
+      this.nextBuffer = null;
+      this.nextPoolIndex = -1;
+    }
+    this.activeIndex = 0;
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+    this.pendingBatch = false;
+    if (this.pendingPoolIndex >= 0) {
+      this.pool.release(this.pendingPoolIndex);
+      this.pendingPoolIndex = -1;
+    }
+
     clearSimulationHistory();
     this.prevSnapshot = null;
     this.currSnapshot = null;
@@ -293,11 +316,20 @@ export class SimulationScheduler {
           clearTimeout(this.timeoutId);
           this.timeoutId = null;
         }
-        this.requestNextBatch();
+        // 仅在仿真运行中才预取批次，避免暂停态产生无用批次
+        if (this.running) {
+          this.requestNextBatch();
+        }
         break;
       }
 
       case "batchReady": {
+        // 丢弃过期批次：reset() 清空了 pendingBatch 和 timeoutId，旧 Worker 计算中的批次
+        // 在 reset 之后到达时不应被激活，否则会导致场景闪现旧摆位
+        if (!this.pendingBatch && !this.timeoutId) {
+          return;
+        }
+
         if (this.timeoutId) {
           clearTimeout(this.timeoutId);
           this.timeoutId = null;
@@ -319,6 +351,9 @@ export class SimulationScheduler {
 
         if (resp.energyCorrection !== undefined) {
           useSimulationStore.setState({ energyCorrection: resp.energyCorrection });
+        }
+        if (resp.lyapunovExponent !== undefined) {
+          useSimulationStore.setState({ lyapunovExponent: resp.lyapunovExponent });
         }
 
         // 双缓冲：若 activeBuffer 仍在消费中，新批次暂存到 nextBuffer
