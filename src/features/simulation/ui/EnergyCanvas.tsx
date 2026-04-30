@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import * as d3Scale from "d3-scale";
 import { useSimulationStore } from "../store";
 
@@ -21,6 +21,8 @@ interface EnergyCanvasProps {
 // ─── 常量 ──────────────────────────────────────
 
 const MARGIN = { top: 20, right: 80, bottom: 30, left: 60 };
+const IDLE_FPS = 2;
+const IDLE_INTERVAL = 1000 / IDLE_FPS;
 const COLORS = {
   E: "#22c55e",
   K: "#3b82f6",
@@ -41,15 +43,20 @@ export function EnergyCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const bufferRef = useRef<EnergyDataPoint[]>([]);
-  const yRangeRef = useRef<[number, number]>([-1, 1]);
+  const yRangeRef = useRef<[number, number]>([Infinity, -Infinity]);
+  const lastXDomainRef = useRef<[number, number]>([0, timeWindow]);
   const rafRef = useRef(0);
+  const isVisibleRef = useRef(true);
+  const lastIdleDrawRef = useRef(0);
+  const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   // ── 离屏坐标轴渲染 ─────────────────────────
 
   const redrawOffscreen = useCallback(
-    (yMin: number, yMax: number) => {
+    (yMin: number, yMax: number, xMin?: number, xMax?: number) => {
       const offscreen = offscreenRef.current;
       if (!offscreen) return;
+      if (!isFinite(yMin) || !isFinite(yMax)) return;
 
       const dpr = window.devicePixelRatio || 1;
       offscreen.width = width * dpr;
@@ -64,9 +71,12 @@ export function EnergyCanvas({
       const plotW = width - MARGIN.left - MARGIN.right;
       const plotH = height - MARGIN.bottom - MARGIN.top;
 
+      const xDomainMin = xMin ?? 0;
+      const xDomainMax = xMax ?? timeWindow;
+
       const xScale = d3Scale
         .scaleLinear()
-        .domain([0, timeWindow])
+        .domain([xDomainMin, xDomainMax])
         .range([MARGIN.left, MARGIN.left + plotW]);
 
       const yScale = d3Scale
@@ -124,10 +134,11 @@ export function EnergyCanvas({
         );
       }
       // X 轴标签
+      octx.textBaseline = "bottom";
       octx.fillText(
         "时间 (s)",
         MARGIN.left + plotW / 2,
-        height - 4,
+        height - 2,
       );
 
       // Y 轴
@@ -194,22 +205,65 @@ export function EnergyCanvas({
   useEffect(() => {
     const offscreen = document.createElement("canvas");
     offscreenRef.current = offscreen;
-    redrawOffscreen(yRangeRef.current[0], yRangeRef.current[1]);
+    redrawOffscreen(-1, 1, 0, timeWindow);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── 可见性降频 ─────────────────────────────
+
   useEffect(() => {
-    redrawOffscreen(yRangeRef.current[0], yRangeRef.current[1]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry!.isIntersecting;
+      },
+      { threshold: 0 },
+    );
+
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    redrawOffscreen(
+      yRangeRef.current[0],
+      yRangeRef.current[1],
+      lastXDomainRef.current[0],
+      lastXDomainRef.current[1],
+    );
   }, [width, height, redrawOffscreen]);
+
+  // ── 重置时清空缓冲区（useLayoutEffect 确保在浏览器绘制前执行）──
+
+  useLayoutEffect(() => {
+    bufferRef.current.length = 0;
+    yRangeRef.current = [Infinity, -Infinity];
+    lastXDomainRef.current = [0, timeWindow];
+    const offscreen = offscreenRef.current;
+    if (offscreen) {
+      redrawOffscreen(-1, 1, 0, timeWindow);
+    }
+  }, [resetTrigger, timeWindow, redrawOffscreen]);
 
   // ── 每帧绘制 ───────────────────────────────
 
   useEffect(() => {
     let running = true;
 
-    function drawFrame() {
+    function drawFrame(timestamp: number) {
       if (!running) return;
+
+      if (!isVisibleRef.current) {
+        if (timestamp - lastIdleDrawRef.current < IDLE_INTERVAL) {
+          rafRef.current = requestAnimationFrame(drawFrame);
+          return;
+        }
+        lastIdleDrawRef.current = timestamp;
+      }
+
       const canvas = canvasRef.current;
       const offscreen = offscreenRef.current;
       if (!canvas || !offscreen) {
@@ -256,24 +310,6 @@ export function EnergyCanvas({
         }
       }
 
-      // 检测 reset
-      if (currentTime < 0.5 && buffer.length > 0 && buffer[buffer.length - 1]!.t > 1) {
-        buffer.length = 0;
-      }
-
-      // Y 轴范围自适应
-      const currentE = store.totalEnergy;
-      let [yMin, yMax] = yRangeRef.current;
-      if (
-        !isNaN(currentE) &&
-        (currentE < yMin || currentE > yMax)
-      ) {
-        yMin = Math.min(yMin, currentE);
-        yMax = Math.max(yMax, currentE);
-        yRangeRef.current = [yMin, yMax];
-        redrawOffscreen(yMin, yMax);
-      }
-
       // 清空主 Canvas
       ctx.clearRect(0, 0, width, height);
 
@@ -286,18 +322,91 @@ export function EnergyCanvas({
         return;
       }
 
-      // 滑动窗口过滤
-      const windowStart = currentTime - timeWindow;
+      // 滑动窗口：仿真初期固定从 0 开始，后期正常滑动
       const plotW = width - MARGIN.left - MARGIN.right;
       const plotH = height - MARGIN.bottom - MARGIN.top;
 
-      const windowedData = buffer.filter((d) => d.t >= windowStart);
+      let xDomainMin: number, xDomainMax: number;
+      if (currentTime < timeWindow) {
+        xDomainMin = 0;
+        xDomainMax = timeWindow;
+      } else {
+        xDomainMin = currentTime - timeWindow;
+        xDomainMax = currentTime;
+      }
 
+      // 检测 X 轴 domain 是否变化（按整数秒判断，减少离屏重绘频率）
+      const [lastXMin, lastXMax] = lastXDomainRef.current;
+      const xDomainChanged =
+        Math.floor(lastXMin) !== Math.floor(xDomainMin) ||
+        Math.floor(lastXMax) !== Math.floor(xDomainMax);
+      if (xDomainChanged) {
+        lastXDomainRef.current = [xDomainMin, xDomainMax];
+      }
+
+      const windowedData = buffer.filter((d) => d.t >= xDomainMin);
+
+      if (windowedData.length < 2) {
+        rafRef.current = requestAnimationFrame(drawFrame);
+        return;
+      }
+
+      // X 轴比例尺（与离屏坐标轴 domain 保持一致）
       const xScale = d3Scale
         .scaleLinear()
-        .domain([windowStart, currentTime])
+        .domain([xDomainMin, xDomainMax])
         .range([MARGIN.left, MARGIN.left + plotW]);
 
+      // Y 轴范围自适应（基于可见窗口数据的 E/K/V）
+      let [yMin, yMax] = yRangeRef.current;
+      let yChanged = false;
+      {
+        let dataMin = Infinity;
+        let dataMax = -Infinity;
+        for (const d of windowedData) {
+          if (!isNaN(d.E)) {
+            dataMin = Math.min(dataMin, d.E);
+            dataMax = Math.max(dataMax, d.E);
+          }
+          if (showComponents) {
+            if (!isNaN(d.K)) {
+              dataMin = Math.min(dataMin, d.K);
+              dataMax = Math.max(dataMax, d.K);
+            }
+            if (!isNaN(d.V)) {
+              dataMin = Math.min(dataMin, d.V);
+              dataMax = Math.max(dataMax, d.V);
+            }
+          }
+        }
+
+        const range = dataMax - dataMin;
+        const padding = range > 0 ? range * 0.12 : 1.0;
+        const newYMin = dataMin - padding;
+        const newYMax = dataMax + padding;
+
+        const isUninit = !isFinite(yMin) || !isFinite(yMax);
+        const needsExpand = newYMin < yMin || newYMax > yMax;
+        const prevRange = yMax - yMin;
+        const newRange = newYMax - newYMin;
+        // 当范围显著收缩时（>15%）也更新，避免残留大量空白
+        const significantShrink =
+          !isUninit && prevRange > 0 && (prevRange - newRange) / prevRange > 0.15;
+
+        if (isUninit || needsExpand || significantShrink) {
+          yMin = newYMin;
+          yMax = newYMax;
+          yRangeRef.current = [yMin, yMax];
+          yChanged = true;
+        }
+      }
+
+      // 离屏坐标轴重绘（X 或 Y 变化时）
+      if (yChanged || xDomainChanged) {
+        redrawOffscreen(yMin, yMax, xDomainMin, xDomainMax);
+      }
+
+      // Y 轴比例尺
       const yScale = d3Scale
         .scaleLinear()
         .domain(yRangeRef.current)
@@ -308,11 +417,6 @@ export function EnergyCanvas({
         windowedData.length > 600
           ? windowedData.filter((_, i) => i % 2 === 0)
           : windowedData;
-
-      if (renderData.length < 2) {
-        rafRef.current = requestAnimationFrame(drawFrame);
-        return;
-      }
 
       // 绘制曲线
       ctx.save();

@@ -3,6 +3,7 @@ import { useSimulationStore } from "../store";
 
 export interface UseSimulationControlsAPI {
   isRunning: boolean;
+  isWorkerReady: boolean;
   engineError: string | null;
   isSceneFrozen: boolean;
   disabled: boolean;
@@ -12,6 +13,7 @@ export interface UseSimulationControlsAPI {
 
 export function useSimulationControls(): UseSimulationControlsAPI {
   const isRunning = useSimulationStore((s) => s.isRunning);
+  const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
   const engineError = useSimulationStore((s) => s.engineError);
   const isSceneFrozen = useSimulationStore((s) => s.isSceneFrozen);
   const setRunning = useSimulationStore((s) => s.setRunning);
@@ -29,6 +31,7 @@ export function useSimulationControls(): UseSimulationControlsAPI {
 
   return {
     isRunning,
+    isWorkerReady,
     engineError,
     isSceneFrozen,
     disabled,

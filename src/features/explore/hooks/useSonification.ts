@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "../store";
 import { useAppStore } from "@/stores/useAppStore";
-import { useChaosIndicator } from "./useChaosIndicator";
 import { notify } from "@/features/system/error-handling/notify";
 import {
   getAudioContext,
@@ -42,7 +41,6 @@ export function useSonification(): UseSonificationAPI {
   const engineRef = useRef<SonificationEngine | null>(null);
   const maxObservedEnergyRef = useRef(MAX_ENERGY_MIN);
   const initializedRef = useRef(false);
-  const chaosIndicator = useChaosIndicator();
   const rebuildCountRef = useRef(0);
 
   // ── 惰性初始化引擎 ──
@@ -127,8 +125,8 @@ export function useSonification(): UseSonificationAPI {
       MAX_ENERGY_MIN,
     );
 
-    // 混沌检测
-    const { variance } = chaosIndicator.pushAndGet(state.omega2);
+    // 混沌检测：从 store 读取（由 useChaosUpdater 统一计算）
+    const variance = useExploreStore.getState().chaosVariance;
 
     // 更新引擎（带 InvalidStateError 捕获与自动重建）
     try {
@@ -172,7 +170,7 @@ export function useSonification(): UseSonificationAPI {
         throw err;
       }
     }
-  }, [simTime, sonificationEnabled, deviceType, chaosIndicator, initEngine, setSonificationEnabled]);
+  }, [simTime, sonificationEnabled, deviceType, initEngine, setSonificationEnabled]);
 
   // ── 卸载清理 ──
   useEffect(() => {

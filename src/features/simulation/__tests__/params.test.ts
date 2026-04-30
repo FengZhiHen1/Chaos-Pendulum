@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSimulationStore } from "../store";
-import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS } from "@/shared/types";
+import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, DEFAULT_METHOD } from "@/shared/types";
 
 // 重置 store 的辅助函数
 function resetStore(): void {
@@ -155,7 +155,7 @@ describe("injectParams", () => {
 describe("resetToDefaults", () => {
   beforeEach(resetStore);
 
-  it("重置恢复默认值", () => {
+  it("重置恢复初始条件和积分方法为默认值，保留用户参数", () => {
     // 先制造一些脏数据
     const store = useSimulationStore.getState();
     store.setParam("m1", 5.0);
@@ -167,8 +167,10 @@ describe("resetToDefaults", () => {
 
     store.resetToDefaults();
     const s = useSimulationStore.getState();
-    expect(s.params.m1).toBe(DEFAULT_PARAMS.m1);
+    // params 保留用户设置，不覆盖
+    expect(s.params.m1).toBe(5.0);
     expect(s.initialConditions.theta1).toBe(DEFAULT_INITIAL_CONDITIONS.theta1);
+    expect(s.method).toBe(DEFAULT_METHOD);
     expect(s.fieldErrors).toEqual({});
     expect(s.isSceneFrozen).toBe(false);
   });

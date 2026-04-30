@@ -65,6 +65,18 @@ export function useTrailBuffer(): TrailBufferAPI {
   const trailLength = useExploreStore((s) => s.trailLength);
   const persistence: TrailPersistence = mapPersistence(trailLength);
 
+  // 渲染阶段同步清空：useEffect 在绘制后执行会导致闪现，此处必须在渲染阶段检测并清空
+  const resetTrigger = useSimulationStore((s) => s.resetTrigger);
+  const prevResetTriggerRef = useRef(resetTrigger);
+  if (prevResetTriggerRef.current !== resetTrigger) {
+    prevResetTriggerRef.current = resetTrigger;
+    ringBufferRef.current!.clear();
+    cycleStartStateRef.current = null;
+    cycleStartPointRef.current = null;
+    stepsSinceCycleStartRef.current = 0;
+    cycleDetectedOnceRef.current = false;
+  }
+
   // 版本号：每次 mutation 自增，触发 React 重渲染以更新 trailPoints
   const [version, setVersion] = useState(0);
 
@@ -222,7 +234,7 @@ export function useTrailBuffer(): TrailBufferAPI {
       return all;
     }
     return all.length > persistence ? all.slice(-persistence) : all;
-  }, [persistence, version]);
+  }, [persistence, version, resetTrigger]);
 
   return { trailPoints, appendPoint, clear, persistence };
 }

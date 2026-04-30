@@ -4,7 +4,7 @@ import { useSimulationStore } from "../store";
 
 export function PresetButtons() {
   const applyPreset = useSimulationStore((s) => s.applyPreset);
-  const engineError = useSimulationStore((s) => s.engineError);
+  const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -13,7 +13,7 @@ export function PresetButtons() {
           key={preset.id}
           variant="secondary"
           size="sm"
-          disabled={engineError !== null}
+          disabled={!isWorkerReady}
           onClick={() => {
             const err = applyPreset(preset);
             if (err) {

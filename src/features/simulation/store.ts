@@ -71,6 +71,8 @@ interface SimulationState extends SimulationFrame {
 
   // 仿真运行
   isRunning: boolean;
+  /** Worker 是否已就绪（ready 消息已到达）。false 时参数面板应显示加载态。 */
+  isWorkerReady: boolean;
   engineError: string | null;
   /** 引擎事件通知（供 toast UI 消费）。消费后应设为 null。 */
   engineEvent: { type: "recovered"; message: string } | null;
@@ -111,6 +113,8 @@ interface SimulationState extends SimulationFrame {
   consumedFrameIndex: number;
   /** 最近批次能量投影累积校正量 (J)，仅 damping=0 时有意义 */
   energyCorrection: number;
+  /** 实时 Lyapunov 指数（由 Worker 影子轨迹法计算） */
+  lyapunovExponent: number;
 
   // ── 内部状态（从模块级变量迁移至 store，避免测试污染）──
   _nanSkipCount: number;
@@ -190,6 +194,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   paramMeta: PARAM_META,
 
   isRunning: false,
+  isWorkerReady: false,
   engineError: null,
   engineEvent: null,
   resetTrigger: 0,
@@ -207,6 +212,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   isSimulationActive: false,
   consumedFrameIndex: 0,
   energyCorrection: 0,
+  lyapunovExponent: 0,
   _nanSkipCount: 0,
   _lastDamping: NaN,
   _energyResetGeneration: 0,
@@ -501,6 +507,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       isSimulationActive: false,
       consumedFrameIndex: 0,
       energyCorrection: 0,
+      lyapunovExponent: 0,
       _nanSkipCount: 0,
       _lastDamping: NaN,
       _energyResetGeneration: s.resetTrigger + 1,

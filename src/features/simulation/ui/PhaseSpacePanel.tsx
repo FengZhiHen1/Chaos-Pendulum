@@ -1,4 +1,5 @@
 import { usePhaseSpace } from "../hooks/usePhaseSpace";
+import { useAppStore } from "@/stores/useAppStore";
 import { PhaseSpaceCanvas } from "./PhaseSpaceCanvas";
 import type { PhaseVariable } from "./PhaseSpaceCanvas";
 
@@ -27,6 +28,11 @@ export function PhaseSpacePanel({
     setActiveVariable,
     isRunning,
   } = usePhaseSpace();
+
+  const deviceType = useAppStore((s) => s.deviceType);
+  const effectiveMaxTrailPoints = deviceType === "mobile"
+    ? Math.min(maxTrailPoints, 1000)
+    : maxTrailPoints;
 
   const show = size >= 100;
 
@@ -60,7 +66,7 @@ export function PhaseSpacePanel({
           <PhaseSpaceCanvas
             width={size}
             height={size}
-            maxTrailPoints={maxTrailPoints}
+            maxTrailPoints={effectiveMaxTrailPoints}
             cursorRadius={cursorRadius}
             trailWidth={trailWidth}
             activeVariable={activeVariable}

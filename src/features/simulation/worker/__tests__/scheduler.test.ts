@@ -658,7 +658,7 @@ describe("SimulationScheduler 庞加莱截面转发", () => {
 
 describe("SimulationScheduler pause / resume / destroy / reset", () => {
   it("pause() 暂停消费循环", () => {
-    const { scheduler, worker } = initScheduler();
+    const { scheduler } = initScheduler();
     scheduler.start(
       { m1: 1, m2: 1, L1: 1, L2: 1, g: 9.81, damping: 0 },
       { theta1: 1, theta1Dot: 0, theta2: 0.5, theta2Dot: 0 },

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useLayoutEffect } from "react";
 import * as d3Scale from "d3-scale";
 import { useSimulationStore } from "../store";
 
@@ -36,6 +36,8 @@ const X_TICK_VALUES = [-Math.PI, -Math.PI / 2, 0, Math.PI / 2, Math.PI];
 const X_TICK_LABELS = ["-π", "-π/2", "0", "π/2", "π"];
 const Y_AUTO_INTERVAL = 60; // 每 60 帧检查一次 Y 轴
 const EMA_SMOOTH = 0.2;
+const MIN_Y_RANGE = 2.0; // Y 轴最小范围（rad/s）
+const SHRINK_THRESHOLD = 0.7; // 收缩超过 30% 时直接跳变
 
 // ─── 角度归一化 ────────────────────────────────
 
@@ -76,12 +78,17 @@ function drawXAxis(
     ctx.moveTo(x, plotY);
     ctx.lineTo(x, plotY + 5);
     ctx.stroke();
-    // 标签
+    // 标签（边界保护：首尾两端分别左/右对齐）
+    if (i === 0) ctx.textAlign = "left";
+    else if (i === X_TICK_VALUES.length - 1) ctx.textAlign = "right";
+    else ctx.textAlign = "center";
     ctx.fillText(label, x, plotY + 7);
   }
 
   // 轴标题
-  ctx.fillText("θ (rad)", (xMin + xMax) / 2, plotY + 22);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("θ (rad)", (xMin + xMax) / 2, plotY + 28);
   ctx.restore();
 }
 
@@ -129,6 +136,37 @@ function drawYAxis(
   ctx.restore();
 
   ctx.restore();
+}
+
+// ─── 分段绘制轨迹段 ────────────────────────────
+
+function drawSegment(
+  ctx: CanvasRenderingContext2D,
+  points: TrailPoint[],
+  startIdx: number,
+  endIdx: number,
+  xScale: d3Scale.ScaleLinear<number, number>,
+  yScale: d3Scale.ScaleLinear<number, number>,
+  trailWidth: number,
+  totalLen: number,
+) {
+  const segmentLen = endIdx - startIdx;
+  if (segmentLen < 1) return;
+
+  for (let i = startIdx; i < endIdx; i++) {
+    const { theta, thetaDot } = points[i]!;
+    const alpha = 0.05 + (i / totalLen) * 0.75;
+    const x = xScale(theta);
+    const y = yScale(thetaDot);
+
+    const r = 30 + (i / totalLen) * 25;
+    const g = 80 + (i / totalLen) * 175;
+    const b = 150 + (i / totalLen) * 105;
+
+    ctx.fillStyle = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${alpha})`;
+    const halfW = trailWidth / 2;
+    ctx.fillRect(x - halfW, y - halfW, trailWidth, trailWidth);
+  }
 }
 
 // ─── 离线坐标轴渲染 ────────────────────────────
@@ -228,11 +266,25 @@ export function PhaseSpaceCanvas({
 }: PhaseSpaceCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
-  const trailRef = useRef<TrailPoint[]>([]);
-  const yDomainRef = useRef<[number, number]>([-5, 5]);
-  const frameCountRef = useRef(0);
+  const trailCacheRef = useRef<Record<PhaseVariable, TrailPoint[]>>({
+    theta1: [],
+    theta2: [],
+  });
+  const yDomainCacheRef = useRef<Record<PhaseVariable, [number, number]>>({
+    theta1: [-5, 5],
+    theta2: [-5, 5],
+  });
+  const yCheckFrameCacheRef = useRef<Record<PhaseVariable, number>>({
+    theta1: 0,
+    theta2: 0,
+  });
+  const decimateFrameCacheRef = useRef<Record<PhaseVariable, number>>({
+    theta1: 0,
+    theta2: 0,
+  });
   const rafRef = useRef(0);
   const activeVarRef = useRef<PhaseVariable>(activeVariable);
+  const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   // 暴露 export 函数到 canvas 元素
   useEffect(() => {
@@ -256,7 +308,7 @@ export function PhaseSpaceCanvas({
   useEffect(() => {
     const offscreen = document.createElement("canvas");
     offscreenRef.current = offscreen;
-    renderOffscreen(offscreen, width, height, yDomainRef.current);
+    renderOffscreen(offscreen, width, height, yDomainCacheRef.current[activeVariable]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -265,21 +317,33 @@ export function PhaseSpaceCanvas({
   useEffect(() => {
     const offscreen = offscreenRef.current;
     if (offscreen) {
-      renderOffscreen(offscreen, width, height, yDomainRef.current);
+      renderOffscreen(offscreen, width, height, yDomainCacheRef.current[activeVariable]);
     }
   }, [width, height]);
 
-  // ── 变量切换 → 清空轨迹 ──────────────────
+  // ── 变量切换 → 切换活跃缓存，保留轨迹 ──
 
   useEffect(() => {
     activeVarRef.current = activeVariable;
-    trailRef.current.length = 0;
-    yDomainRef.current = [-5, 5];
+    const yDom = yDomainCacheRef.current[activeVariable];
+    const offscreen = offscreenRef.current;
+    if (offscreen) {
+      renderOffscreen(offscreen, width, height, yDom);
+    }
+  }, [activeVariable, width, height]);
+
+  // ── 仿真 reset → 清空全部缓存（useLayoutEffect 确保绘制前执行）──
+
+  useLayoutEffect(() => {
+    trailCacheRef.current = { theta1: [], theta2: [] };
+    yDomainCacheRef.current = { theta1: [-5, 5], theta2: [-5, 5] };
+    yCheckFrameCacheRef.current = { theta1: 0, theta2: 0 };
+    decimateFrameCacheRef.current = { theta1: 0, theta2: 0 };
     const offscreen = offscreenRef.current;
     if (offscreen) {
       renderOffscreen(offscreen, width, height, [-5, 5]);
     }
-  }, [activeVariable, width, height]);
+  }, [resetTrigger, width, height]);
 
   // ── rAF 渲染循环 (30fps) ──────────────────
 
@@ -320,42 +384,63 @@ export function PhaseSpaceCanvas({
       // ── 数据采集 ──
       const store = useSimulationStore.getState();
       const isRunning = store.isRunning;
+      const av = activeVarRef.current;
+      const trail = trailCacheRef.current[av];
+      const yDomain = yDomainCacheRef.current[av];
 
       if (isRunning) {
         const thetaRaw =
-          activeVarRef.current === "theta1" ? store.theta1 : store.theta2;
+          av === "theta1" ? store.theta1 : store.theta2;
         const thetaDot =
-          activeVarRef.current === "theta1" ? store.theta1Dot : store.theta2Dot;
+          av === "theta1" ? store.theta1Dot : store.theta2Dot;
 
         if (!isNaN(thetaRaw) && !isNaN(thetaDot)) {
           const theta = normalizeAngle(thetaRaw);
 
           // 追加轨迹点
-          trailRef.current.push({ theta, thetaDot });
-          while (trailRef.current.length > maxTrailPoints) {
-            trailRef.current.shift();
+          trail.push({ theta, thetaDot });
+          while (trail.length > maxTrailPoints) {
+            trail.shift();
           }
 
           // Y 轴自适应
-          frameCountRef.current++;
-          if (frameCountRef.current >= Y_AUTO_INTERVAL) {
-            frameCountRef.current = 0;
-            const buffer = trailRef.current;
-            if (buffer.length > 0) {
+          yCheckFrameCacheRef.current[av]++;
+          if (yCheckFrameCacheRef.current[av] >= Y_AUTO_INTERVAL) {
+            yCheckFrameCacheRef.current[av] = 0;
+            if (trail.length > 0) {
               let absMax = 0;
-              for (const p of buffer) {
-                const av = Math.abs(p.thetaDot);
-                if (av > absMax) absMax = av;
+              for (const p of trail) {
+                const aval = Math.abs(p.thetaDot);
+                if (aval > absMax) absMax = aval;
               }
               absMax = Math.max(absMax * 1.1, 1.0); // 10% 余量，最少 ±1
-              const [oldLo, oldHi] = yDomainRef.current;
+
+              const [oldLo, oldHi] = yDomain;
+              const currentAbsMax = Math.max(Math.abs(oldLo), Math.abs(oldHi));
               const newLo = -absMax;
               const newHi = absMax;
-              // EMA 平滑
-              const smLo = oldLo * (1 - EMA_SMOOTH) + newLo * EMA_SMOOTH;
-              const smHi = oldHi * (1 - EMA_SMOOTH) + newHi * EMA_SMOOTH;
-              yDomainRef.current = [smLo, smHi];
-              renderOffscreen(offscreen, width, height, [smLo, smHi]);
+
+              let nextLo: number, nextHi: number;
+              if (absMax < currentAbsMax * SHRINK_THRESHOLD) {
+                // 显著收缩（>30%）：直接跳变
+                nextLo = newLo;
+                nextHi = newHi;
+              } else {
+                // 小幅变化：EMA 平滑
+                nextLo = oldLo * (1 - EMA_SMOOTH) + newLo * EMA_SMOOTH;
+                nextHi = oldHi * (1 - EMA_SMOOTH) + newHi * EMA_SMOOTH;
+              }
+
+              // 保底范围
+              if (nextHi - nextLo < MIN_Y_RANGE) {
+                const center = (nextLo + nextHi) / 2;
+                nextLo = center - MIN_Y_RANGE / 2;
+                nextHi = center + MIN_Y_RANGE / 2;
+              }
+
+              yDomain[0] = nextLo;
+              yDomain[1] = nextHi;
+              renderOffscreen(offscreen, width, height, [nextLo, nextHi]);
             }
           }
         }
@@ -372,40 +457,39 @@ export function PhaseSpaceCanvas({
 
       const yScale = d3Scale
         .scaleLinear()
-        .domain(yDomainRef.current)
+        .domain(yDomain)
         .range([MARGIN.top + plotH, MARGIN.top]);
 
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(offscreen, 0, 0);
 
-      const trail = trailRef.current;
       const len = trail.length;
 
       if (len > 0) {
-        // 每 10 帧稀疏化：保留奇数索引点
+        // 稀疏化：当轨迹过长时，每 10 帧执行一次降采样
         let renderTrail = trail;
-        if (len > maxTrailPoints * 0.9 && frameCountRef.current % 10 === 0) {
-          trailRef.current = trail.filter((_, i) => i % 2 === 0);
-          renderTrail = trailRef.current;
+        if (len > maxTrailPoints * 0.9) {
+          decimateFrameCacheRef.current[av]++;
+          if (decimateFrameCacheRef.current[av] >= 10) {
+            decimateFrameCacheRef.current[av] = 0;
+            trailCacheRef.current[av] = trail.filter((_, i) => i % 2 === 0);
+            renderTrail = trailCacheRef.current[av];
+          }
         }
 
         const rLen = renderTrail.length;
 
-        // 绘制轨迹点（旧→新）
-        for (let i = 0; i < rLen; i++) {
-          const { theta, thetaDot } = renderTrail[i]!;
-          const alpha = 0.05 + (i / rLen) * 0.75; // 旧点 5%，新点 80%
-          const x = xScale(theta);
-          const y = yScale(thetaDot);
-
-          const r = 30 + (i / rLen) * 25;
-          const g = 80 + (i / rLen) * 175;
-          const b = 150 + (i / rLen) * 105;
-
-          ctx.fillStyle = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${alpha})`;
-          const halfW = trailWidth / 2;
-          ctx.fillRect(x - halfW, y - halfW, trailWidth, trailWidth);
+        // 按段绘制轨迹（处理角度 ±π 边界跨越）
+        let segmentStart = 0;
+        for (let i = 1; i < rLen; i++) {
+          const prevTheta = renderTrail[i - 1]!.theta;
+          const currTheta = renderTrail[i]!.theta;
+          if (Math.abs(currTheta - prevTheta) > Math.PI) {
+            drawSegment(ctx, renderTrail, segmentStart, i, xScale, yScale, trailWidth, rLen);
+            segmentStart = i;
+          }
         }
+        drawSegment(ctx, renderTrail, segmentStart, rLen, xScale, yScale, trailWidth, rLen);
 
         // 当前位置高亮（最上层）
         const last = renderTrail[rLen - 1]!;

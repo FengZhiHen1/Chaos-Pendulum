@@ -14,6 +14,8 @@ export { useSonification } from "./hooks/useSonification";
 export type { UseSonificationAPI } from "./hooks/useSonification";
 export { useChaosIndicator } from "./hooks/useChaosIndicator";
 export type { ChaosIndicatorAPI } from "./hooks/useChaosIndicator";
+export { useChaosUpdater } from "./hooks/useChaosUpdater";
+export { ChaosIndicator } from "./components/ChaosIndicator";
 export { useTrailBuffer } from "./hooks/useTrailBuffer";
 export type { TrailPoint, TrailBufferAPI } from "./hooks/useTrailBuffer";
 export { ExplorePage } from "./ExplorePage";

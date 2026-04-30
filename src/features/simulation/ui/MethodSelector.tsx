@@ -21,9 +21,14 @@ const METHOD_OPTIONS: {
 export function MethodSelector() {
   const method = useSimulationStore((s) => s.method);
   const setMethod = useSimulationStore((s) => s.setMethod);
+  const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
 
   return (
-    <Select value={method} onValueChange={(v) => setMethod(v as IntegratorMethod)}>
+    <Select
+      value={method}
+      onValueChange={(v) => setMethod(v as IntegratorMethod)}
+      disabled={!isWorkerReady}
+    >
       <SelectTrigger className="w-full">
         <SelectValue />
       </SelectTrigger>

@@ -187,6 +187,8 @@ export interface WorkerBatchReadyResponse {
   forceExtrema?: ForceExtrema;
   /** 本批次能量投影累积校正量 (J)，仅 damping=0 时非零 */
   energyCorrection?: number;
+  /** 实时 Lyapunov 指数估计（影子轨迹法），阻尼=0 时有效 */
+  lyapunovExponent?: number;
 }
 
 export type ErrorCode = "DIVERGED" | "TIMEOUT" | "INVALID_STATE";

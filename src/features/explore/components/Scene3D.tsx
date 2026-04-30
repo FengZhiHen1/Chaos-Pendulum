@@ -85,8 +85,8 @@ const MATERIAL_CONFIGS: Record<PendulumMaterialType, MaterialVisualConfig> = {
 
 const CAMERA_PRESETS: Record<ViewPreset, CameraConfig> = {
   side: {
-    position: new Vector3(3.5, 0, 0),
-    target: new Vector3(0, -1.2, 0),
+    position: new Vector3(3.0, 0.6, 2.2),
+    target: new Vector3(0, -1.0, 0),
     fov: 45,
   },
   top: {
@@ -224,10 +224,11 @@ export function Scene3D({
     <div className={`relative ${className}`}>
       <Canvas
         shadows={effectiveEnableShadows}
-        camera={{ fov: 50, position: [3.5, 0, 0] }}
+        camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
         style={{ background: envConfig.background }}
         onCreated={({ gl }) => {
           if (!gl) return;
+          gl.shadowMap.type = THREE.PCFShadowMap;
           onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement });
         }}
       >
@@ -329,8 +330,8 @@ function SceneContent({
 
   // Store 订阅（React 重渲染触发器）
   const viewPreset = useExploreStore((s) => s.viewPreset);
-  const isRunning = useSimulationStore((s) => s.isRunning);
   const params = useSimulationStore((s) => s.params);
+  const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   const materialConfig = MATERIAL_CONFIGS[pendulumMaterial];
   const envConfig = ENVIRONMENT_CONFIGS[environment];
@@ -348,17 +349,14 @@ function SceneContent({
     prevViewPresetRef.current = viewPreset;
   }, [viewPreset]);
 
-  // ── 仿真重置时清空尾迹 ──
-  const wasRunningRef = useRef(isRunning);
+  // ── 仿真重置时清空帧累加器（轨迹清空已在 useTrailBuffer 渲染阶段同步处理）──
+  const prevResetTriggerRef = useRef(resetTrigger);
   useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      const s = useSimulationStore.getState();
-      if (s.isSceneFrozen && s.fieldErrors && Object.keys(s.fieldErrors).length === 0) {
-        // 可能是重置操作
-      }
+    if (prevResetTriggerRef.current !== resetTrigger) {
+      prevResetTriggerRef.current = resetTrigger;
+      simTimeAccRef.current = 0;
     }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
+  }, [resetTrigger]);
 
   // ── Unmount 清理 ──
   useEffect(() => {
@@ -431,7 +429,6 @@ function SceneContent({
           }
         }
       }
-      // 注意：暂停时保留 simTimeAccRef，恢复后首帧可平滑插值
     }
 
     // 蝴蝶效应模式：从 ButterflySimStore 读取

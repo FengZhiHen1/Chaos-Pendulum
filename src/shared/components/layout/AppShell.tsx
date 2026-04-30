@@ -61,7 +61,7 @@ export function AppShell({ children }: AppShellProps) {
         {!isDesktop && (
           <nav
             className="h-12 flex items-center bg-surface-container-lowest shrink-0 animate-appshell-panel"
-            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 20px)" }}
           >
             <GlobalNavBar />
           </nav>

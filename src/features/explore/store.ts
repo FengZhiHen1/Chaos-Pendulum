@@ -28,6 +28,9 @@ interface ExploreState {
   driftHistory: DriftSample[];
   annotationDismissed: boolean;
 
+  // ── 混沌检测 ──
+  chaosVariance: number;
+
   setViewPreset: (preset: ViewPreset) => void;
   setTrailLength: (length: TrailLength) => void;
   setMaxTrailLength: (length: number) => void;
@@ -43,6 +46,8 @@ interface ExploreState {
   dismissAnnotation: () => void;
   resetAnnotation: () => void;
   resetReversalState: () => void;
+
+  setChaosState: (variance: number) => void;
 }
 
 export const useExploreStore = create<ExploreState>((set) => ({
@@ -59,6 +64,8 @@ export const useExploreStore = create<ExploreState>((set) => ({
   driftHistory: [],
   annotationDismissed: false,
 
+  chaosVariance: 0,
+
   setViewPreset: (viewPreset) => set({ viewPreset }),
   setTrailLength: (trailLength) => set({ trailLength }),
   setMaxTrailLength: (maxTrailLength) => set({ maxTrailLength }),
@@ -74,6 +81,8 @@ export const useExploreStore = create<ExploreState>((set) => ({
   clearDriftHistory: () => set({ driftHistory: [] }),
   dismissAnnotation: () => set({ annotationDismissed: true }),
   resetAnnotation: () => set({ annotationDismissed: false }),
+
+  setChaosState: (chaosVariance) => set({ chaosVariance }),
 
   resetReversalState: () =>
     set({

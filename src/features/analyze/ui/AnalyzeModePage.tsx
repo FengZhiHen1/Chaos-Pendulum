@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useAnalysisView } from "../hooks/useAnalysisView";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
@@ -5,17 +6,66 @@ import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
 import { AnalysisControls } from "./AnalysisControls";
 
-const LYAPUNOV_PATHS = {
-  lyapunov_max: "/assets/lyapunov_max-a1b3f2e8.json",
-  lyapunov_min: "/assets/lyapunov_min-a1b3f2e8.json",
-  energy_curvature: "/assets/energy_curvature-a1b3f2e8.json",
+// 预计算数据路径清单。由 scripts/precompute/ 各脚本维护，
+// 前端启动时 fetch 获取含 gridHash 的实际文件名。
+const MANIFEST_PATH = "/assets/layer_manifest.json";
+
+interface LayerManifest {
+  lyapunov_max?: string;
+  lyapunov_min?: string;
+  energy_curvature?: string;
+  bifurcation?: string;
+}
+
+const FALLBACK_PATHS = {
+  lyapunov_max: "/assets/lyapunov_max-missing.json",
+  lyapunov_min: "/assets/lyapunov_min-missing.json",
+  energy_curvature: "/assets/energy_curvature-missing.json",
 };
 
-const BIFURCATION_PATH = "/assets/bifurcation-a1b3f2e8.json";
+const FALLBACK_BIFURCATION = "/assets/bifurcation-missing.json";
+
+function useLayerManifest(): {
+  lyapunovPaths: typeof FALLBACK_PATHS;
+  bifurcationPath: string;
+} {
+  const [manifest, setManifest] = useState<LayerManifest | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(MANIFEST_PATH)
+      .then((r) => r.json())
+      .then((m: LayerManifest) => {
+        if (!cancelled) setManifest(m);
+      })
+      .catch(() => {
+        // manifest 不存在时使用 fallback（首次运行或预计算未完成）
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const lyapunovPaths = {
+    lyapunov_max: manifest?.lyapunov_max
+      ? `/assets/${manifest.lyapunov_max}`
+      : FALLBACK_PATHS.lyapunov_max,
+    lyapunov_min: manifest?.lyapunov_min
+      ? `/assets/${manifest.lyapunov_min}`
+      : FALLBACK_PATHS.lyapunov_min,
+    energy_curvature: manifest?.energy_curvature
+      ? `/assets/${manifest.energy_curvature}`
+      : FALLBACK_PATHS.energy_curvature,
+  };
+
+  const bifurcationPath = manifest?.bifurcation
+    ? `/assets/${manifest.bifurcation}`
+    : FALLBACK_BIFURCATION;
+
+  return { lyapunovPaths, bifurcationPath };
+}
 
 export function AnalyzeModePage() {
-  const { activeView, setActiveView, isDesktop } =
-    useAnalysisView();
+  const { activeView, setActiveView, isDesktop } = useAnalysisView();
+  const { lyapunovPaths, bifurcationPath } = useLayerManifest();
 
   return (
     <div className="h-full w-full flex">
@@ -48,10 +98,10 @@ export function AnalyzeModePage() {
 
         <div className="flex-1 min-h-0">
           {activeView === "lyapunov" && (
-            <LyapunovHeatmap dataPaths={LYAPUNOV_PATHS} />
+            <LyapunovHeatmap dataPaths={lyapunovPaths} />
           )}
           {activeView === "bifurcation" && (
-            <BifurcationPlot dataPath={BIFURCATION_PATH} />
+            <BifurcationPlot dataPath={bifurcationPath} />
           )}
           {activeView === "poincare" && <PoincareSection />}
           {activeView === "energy-landscape" && (

@@ -28,6 +28,7 @@ for (const m of PARAM_META) {
 export function ParamPanel() {
   const {
     isRunning,
+    isWorkerReady,
     engineError,
     isSceneFrozen,
     disabled,
@@ -37,6 +38,15 @@ export function ParamPanel() {
 
   return (
     <div className="flex flex-col h-full bg-surface-container-low">
+      {/* Worker 未就绪引导提示 */}
+      {!isWorkerReady && (
+        <div className="shrink-0 px-3 py-2.5 bg-primary/5 border-b border-primary/10">
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            点击 <span className="text-primary font-semibold">▶ 启动</span> 以初始化仿真引擎
+          </p>
+        </div>
+      )}
+
       {/* 头部 */}
       <div className="shrink-0 p-3 border-b border-white/5 space-y-2">
         <div className="flex items-center justify-between">
@@ -48,6 +58,7 @@ export function ParamPanel() {
               variant="icon"
               size="icon"
               onClick={resetToDefaults}
+              disabled={!isWorkerReady}
               title="恢复默认"
             >
               <RotateCcw className="h-3.5 w-3.5" />

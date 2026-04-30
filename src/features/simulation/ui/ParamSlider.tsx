@@ -18,6 +18,8 @@ export function ParamSlider({ meta }: ParamSliderProps) {
     return s.params[meta.key as keyof PendulumParams] as number;
   });
   const error = useSimulationStore((s) => s.fieldErrors[meta.key]);
+  const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
+  const paramDisabled = !isWorkerReady;
   const setParam = useSimulationStore((s) => s.setParam);
   const setInitialCondition = useSimulationStore((s) => s.setInitialCondition);
   const activeField = useSimulationStore((s) => s.activeField);
@@ -49,6 +51,7 @@ export function ParamSlider({ meta }: ParamSliderProps) {
           }}
           onFocus={() => setActiveField(meta.key)}
           onBlur={() => setActiveField(null)}
+          disabled={paramDisabled}
           className={cn(
             "w-20 h-7 text-xs font-mono",
             error?.level === "error" && "border-red-500 ring-red-200",
@@ -80,7 +83,7 @@ export function ParamSlider({ meta }: ParamSliderProps) {
           if (v !== undefined) handleChange(meta.key, v);
         }}
         onValueCommit={() => setActiveField(null)}
-        disabled={useSimulationStore.getState().engineError !== null}
+        disabled={paramDisabled}
         className="w-full"
       />
     </div>

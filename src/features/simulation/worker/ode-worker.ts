@@ -28,6 +28,12 @@ interface WorkerContext {
   initialEnergy: number;
   projectionEnabled: boolean;
   batchEnergyCorrection: number;
+  // Lyapunov 影子轨迹
+  shadowState: Float64Array | null;
+  lyapAccum: number;   // Σ ln(d/d₀)
+  lyapTime: number;    // 累计重标定时间
+  lyapFrameCount: number;
+  lyapExponent: number;
 }
 
 const ctx: WorkerContext = {
@@ -43,6 +49,11 @@ const ctx: WorkerContext = {
   initialEnergy: 0,
   projectionEnabled: false,
   batchEnergyCorrection: 0,
+  shadowState: null,
+  lyapAccum: 0,
+  lyapTime: 0,
+  lyapFrameCount: 0,
+  lyapExponent: 0,
 };
 
 // ─── 消息循环入口 ────────────────────────────────
@@ -98,6 +109,11 @@ function resetWorkerState(
   ctx.projectionEnabled = params.damping === 0;
   ctx.initialEnergy = ctx.projectionEnabled ? computeDerived(ctx.state, params).totalEnergy : 0;
   ctx.batchEnergyCorrection = 0;
+  ctx.shadowState = null;
+  ctx.lyapAccum = 0;
+  ctx.lyapTime = 0;
+  ctx.lyapFrameCount = 0;
+  ctx.lyapExponent = 0;
   ctx.phase = "idle";
 }
 
@@ -158,6 +174,49 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
     // 能量投影（保守系统）
     if (ctx.projectionEnabled) {
       ctx.batchEnergyCorrection += projectEnergy(ctx.state, ctx.params, ctx.initialEnergy);
+
+      // ── Lyapunov 影子轨迹积分（保守系统下运行）──
+      const D0 = 1e-8;
+      const RENORM_INTERVAL = 60;
+
+      // 惰性初始化
+      if (!ctx.shadowState) {
+        ctx.shadowState = new Float64Array(ctx.state);
+        ctx.shadowState[0] = ctx.shadowState[0]! + D0;
+        ctx.lyapFrameCount = 0;
+      }
+
+      // 积分影子轨迹（同一积分器、同一 dt）
+      integratorStep(ctx.shadowState, ctx.params, dt * ctx.direction, ctx.method);
+      projectEnergy(ctx.shadowState, ctx.params, ctx.initialEnergy);
+      ctx.shadowState[0] = normalizeAngle(ctx.shadowState[0]!);
+      ctx.shadowState[2] = normalizeAngle(ctx.shadowState[2]!);
+      ctx.lyapFrameCount++;
+
+      // 重标定周期
+      if (ctx.lyapFrameCount >= RENORM_INTERVAL) {
+        ctx.lyapFrameCount = 0;
+        const s = ctx.state!;
+        const sh = ctx.shadowState;
+        const d0 = s[0]! - sh[0]!;
+        const d1 = s[1]! - sh[1]!;
+        const d2 = s[2]! - sh[2]!;
+        const d3 = s[3]! - sh[3]!;
+        const dist = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3);
+
+        if (dist > 0 && dist < 1e6) {
+          ctx.lyapAccum += Math.log(dist / D0);
+          ctx.lyapTime += RENORM_INTERVAL * Math.abs(dt);
+          ctx.lyapExponent = ctx.lyapAccum / Math.max(ctx.lyapTime, 1e-6);
+        }
+
+        // 重标定：影子 = 参考 + (D0/dist) * (影子 - 参考)
+        const scale = D0 / Math.max(dist, 1e-15);
+        sh[0] = s[0]! + scale * (sh[0]! - s[0]!);
+        sh[1] = s[1]! + scale * (sh[1]! - s[1]!);
+        sh[2] = s[2]! + scale * (sh[2]! - s[2]!);
+        sh[3] = s[3]! + scale * (sh[3]! - s[3]!);
+      }
     }
 
     // NaN 检查（必须在能量投影之后）
@@ -471,6 +530,7 @@ function transferBuffer(
     forceData: forceBuffer ?? undefined,
     forceExtrema: ctx.computeForces ? (ctx.forceExtrema ?? undefined) : undefined,
     energyCorrection: ctx.batchEnergyCorrection,
+    lyapunovExponent: ctx.projectionEnabled ? ctx.lyapExponent : undefined,
   };
   const transfers: Transferable[] = [buffer.buffer as ArrayBuffer];
   if (forceBuffer) {

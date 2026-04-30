@@ -6,6 +6,8 @@ import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajecto
 import { SonificationToggle } from "./components/SonificationToggle";
 import { ButterflySplit } from "./components/ButterflySplit";
 import { TrailControls } from "./components/TrailControls";
+import { ChaosIndicator } from "./components/ChaosIndicator";
+import { useChaosUpdater } from "./hooks/useChaosUpdater";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
@@ -22,6 +24,8 @@ export function ExplorePage() {
     enterButterfly,
     exitButterfly,
   } = useButterflyMode();
+
+  useChaosUpdater();
 
   const {
     isRunning,
@@ -125,6 +129,7 @@ export function ExplorePage() {
 
           {/* 叠加控件 */}
           <SonificationToggle className="absolute top-3 left-3 z-20" />
+          <ChaosIndicator className="absolute top-12 left-3 z-20" />
           <TimeReversal />
 
           {/* 蝴蝶效应入口 */}
