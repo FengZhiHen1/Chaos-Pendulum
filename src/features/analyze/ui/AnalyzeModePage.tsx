@@ -28,8 +28,10 @@ const FALLBACK_BIFURCATION = "/assets/bifurcation-missing.json";
 function useLayerManifest(): {
   lyapunovPaths: typeof FALLBACK_PATHS;
   bifurcationPath: string;
+  ready: boolean;
 } {
   const [manifest, setManifest] = useState<LayerManifest | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +42,9 @@ function useLayerManifest(): {
       })
       .catch(() => {
         // manifest 不存在时使用 fallback（首次运行或预计算未完成）
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
       });
     return () => { cancelled = true; };
   }, []);
@@ -60,12 +65,12 @@ function useLayerManifest(): {
     ? `/assets/${manifest.bifurcation}`
     : FALLBACK_BIFURCATION;
 
-  return { lyapunovPaths, bifurcationPath };
+  return { lyapunovPaths, bifurcationPath, ready };
 }
 
 export function AnalyzeModePage() {
   const { activeView, setActiveView, isDesktop } = useAnalysisView();
-  const { lyapunovPaths, bifurcationPath } = useLayerManifest();
+  const { lyapunovPaths, bifurcationPath, ready } = useLayerManifest();
 
   return (
     <div className="h-full w-full flex">
@@ -97,10 +102,15 @@ export function AnalyzeModePage() {
         </Tabs>
 
         <div className="flex-1 min-h-0">
-          {activeView === "lyapunov" && (
+          {!ready && (
+            <div className="h-full flex items-center justify-center">
+              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {ready && activeView === "lyapunov" && (
             <LyapunovHeatmap dataPaths={lyapunovPaths} />
           )}
-          {activeView === "bifurcation" && (
+          {ready && activeView === "bifurcation" && (
             <BifurcationPlot dataPath={bifurcationPath} />
           )}
           {activeView === "poincare" && <PoincareSection />}

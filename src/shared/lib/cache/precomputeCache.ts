@@ -13,7 +13,7 @@ const DB_NAME = "chaos-pendulum-cache";
 const DB_VERSION = 1;
 const STORE_NAME = "precompute";
 const MAX_ENTRIES = 10;
-const SOLVER_VERSION = "1.0.0";
+const SOLVER_VERSION = "2.0.0";
 
 let dbInstance: IDBDatabase | null = null;
 let dbAvailable = true;

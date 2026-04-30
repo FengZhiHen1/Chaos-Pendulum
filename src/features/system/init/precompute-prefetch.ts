@@ -4,10 +4,9 @@
  */
 
 const PRECOMPUTE_URLS = [
-  "/assets/lyapunov_max-a1b3f2e8.json",
-  "/assets/lyapunov_min-a1b3f2e8.json",
+  "/assets/lyapunov_max-18a7e25c8db5e979.json",
   "/assets/energy_curvature-a1b3f2e8.json",
-  "/assets/bifurcation-a1b3f2e8.json",
+  "/assets/bifurcation-f5770d24521b59de.json",
 ];
 
 /**

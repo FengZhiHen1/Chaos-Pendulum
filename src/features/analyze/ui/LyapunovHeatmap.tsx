@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { scaleSequential } from "d3-scale";
 import { interpolateRdBu, interpolateViridis } from "d3-scale-chromatic";
 import { useAnalyzeStore } from "../store";
@@ -485,13 +485,29 @@ export function LyapunovHeatmap({ dataPaths }: Props) {
     energy_curvature: "能量曲率",
   };
 
+  // 预计算数据不可用时禁用对应标签页（manifest 中无条目则回退到 -missing.json）
+  const availableLayers = useMemo(
+    () => new Set(
+      (Object.keys(dataPaths) as LyapunovLayerType[]).filter(
+        (k) => !dataPaths[k].endsWith("-missing.json"),
+      ),
+    ),
+    [dataPaths],
+  );
+
   return (
     <div className="flex flex-col h-full w-full gap-2">
       <Tabs value={activeLayer} onValueChange={handleLayerChange}>
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="lyapunov_max">{layerLabels.lyapunov_max}</TabsTrigger>
-          <TabsTrigger value="lyapunov_min">{layerLabels.lyapunov_min}</TabsTrigger>
-          <TabsTrigger value="energy_curvature">{layerLabels.energy_curvature}</TabsTrigger>
+          <TabsTrigger value="lyapunov_max" disabled={!availableLayers.has("lyapunov_max")}>
+            {layerLabels.lyapunov_max}
+          </TabsTrigger>
+          <TabsTrigger value="lyapunov_min" disabled={!availableLayers.has("lyapunov_min")}>
+            {layerLabels.lyapunov_min}
+          </TabsTrigger>
+          <TabsTrigger value="energy_curvature" disabled={!availableLayers.has("energy_curvature")}>
+            {layerLabels.energy_curvature}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
