@@ -689,8 +689,6 @@ function SceneContent({
       <TrailRenderer
         points={trailPoints}
         colorMode="velocity"
-        opacity={0.85}
-        maxWidth={3}
       />
 
       {/* 相机控制 */}
