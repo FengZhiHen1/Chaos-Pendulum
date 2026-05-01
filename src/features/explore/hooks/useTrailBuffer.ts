@@ -55,6 +55,7 @@ export function useTrailBuffer(): TrailBufferAPI {
 
   const nanSkipCountRef = useRef(0);
   const lastCapacityWarnedRef = useRef(false);
+  const lastAppendParamsRef = useRef<{ L1: number; L2: number } | null>(null);
 
   // 周期检测状态
   const cycleStartStateRef = useRef<StateVector | null>(null);
@@ -75,6 +76,7 @@ export function useTrailBuffer(): TrailBufferAPI {
     cycleStartPointRef.current = null;
     stepsSinceCycleStartRef.current = 0;
     cycleDetectedOnceRef.current = false;
+    lastAppendParamsRef.current = null;
   }
 
   // 版本号：每次 mutation 自增，触发 React 重渲染以更新 trailPoints
@@ -90,6 +92,7 @@ export function useTrailBuffer(): TrailBufferAPI {
     cycleStartPointRef.current = null;
     stepsSinceCycleStartRef.current = 0;
     cycleDetectedOnceRef.current = false;
+    lastAppendParamsRef.current = null;
     setVersion((v) => v + 1);
   }, []);
 
@@ -128,6 +131,29 @@ export function useTrailBuffer(): TrailBufferAPI {
       }
 
       const rb = ringBufferRef.current!;
+
+      // 参数变更检测：L1/L2 变化意味着系统已改变，旧轨迹点无效
+      if (rb.length > 0 && lastAppendParamsRef.current) {
+        const prev = lastAppendParamsRef.current;
+        if (prev.L1 !== params.L1 || prev.L2 !== params.L2) {
+          rb.clear();
+        }
+      }
+
+      // 帧间跳跃检测：位移超过当前速度合理上限则视为闪现
+      if (rb.length > 0) {
+        const last = rb.at(rb.length - 1)!;
+        const dx = point.position.x - last.position.x;
+        const dy = point.position.y - last.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const maxSpeed = params.L1 * Math.abs(state.omega1) + params.L2 * Math.abs(state.omega2);
+        const maxDispPerFrame = maxSpeed / 60;
+        const minThreshold = (params.L1 + params.L2) * 0.5;
+        const effectiveThreshold = Math.max(maxDispPerFrame * 3, minThreshold);
+        if (dist > effectiveThreshold) {
+          rb.clear();
+        }
+      }
 
       // 周期模式检测
       const currentPersistence = persistence;
@@ -170,6 +196,7 @@ export function useTrailBuffer(): TrailBufferAPI {
 
       // 追加点
       rb.push(point);
+      lastAppendParamsRef.current = { L1: params.L1, L2: params.L2 };
 
       // 调试：每 60 帧打印一次
       if (rb.length % 60 === 1) {

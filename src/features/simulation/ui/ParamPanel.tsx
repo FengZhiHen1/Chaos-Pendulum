@@ -28,6 +28,12 @@ for (const m of PARAM_META) {
   GROUPED_META[m.group].push(m.key);
 }
 
+/**
+ * 参数控制面板 — 探索模式左侧面板。
+ *
+ * 风格：Dark Room，surface-container-low 背景，无实线边框
+ * 参数分组：系统参数 / 初始条件 / 环境
+ */
 export function ParamPanel() {
   const {
     isRunning,
@@ -58,8 +64,8 @@ export function ParamPanel() {
     <div className="flex flex-col h-full bg-surface-container-low">
       {/* Worker 未就绪引导提示 */}
       {!isWorkerReady && (
-        <div className="shrink-0 px-3 py-2.5 bg-primary/5 border-b border-primary/10">
-          <p className="text-xs text-on-surface-variant leading-relaxed">
+        <div className="shrink-0 px-3 py-2.5 bg-primary/[0.04] border-b border-primary/10">
+          <p className="text-xs text-on-surface-variant/70 leading-relaxed">
             点击 <span className="text-primary font-semibold">▶ 启动</span> 以初始化仿真引擎
           </p>
         </div>
@@ -67,10 +73,10 @@ export function ParamPanel() {
 
       {/* 参数更改待生效提示 */}
       {paramsDirty && isWorkerReady && (
-        <div className="shrink-0 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2">
+        <div className="shrink-0 px-3 py-2 bg-amber-500/[0.04] border-b border-amber-500/15 flex items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-          <p className="text-xs text-amber-300 leading-relaxed flex-1">
-            参数已更改，点击 <span className="font-semibold text-amber-200">重置</span> 以应用新设置
+          <p className="text-xs text-amber-300/80 leading-relaxed flex-1">
+            参数已更改，点击 <span className="font-semibold text-amber-200/90">重置</span> 以应用新设置
           </p>
         </div>
       )}
@@ -108,12 +114,12 @@ export function ParamPanel() {
         </div>
 
         {isSceneFrozen && (
-          <Badge variant="outline" className="text-separation-alert border-separation-alert/30 text-[10px]">
+          <Badge variant="outline" className="text-separation-alert border-separation-alert/20 text-[10px]">
             场景已冻结 — 参数非法
           </Badge>
         )}
         {engineError && (
-          <Badge variant="outline" className="text-separation-alert border-separation-alert/30 text-[10px]">
+          <Badge variant="outline" className="text-separation-alert border-separation-alert/20 text-[10px]">
             {engineError}
           </Badge>
         )}
@@ -121,17 +127,21 @@ export function ParamPanel() {
 
       {/* 参数标签页 */}
       <Tabs defaultValue="system" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="mx-3 mt-2 shrink-0">
+        <TabsList className="mx-3 mt-2 shrink-0 bg-transparent gap-1">
           {GROUPS.map((g) => (
-            <TabsTrigger key={g.id} value={g.id}>
+            <TabsTrigger
+              key={g.id}
+              value={g.id}
+              className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-surface-container data-[state=active]:text-on-surface text-on-surface-variant/60"
+            >
               {g.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        <div className="flex-1 overflow-y-auto px-3 py-2">
+        <div className="flex-1 overflow-y-auto px-3 py-3">
           {GROUPS.map((g) => (
-            <TabsContent key={g.id} value={g.id} className="space-y-3 mt-0">
+            <TabsContent key={g.id} value={g.id} className="space-y-4 mt-0">
               {GROUPED_META[g.id]
                 .map((key) => PARAM_META.find((m) => m.key === key)!)
                 .sort((a, b) => a.order - b.order)
@@ -145,9 +155,9 @@ export function ParamPanel() {
 
       {/* 底部 */}
       <div className="shrink-0 p-3 border-t border-white/5 space-y-2">
-        <span className="text-[10px] text-on-surface-variant">积分方法</span>
+        <span className="text-[10px] text-on-surface-variant/50">积分方法</span>
         <MethodSelector />
-        <span className="text-[10px] text-on-surface-variant">预设</span>
+        <span className="text-[10px] text-on-surface-variant/50">预设</span>
         <PresetButtons />
       </div>
 
@@ -159,7 +169,7 @@ export function ParamPanel() {
         description="将使用面板当前参数重置仿真，已积累的正向历史和反演数据将被清空。"
       >
         <div className="space-y-3">
-          <div className="rounded-lg bg-surface-container-lowest px-3 py-2 text-xs font-mono text-on-surface-variant space-y-1">
+          <div className="rounded-lg bg-surface-container-lowest px-3 py-2 text-xs font-mono text-on-surface-variant/70 space-y-1">
             <p>θ₁={initialConditions.theta1.toFixed(3)}  ω₁={initialConditions.theta1Dot.toFixed(3)}</p>
             <p>θ₂={initialConditions.theta2.toFixed(3)}  ω₂={initialConditions.theta2Dot.toFixed(3)}</p>
             <p className="border-t border-white/5 pt-1 mt-1">

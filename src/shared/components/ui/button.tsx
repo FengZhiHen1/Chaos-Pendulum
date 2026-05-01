@@ -3,18 +3,28 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
+/**
+ * 按钮组件 — Dark Room 设计系统。
+ *
+ * | Variant | Style |
+ * |:---|:---|
+ * | Primary | Solid primary bg, near-black text, hover: primary-hover |
+ * | Secondary | surface-container bg, primary text, hover: primary-container bg |
+ * | Tertiary | Transparent bg, on-surface-variant text, hover: text shift |
+ * | Icon | 40x40px touch target, transparent bg, active: primary-container |
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
         primary:
           "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
         secondary:
-          "bg-surface-container text-primary hover:bg-primary-container",
+          "bg-surface-container text-primary hover:bg-primary-container active:scale-[0.98]",
         tertiary:
           "bg-transparent text-on-surface-variant hover:text-on-surface",
-        icon: "h-10 w-10 bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low",
+        icon: "h-10 w-10 bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg",
       },
       size: {
         default: "h-9 px-4 py-2",

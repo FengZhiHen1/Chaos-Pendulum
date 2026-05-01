@@ -15,6 +15,16 @@ function formatEta(seconds: number): string {
   return `预计剩余 ${mins} 分钟`;
 }
 
+/**
+ * 加载屏幕 — 首次访问必经。
+ *
+ * 设计规范（DESIGN.md）：
+ * - 背景：surface (#1A1D22) 全暗
+ * - 中心元素："双摆混沌实验室" Inter SemiBold 24px，on-surface
+ * - 进度条：Track surface-container，Fill primary
+ * - 文本：JetBrains Mono 12px，on-surface-variant
+ * - 过渡：进度淡出 (200ms) → 3D stage 先亮 (400ms) → 暗面板随后交错淡入
+ */
 export function LoadingScreen({ progress, showQuotes, transitioning }: LoadingScreenProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [nextIndex, setNextIndex] = useState(1);
@@ -110,17 +120,17 @@ export function LoadingScreen({ progress, showQuotes, transitioning }: LoadingSc
           </svg>
         </div>
 
-        {/* 标题 */}
+        {/* 标题 — Inter SemiBold 24px */}
         <div className="flex flex-col items-center gap-1 animate-fade-in-up">
           <h1 className="text-2xl font-semibold text-on-surface tracking-[0.1em]">
             双摆混沌实验室
           </h1>
-          <p className="text-base font-light text-on-surface-variant">
+          <p className="text-base font-light text-on-surface-variant tracking-wide">
             Chaos Pendulum Lab
           </p>
         </div>
 
-        {/* 进度条 */}
+        {/* 进度条 — Track surface-container, Fill primary */}
         <div className="w-80 max-w-[80vw] flex flex-col gap-2">
           <div className="h-1.5 bg-surface-container rounded-full overflow-hidden">
             <div
@@ -137,7 +147,7 @@ export function LoadingScreen({ progress, showQuotes, transitioning }: LoadingSc
             </span>
           </div>
           {progress.etaSeconds > 0 && (
-            <span className="text-on-surface-variant text-xs">
+            <span className="text-on-surface-variant text-xs font-mono">
               {formatEta(progress.etaSeconds)}
             </span>
           )}

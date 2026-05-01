@@ -20,11 +20,101 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(155, 160, 170, 0.2);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(155, 160, 170, 0.35);
+  }
 }
 
 @layer utilities {
+  /* ── Shake Animation (Parameter Input Error) ── */
   .animate-shake {
-    animation: shake 0.3s ease-in-out;
+    animation: shake 0.36s ease-in-out;
+  }
+
+  /* ── AppShell Staggered Entrance ── */
+  .animate-appshell-stage {
+    animation: appshell-stage-fade-in 400ms ease-out both;
+  }
+
+  .animate-appshell-panel {
+    animation: appshell-panel-fade-in 300ms ease-out 200ms both;
+  }
+
+  /* ── Story Mode Pulse Highlight ── */
+  .animate-pulse-glow {
+    animation: pulse-glow 2s linear infinite;
+  }
+
+  /* ── Mode Crossfade ── */
+  .animate-mode-enter {
+    animation: mode-enter 200ms ease-out both;
+  }
+
+  /* ── Glassmorphism Panel ── */
+  .glass-panel {
+    background: rgba(35, 38, 44, 0.85);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  /* ── Butterfly Alert Edge Pulse ── */
+  .animate-alert-edge {
+    animation: alert-edge-pulse 600ms ease-out both;
+  }
+
+  /* ── Card Hover Lift ── */
+  .card-lift {
+    transition: background-color 200ms ease-out, box-shadow 200ms ease-out;
+  }
+  .card-lift:hover {
+    background-color: #2A2D34;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ── No-line ghost border ── */
+  .ghost-border {
+    border: 1px solid rgba(155, 160, 170, 0.1);
+  }
+  .ghost-border-focus:focus {
+    border-color: rgba(75, 159, 255, 0.7);
+    box-shadow: 0 0 0 3px rgba(75, 159, 255, 0.25);
+  }
+
+  /* ── Primary focus ring ── */
+  .focus-ring-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(75, 159, 255, 0.25);
+  }
+
+  /* ── Smooth transition tokens ── */
+  .transition-instant {
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+  }
+  .transition-quick {
+    transition-duration: 200ms;
+    transition-timing-function: ease-out;
+  }
+  .transition-smooth {
+    transition-duration: 300ms;
+    transition-timing-function: ease-in-out;
+  }
+  .transition-dramatic {
+    transition-duration: 600ms;
+    transition-timing-function: ease-out;
   }
 }
 
@@ -34,7 +124,6 @@
   30%, 70% { transform: translateX(4px); }
 }
 
-/* ── AppShell Staggered Entrance ── */
 @keyframes appshell-stage-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -45,10 +134,54 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-appshell-stage {
-  animation: appshell-stage-fade-in 400ms ease-out both;
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(75, 159, 255, 0);
+  }
+  50% { 
+    box-shadow: 0 0 12px 2px rgba(75, 159, 255, 0.35);
+  }
 }
 
-.animate-appshell-panel {
-  animation: appshell-panel-fade-in 300ms ease-out 200ms both;
+@keyframes mode-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes alert-edge-pulse {
+  0% { box-shadow: inset 0 0 0 rgba(255, 59, 59, 0); }
+  50% { box-shadow: inset 0 0 100px rgba(255, 59, 59, 0.3); }
+  100% { box-shadow: inset 0 0 0 rgba(255, 59, 59, 0); }
+}
+
+/* ── Loading Screen Animations ── */
+@keyframes pendulum-swing-upper {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@keyframes pendulum-swing-lower {
+  0%, 100% { transform: rotate(-24deg); }
+  25% { transform: rotate(8deg); }
+  50% { transform: rotate(24deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pendulum-upper {
+  animation: pendulum-swing-upper 2.5s ease-in-out infinite;
+  transform-origin: 32px 8px;
+}
+
+.animate-pendulum-lower {
+  animation: pendulum-swing-lower 1.25s ease-in-out infinite;
+  transform-origin: 32px 32px;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out both;
 }
