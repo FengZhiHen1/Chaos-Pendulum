@@ -10,7 +10,7 @@ import { BarChart3, Activity, ScatterChart, Mountain } from "lucide-react";
 
 // 预计算数据路径清单。由 scripts/precompute/ 各脚本维护，
 // 前端启动时 fetch 获取含 gridHash 的实际文件名。
-const MANIFEST_PATH = "/assets/layer_manifest.json";
+const MANIFEST_PATH = "./assets/layer_manifest.json";
 
 interface LayerManifest {
   lyapunov_max?: string;
@@ -23,12 +23,12 @@ interface LayerManifest {
 }
 
 const FALLBACK_PATHS = {
-  lyapunov_max: "/assets/lyapunov_max-missing.json",
-  lyapunov_min: "/assets/lyapunov_min-missing.json",
-  energy_curvature: "/assets/energy_curvature-missing.json",
+  lyapunov_max: "./assets/lyapunov_max-missing.json",
+  lyapunov_min: "./assets/lyapunov_min-missing.json",
+  energy_curvature: "./assets/energy_curvature-missing.json",
 };
 
-const FALLBACK_BIFURCATION = "/assets/bifurcation-missing.json";
+const FALLBACK_BIFURCATION = "./assets/bifurcation-missing.json";
 
 function useLayerManifest(): {
   lyapunovPaths: typeof FALLBACK_PATHS;
@@ -57,18 +57,18 @@ function useLayerManifest(): {
 
   const lyapunovPaths = {
     lyapunov_max: manifest?.lyapunov_max
-      ? `/assets/${manifest.lyapunov_max}`
+      ? `./assets/${manifest.lyapunov_max}`
       : FALLBACK_PATHS.lyapunov_max,
     lyapunov_min: manifest?.lyapunov_min
-      ? `/assets/${manifest.lyapunov_min}`
+      ? `./assets/${manifest.lyapunov_min}`
       : FALLBACK_PATHS.lyapunov_min,
     energy_curvature: manifest?.energy_curvature
-      ? `/assets/${manifest.energy_curvature}`
+      ? `./assets/${manifest.energy_curvature}`
       : FALLBACK_PATHS.energy_curvature,
   };
 
   const bifurcationPath = manifest?.bifurcation
-    ? `/assets/${manifest.bifurcation}`
+    ? `./assets/${manifest.bifurcation}`
     : FALLBACK_BIFURCATION;
 
   // 提取当前活动图层的阻尼切片

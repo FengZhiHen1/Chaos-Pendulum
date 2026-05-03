@@ -4,7 +4,7 @@
  * v2: 动态从 manifest 读取，自动覆盖阻尼切片。
  */
 
-const MANIFEST_URL = "/assets/layer_manifest.json";
+const MANIFEST_URL = "./assets/layer_manifest.json";
 
 interface LayerManifest {
   lyapunov_max?: string;
@@ -44,7 +44,7 @@ export async function prefetchPrecomputeData(): Promise<void> {
       }
     }
 
-    const urls = Array.from(files).map((f) => `/assets/${f}`);
+    const urls = Array.from(files).map((f) => `./assets/${f}`);
 
     await Promise.all(
       urls.map(async (url) => {

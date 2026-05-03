@@ -60,7 +60,7 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
     if (dampingSlices.length > 0 && activeLayer === "lyapunov_max") {
       const slice = dampingSlices.find((s) => s.value === activeDamping)
         ?? dampingSlices[0];
-      if (slice) return `/assets/${slice.file}`;
+      if (slice) return `./assets/${slice.file}`;
     }
     return dataPaths[activeLayer] ?? "";
   })();
