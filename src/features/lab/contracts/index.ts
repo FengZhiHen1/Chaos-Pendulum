@@ -41,3 +41,17 @@ export {
   VALIDATION_THRESHOLDS,
   VALIDATION_DEFAULTS,
 } from "./physics-validation.contract";
+
+// ─── LAB-03 可编程沙箱 ─────────────────────────
+export type {
+  SandboxTemplateId,
+  ISandboxTemplate,
+  ISandboxExecutionResult,
+  ISandboxRunner,
+  ISandboxController,
+} from "./programmable-sandbox.contract";
+export {
+  SANDBOX_TEMPLATES,
+  ERROR_TRANSLATIONS,
+  SANDBOX_DEFAULTS,
+} from "./programmable-sandbox.contract";

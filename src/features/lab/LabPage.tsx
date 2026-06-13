@@ -200,14 +200,8 @@ export function LabPage() {
                 </button>
               ))}
             </div>
-            <div className="mt-3 p-2.5 rounded-lg bg-surface-container-lowest/60 border border-white/5">
-              <div className="flex items-center gap-1.5 mb-1">
-                <AlertTriangle className="w-3 h-3 text-amber-400" />
-                <span className="text-[10px] font-medium text-amber-300">开发中</span>
-              </div>
-              <p className="text-[10px] text-on-surface-variant/60 leading-relaxed">
-                Pyodide 沙箱集成开发中，届时支持在线编辑与运行 Python 物理模拟代码
-              </p>
+            <div className="mt-3">
+              <SandboxPanel />
             </div>
           </div>
 

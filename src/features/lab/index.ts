@@ -2,8 +2,9 @@ export { useLabStore } from "./store";
 export { LabPage } from "./LabPage";
 export { ForceArrows3D } from "./components/ForceArrows3D";
 export { DecompositionPanel } from "./components/DecompositionPanel";
+export { SandboxPanel } from "./components/SandboxPanel";
 
-// ─── Contracts — LAB-01 + LAB-02 ────────────────
+// ─── Contracts — LAB-01 + LAB-02 + LAB-03 ───────
 export type {
   ForceKind,
   CoordinateSystem,
