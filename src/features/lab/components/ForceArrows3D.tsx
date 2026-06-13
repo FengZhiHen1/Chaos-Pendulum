@@ -47,11 +47,20 @@ const ARROWS: ArrowMeta[] = [
   { key: "Fi2_n", idx: 2, kind: "inertial", label: "下摆法向惯性力 (Fi₂_n)" },
 ];
 
-// ─── 共享几何体 ──────────────────────────────
+// ─── 共享几何体 + 材质池（预分配、帧间复用，禁止每帧 new）─────────
 
 const shaftGeo = new THREE.CylinderGeometry(SHAFT_R, SHAFT_R, 1, 8);
 const headGeo = new THREE.ConeGeometry(HEAD_R, HEAD_L, 8);
 const hoverGeo = new THREE.CylinderGeometry(HOVER_R, HOVER_R, 1, 8);
+
+// 预分配 8 个箭头各 3 个材质（杆身 + 箭头 + 虚线杆身）。总计 8×3=24 个材质
+const materialPool: THREE.MeshStandardMaterial[] = [];
+for (let i = 0; i < 24; i++) {
+  materialPool.push(new THREE.MeshStandardMaterial({ depthTest: false }));
+}
+let matIdx = 0;
+function acquireMaterial(): THREE.MeshStandardMaterial { return materialPool[matIdx++ % materialPool.length]!; }
+function resetMatPool(): void { matIdx = 0; }
 
 // ─── 力方向计算 ──────────────────────────────
 
@@ -206,17 +215,18 @@ function SingleArrow({ meta }: SingleArrowProps) {
     if (!grp || !vis) return;
     grp.visible = true;
 
-    // 清空并重建可见箭头子节点
-    while (vis.children.length > 0) {
-      vis.remove(vis.children[0]!);
-    }
+    // 清空可见子节点（回收材质池）
+    while (vis.children.length > 0) { vis.remove(vis.children[0]!); }
+    resetMatPool();
 
-    // 杆身
+    // 杆身（复用材质池）
     if (isDashed) {
       let pos = 0;
       while (pos < shaftLen) {
         const sl = Math.min(DASH, shaftLen - pos);
-        const seg = new THREE.Mesh(shaftGeo, new THREE.MeshStandardMaterial({ color, transparent: true, opacity, depthTest: false }));
+        const m = acquireMaterial();
+        m.color.set(color); m.transparent = true; m.opacity = opacity;
+        const seg = new THREE.Mesh(shaftGeo, m);
         seg.position.copy(start.clone().add(dir.clone().multiplyScalar(pos + sl / 2)));
         seg.quaternion.setFromUnitVectors(Y, dir);
         seg.scale.set(1, sl, 1);
@@ -224,7 +234,9 @@ function SingleArrow({ meta }: SingleArrowProps) {
         pos += CYCLE;
       }
     } else {
-      const shaft = new THREE.Mesh(shaftGeo, new THREE.MeshStandardMaterial({ color, transparent: true, opacity, depthTest: false }));
+      const m = acquireMaterial();
+      m.color.set(color); m.transparent = true; m.opacity = opacity;
+      const shaft = new THREE.Mesh(shaftGeo, m);
       shaft.position.copy(start.clone().add(dir.clone().multiplyScalar(shaftLen / 2)));
       shaft.quaternion.setFromUnitVectors(Y, dir);
       shaft.scale.set(1, shaftLen, 1);
@@ -232,7 +244,9 @@ function SingleArrow({ meta }: SingleArrowProps) {
     }
 
     // 箭头尖端
-    const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color, transparent: true, opacity, depthTest: false }));
+    const hm = acquireMaterial();
+    hm.color.set(color); hm.transparent = true; hm.opacity = opacity;
+    const head = new THREE.Mesh(headGeo, hm);
     head.position.copy(start.clone().add(dir.clone().multiplyScalar(shaftLen + HEAD_L * 0.4)));
     head.quaternion.setFromUnitVectors(Y, dir);
     vis.add(head);

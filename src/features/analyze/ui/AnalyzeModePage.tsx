@@ -116,7 +116,7 @@ export function AnalyzeModePage() {
             {VIEW_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;
-              const isDisabled = tab.id === "energy-landscape";
+              const isDisabled = false;
               return (
                 <TabsTrigger
                   key={tab.id}

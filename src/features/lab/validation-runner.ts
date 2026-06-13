@@ -84,7 +84,8 @@ function runSmallAngleTest(method: IntegratorMethod): {
     integratorStep(state, p, DT, method);
   }
 
-  const crossings = detectZeroCrossings(thetaHistory.map((t) => t - theta0));
+  // 检测过零点（平衡位置 θ=0），不减去初始角度
+  const crossings = detectZeroCrossings(thetaHistory);
   const measuredPeriod = averagePeriod(crossings);
 
   if (isNaN(measuredPeriod)) {
@@ -128,7 +129,8 @@ function runSinglePendulumTest(method: IntegratorMethod): {
     }
   }
 
-  const crossings = detectZeroCrossings(theta1History.map((t) => t - theta0));
+  // 检测过零点（平衡位置 θ=0），不减去初始角度
+  const crossings = detectZeroCrossings(theta1History);
   const measuredPeriod = averagePeriod(crossings);
 
   if (isNaN(measuredPeriod)) {

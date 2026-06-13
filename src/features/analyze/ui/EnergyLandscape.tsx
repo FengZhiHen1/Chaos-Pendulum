@@ -42,13 +42,18 @@ function EnergyLandscapeScene() {
   const theta2 = useSimulationStore((s) => s.theta2);
   const meshRef = useRef<THREE.Mesh>(null);
   const pointRef = useRef<THREE.Mesh>(null);
+  const prevGeoRef = useRef<THREE.BufferGeometry | null>(null);
 
   const config = DEFAULT_ENERGY_LANDSCAPE_CONFIG;
-  const { resolution, opacity } = config;
-
+  const { resolution, thetaRange, opacity } = config;
+  const [tMin, tMax] = thetaRange;
+  const planeSize = tMax - tMin; // 2*Math.PI when [-π, π]
   // 构建势能曲面几何
   const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(2 * Math.PI, 2 * Math.PI, resolution, resolution);
+    // 释放旧几何体 GPU 内存
+    if (prevGeoRef.current) { prevGeoRef.current.dispose(); }
+    const geo = new THREE.PlaneGeometry(planeSize, planeSize, resolution, resolution);
+    prevGeoRef.current = geo;
     const pos = geo.attributes.position;
     if (!pos) return geo;
     const colors = new Float32Array(pos.count * 3);
@@ -85,9 +90,11 @@ function EnergyLandscapeScene() {
   // 实时光点动画
   useFrame(() => {
     if (pointRef.current) {
+      if (!Number.isFinite(theta1) || !Number.isFinite(theta2)) return;
       const t1 = normalizeAngle(theta1);
       const t2 = normalizeAngle(theta2);
       const v = computePotential(t1, t2, params.m1, params.m2, params.L1, params.L2, params.g);
+      if (!Number.isFinite(v)) return;
       pointRef.current.position.set(t1, t2, v + 0.15);
     }
   });
@@ -110,7 +117,7 @@ function EnergyLandscapeScene() {
       {/* 底部等高线投影（半透明网格平面） */}
       {config.showContours && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -5]}>
-          <planeGeometry args={[2 * Math.PI, 2 * Math.PI, 20, 20]} />
+          <planeGeometry args={[planeSize, planeSize, 20, 20]} />
           <meshBasicMaterial color="#334155" transparent opacity={0.15} wireframe />
         </mesh>
       )}
@@ -123,7 +130,7 @@ function EnergyLandscapeScene() {
       )}
       {/* θ₁-θ₂ 平面参考框 */}
       <lineSegments rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -4.9]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(2 * Math.PI, 2 * Math.PI)]} />
+        <edgesGeometry args={[new THREE.PlaneGeometry(planeSize, planeSize)]} />
         <lineBasicMaterial color="#64748b" transparent opacity={0.3} />
       </lineSegments>
       <OrbitControls enableDamping dampingFactor={0.08} />
