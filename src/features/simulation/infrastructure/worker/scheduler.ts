@@ -5,12 +5,12 @@ import type {
   IntegratorMethod,
   PoincareSectionCondition,
   PoincarePoint,
-} from "@/shared/types";
-import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/types";
+} from "@/shared/domain/valueObjects";
+import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/domain/valueObjects";
 import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useRootStore } from "@/stores/rootStore";
-import { observabilityCoordinator } from "@/shared/lib/observability";
+import { observabilityCoordinator } from "@/shared/infrastructure/observability";
 
 const TIMEOUT_MS = 2000;
 const MAX_CRASH_RECOVERY = 1;

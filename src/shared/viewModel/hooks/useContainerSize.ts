@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ContainerSize, UseContainerSizeOptions } from "@/shared/types";
+import type { ContainerSize, UseContainerSizeOptions } from "@/shared/domain/valueObjects";
 
 const DEFAULT_DEBOUNCE_MS = 150;
 

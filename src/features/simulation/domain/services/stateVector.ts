@@ -1,4 +1,4 @@
-import type { PendulumParams } from "@/shared/types";
+import type { PendulumParams } from "@/shared/domain/valueObjects";
 import { angularAcceleration } from "./derivatives";
 
 /** 计算后的派生值 */

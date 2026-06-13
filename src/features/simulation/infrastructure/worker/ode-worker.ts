@@ -6,8 +6,8 @@ import type {
   PoincarePoint,
   PoincareSectionCondition,
   ForceExtrema,
-} from "@/shared/types";
-import { FRAME_STRIDE, FRAMES_PER_BATCH, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
+} from "@/shared/domain/valueObjects";
+import { FRAME_STRIDE, FRAMES_PER_BATCH, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/domain/valueObjects";
 import { integratorStep, getIntegrator } from "@/features/simulation/domain/services/integrators";
 import { computeDerived, normalizeAngle, hasInvalidValue, projectEnergy } from "@/features/simulation/domain/services/stateVector";
 

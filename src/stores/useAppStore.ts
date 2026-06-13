@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { AppMode, DeviceType, LoadingState, ModeDefinition } from "@/shared/types";
-import { MODE_REGISTRY } from "@/shared/types";
+import type { AppMode, DeviceType, LoadingState, ModeDefinition } from "@/shared/domain/valueObjects";
+import { MODE_REGISTRY } from "@/shared/domain/valueObjects";
 
 interface DebugInfo {
   fps: number;

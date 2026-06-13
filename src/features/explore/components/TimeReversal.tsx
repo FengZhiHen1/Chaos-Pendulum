@@ -5,8 +5,8 @@ import { useExploreStore } from "../store";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
-import { Dialog } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
+import { Dialog } from "@/shared/view/components/ui/dialog";
+import { Button } from "@/shared/view/components/ui/button";
 import type { DriftSample, ReversalMode } from "../store";
 
 // ═══════════════════════════════════════════════════

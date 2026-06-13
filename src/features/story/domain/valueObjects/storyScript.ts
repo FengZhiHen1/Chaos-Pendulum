@@ -1,4 +1,4 @@
-import type { AppMode } from "@/shared/types";
+import type { AppMode } from "@/shared/domain/valueObjects";
 
 export interface StoryStage {
   startTime: number;

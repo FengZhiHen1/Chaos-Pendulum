@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { useSimulationStore } from "../store";
-import { exportPhaseSpaceImage } from "../ui/PhaseSpaceCanvas";
+import { exportPhaseSpaceImage } from "../view/components/PhaseSpaceCanvas";
 import {
   FRAME_STRIDE,
   FrameField,
   DEFAULT_PARAMS,
   DEFAULT_INITIAL_CONDITIONS,
   DEFAULT_METHOD,
-} from "@/shared/types";
+} from "@/shared/domain/valueObjects";
 
 // ─── 辅助：构建模拟帧 buffer ──────────────────
 

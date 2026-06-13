@@ -1,8 +1,8 @@
 import { Compass, BarChart3, FlaskConical, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import { useAppStore } from "@/stores/useAppStore";
-import type { AppMode, ModeDefinition } from "@/shared/types";
+import type { AppMode, ModeDefinition } from "@/shared/domain/valueObjects";
 
 const ICON_MAP: Record<ModeDefinition["iconName"], LucideIcon> = {
   Compass,

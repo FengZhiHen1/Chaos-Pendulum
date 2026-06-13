@@ -8,8 +8,8 @@ import {
   createSonificationEngine,
   resumeAudioContext,
   closeAudioContext,
-} from "@/shared/audio";
-import type { SonificationEngine } from "@/shared/audio";
+} from "@/shared/infrastructure/audio";
+import type { SonificationEngine } from "@/shared/infrastructure/audio";
 
 // ─── 常量 ──────────────────────────────────────────
 

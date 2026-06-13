@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useSimulationStore } from "../store";
-import type { PhaseVariable } from "../ui/PhaseSpacePanel";
+import type { PhaseVariable } from "../view/components/PhaseSpacePanel";
 
 export interface UsePhaseSpaceAPI {
   theta: number;

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@/shared/view/components/ui/button";
 import { useSimulationStore } from "@/features/simulation";
 import type { LyapunovGrid } from "../types";
 import { classifyLambda, resolveStoreParam } from "../types";

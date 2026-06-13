@@ -1,17 +1,17 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAnalyzeStore } from "../store";
-import { useContainerSize } from "@/shared/hooks/useContainerSize";
-import type { PoincarePoint } from "@/shared/types";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
+import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
+import type { PoincarePoint } from "@/shared/domain/valueObjects";
+import { Button } from "@/shared/view/components/ui/button";
+import { Input } from "@/shared/view/components/ui/input";
+import { Label } from "@/shared/view/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@/shared/view/components/ui/select";
 
 const X_MIN = -Math.PI;
 const X_MAX = Math.PI;

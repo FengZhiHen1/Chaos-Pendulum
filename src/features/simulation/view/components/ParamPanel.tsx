@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { Badge } from "@/shared/components/ui/badge";
-import { Button } from "@/shared/components/ui/button";
-import { Dialog } from "@/shared/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
+import { Badge } from "@/shared/view/components/ui/badge";
+import { Button } from "@/shared/view/components/ui/button";
+import { Dialog } from "@/shared/view/components/ui/dialog";
 import { RotateCcw, Play, Pause, AlertTriangle } from "lucide-react";
-import { PARAM_META } from "@/shared/types";
-import type { ParamGroup } from "@/shared/types";
+import { PARAM_META } from "@/shared/domain/valueObjects";
+import type { ParamGroup } from "@/shared/domain/valueObjects";
 import { useSimulationControls } from "../../hooks/useSimulationControls";
 import { useSimulationStore } from "../../store";
 import { ParamSlider } from "./ParamSlider";

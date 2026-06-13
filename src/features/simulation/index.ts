@@ -49,7 +49,7 @@ export type { PhaseVariable } from "./view/components/PhaseSpacePanel";
 export { PhaseSpaceCanvas } from "./view/components/PhaseSpaceCanvas";
 
 // ─── View — Boot ──────────────────────────────────
-export { BootManager } from "./ui/BootManager";
-export { LoadingScreen } from "./ui/LoadingScreen";
-export { ErrorScreen } from "./ui/ErrorScreen";
-export { createOdeWorker } from "./worker/createOdeWorker";
+export { BootManager } from "./view/components/BootManager";
+export { LoadingScreen } from "./view/components/LoadingScreen";
+export { ErrorScreen } from "./view/components/ErrorScreen";
+export { createOdeWorker } from "./infrastructure/worker/createOdeWorker";

@@ -1,10 +1,10 @@
-import { cn } from "@/shared/lib/cn";
-import { Slider } from "@/shared/components/ui/slider";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { cn } from "@/shared/infrastructure/cn";
+import { Slider } from "@/shared/view/components/ui/slider";
+import { Input } from "@/shared/view/components/ui/input";
+import { Label } from "@/shared/view/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/view/components/ui/tooltip";
 import { AlertCircle } from "lucide-react";
-import type { ParamFieldMeta, PendulumParams, InitialConditions } from "@/shared/types";
+import type { ParamFieldMeta, PendulumParams, InitialConditions } from "@/shared/domain/valueObjects";
 import { useSimulationStore } from "../../store";
 
 interface ParamSliderProps {

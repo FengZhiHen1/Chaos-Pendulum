@@ -1,7 +1,7 @@
-import type { PendulumParams, StateVector, InitialConditions } from "@/shared/types";
-import type { WorkerResponse } from "@/shared/types";
-import { FRAME_STRIDE } from "@/shared/types";
-import { Float64Pool } from "@/features/simulation/worker/float64-pool";
+import type { PendulumParams, StateVector, InitialConditions } from "@/shared/domain/valueObjects";
+import type { WorkerResponse } from "@/shared/domain/valueObjects";
+import { FRAME_STRIDE } from "@/shared/domain/valueObjects";
+import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useRootStore } from "@/stores/rootStore";
@@ -119,7 +119,7 @@ export class ButterflyScheduler {
     side: "A" | "B",
   ): SideWorker {
     const worker = new Worker(
-      new URL("@/features/simulation/worker/ode-worker.ts", import.meta.url),
+      new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url),
       { type: "module" },
     );
 
@@ -160,7 +160,7 @@ export class ButterflyScheduler {
       sw.initRetries++;
       sw.worker.terminate();
       const retryWorker = new Worker(
-        new URL("@/features/simulation/worker/ode-worker.ts", import.meta.url),
+        new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url),
         { type: "module" },
       );
       sw.worker = retryWorker;
@@ -285,7 +285,7 @@ export class ButterflyScheduler {
 
     // 重建
     sw.worker = new Worker(
-      new URL("@/features/simulation/worker/ode-worker.ts", import.meta.url),
+      new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url),
       { type: "module" },
     );
     sw.worker.onmessage = (e: MessageEvent<WorkerResponse>) =>

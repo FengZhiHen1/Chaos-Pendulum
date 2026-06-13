@@ -1,5 +1,5 @@
-import { PRESETS } from "@/shared/types";
-import { Button } from "@/shared/components/ui/button";
+import { PRESETS } from "@/shared/domain/valueObjects";
+import { Button } from "@/shared/view/components/ui/button";
 import { useSimulationStore } from "../../store";
 
 export function PresetButtons() {

@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { ForceExtrema } from "@/shared/types";
+import type { ForceExtrema } from "@/shared/domain/valueObjects";
 
 type ValidationStatus = "idle" | "running" | "passed" | "failed";
 type CoordinateSystem = "cartesian" | "polar" | "natural";

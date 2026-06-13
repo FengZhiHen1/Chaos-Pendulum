@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { StateVector } from "@/shared/types";
+import type { StateVector } from "@/shared/domain/valueObjects";
 
 const HISTORY_CAPACITY = 6000; // 100s @ 60fps
 

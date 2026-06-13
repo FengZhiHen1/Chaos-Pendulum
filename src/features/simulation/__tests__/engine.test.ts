@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { odeRhs } from "../engine/derivatives";
-import { integratorStep } from "../engine/integrators";
-import { computeDerived, normalizeAngle, hasInvalidValue } from "../engine/state-vector";
-import { Float64Pool } from "../worker/float64-pool";
-import type { PendulumParams } from "@/shared/types";
+import { odeRhs } from "../domain/services/derivatives";
+import { integratorStep } from "../domain/services/integrators";
+import { computeDerived, normalizeAngle, hasInvalidValue } from "../domain/services/stateVector";
+import { Float64Pool } from "../infrastructure/worker/float64-pool";
+import type { PendulumParams } from "@/shared/domain/valueObjects";
 
 const defaultParams: PendulumParams = {
   m1: 1.0,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useButterflyStore } from "../butterfly-store";
-import type { StateVector, PendulumParams } from "@/shared/types";
+import type { StateVector, PendulumParams } from "@/shared/domain/valueObjects";
 
 const baseParams: PendulumParams = {
   m1: 1.0, m2: 1.0, L1: 1.0, L2: 1.0, g: 9.81, damping: 0,

@@ -1,4 +1,4 @@
-import type { StateVector } from "@/shared/types";
+import type { StateVector } from "@/shared/domain/valueObjects";
 import { useRootStore } from "@/stores/rootStore";
 
 /** 追加正向轨迹历史帧（由调度器每帧调用） */

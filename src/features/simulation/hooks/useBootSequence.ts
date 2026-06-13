@@ -1,10 +1,10 @@
 import { useLayoutEffect, useState, useCallback, useRef } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import { observabilityCoordinator } from "@/shared/lib/observability";
-import { initErrorCapture } from "@/shared/lib/observability";
-import { handleGlobalErrors } from "@/features/system/error-handling";
-import { getScheduler } from "@/features/simulation/worker/scheduler";
-import { createOdeWorker } from "@/features/simulation/worker/createOdeWorker";
+import { observabilityCoordinator } from "@/shared/infrastructure/observability";
+import { initErrorCapture } from "@/shared/infrastructure/observability";
+import { handleGlobalErrors } from "@/shared/infrastructure/error-handling";
+import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler";
+import { createOdeWorker } from "@/features/simulation/infrastructure/worker/createOdeWorker";
 import { prefetchPrecomputeData } from "@/shared/infrastructure/storage/precomputePrefetch";
 import {
   cleanupStalePyodideCache,

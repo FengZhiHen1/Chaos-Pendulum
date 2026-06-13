@@ -5,7 +5,7 @@ import {
   FrameField,
   DEFAULT_PARAMS,
   DEFAULT_INITIAL_CONDITIONS,
-} from "@/shared/types";
+} from "@/shared/domain/valueObjects";
 
 // ─── 辅助：构建模拟帧 buffer ──────────────────
 

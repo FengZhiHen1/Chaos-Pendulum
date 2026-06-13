@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useButterflyStore } from "../butterfly-store";
 import { useExploreStore } from "@/features/explore";
-import { createNoiseGenerator, type NoiseGenerator } from "@/shared/audio/noise-generator";
-import { getAudioContext } from "@/shared/audio/audio-context";
+import { createNoiseGenerator, type NoiseGenerator } from "@/shared/infrastructure/audio/noise-generator";
+import { getAudioContext } from "@/shared/infrastructure/audio/audio-context";
 import type { DeltaEditMode } from "../butterfly-store";
 
 // ─── 全局噪声实例（跨组件生命周期共享） ──────────

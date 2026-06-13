@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import { useAnalysisView } from "../hooks/useAnalysisView";
 import type { DampingSlice } from "../types";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";

@@ -11,38 +11,38 @@ export type CommandPayload =
       buffer?: Float64Array;
       frameCount?: number;
       simTime?: number;
-      poincarePoints?: import("@/shared/types").PoincarePoint[];
+      poincarePoints?: import("@/shared/domain/valueObjects").PoincarePoint[];
       forceData?: Float64Array;
-      forceExtrema?: import("@/shared/types").ForceExtrema;
+      forceExtrema?: import("@/shared/domain/valueObjects").ForceExtrema;
       energyCorrection?: number;
       lyapunovExponent?: number;
     }
-  | { type: "worker:error"; code: import("@/shared/types").ErrorCode; message: string; simTime: number }
+  | { type: "worker:error"; code: import("@/shared/domain/valueObjects").ErrorCode; message: string; simTime: number }
   | { type: "worker:crash"; event: ErrorEvent }
   | { type: "frame:consume"; buffer: Float64Array; frameIndex: number }
-  | { type: "frame:consumed"; state: import("@/shared/types").StateVector }
-  | { type: "history:push"; state: import("@/shared/types").StateVector }
+  | { type: "frame:consumed"; state: import("@/shared/domain/valueObjects").StateVector }
+  | { type: "history:push"; state: import("@/shared/domain/valueObjects").StateVector }
   | { type: "history:clear" }
   | { type: "history:pause" }
   | { type: "history:resume" }
   | { type: "scheduler:started" }
   | { type: "scheduler:paused" }
   | { type: "scheduler:resumed" }
-  | { type: "poincare:addPoints"; points: import("@/shared/types").PoincarePoint[] }
+  | { type: "poincare:addPoints"; points: import("@/shared/domain/valueObjects").PoincarePoint[] }
   | { type: "poincare:clear" }
-  | { type: "lab:forceData"; data: Float64Array; extrema?: import("@/shared/types").ForceExtrema }
+  | { type: "lab:forceData"; data: Float64Array; extrema?: import("@/shared/domain/valueObjects").ForceExtrema }
   | { type: "simulation:reset" }
   | { type: "simulation:runningChanged"; isRunning: boolean }
   | { type: "simulation:setRunning"; isRunning: boolean }
-  | { type: "simulation:overrideState"; state: import("@/shared/types").StateVector }
+  | { type: "simulation:overrideState"; state: import("@/shared/domain/valueObjects").StateVector }
   | { type: "scheduler:requestTick"; delta: number }
   | { type: "scheduler:setDirection"; direction: 1 | -1 }
   | { type: "scheduler:pause" }
   | { type: "scheduler:resume" }
-  | { type: "scheduler:reset"; initialConditions: import("@/shared/types").InitialConditions; simTime?: number }
+  | { type: "scheduler:reset"; initialConditions: import("@/shared/domain/valueObjects").InitialConditions; simTime?: number }
   | { type: "scheduler:prefetchBatch" }
   | { type: "scheduler:prefetchReady" }
-  | { type: "butterfly:frame"; side: "A" | "B"; state: import("@/shared/types").StateVector; energy: { kinetic: number; potential: number; total: number }; derived: { x1: number; y1: number; x2: number; y2: number }; simTime: number }
+  | { type: "butterfly:frame"; side: "A" | "B"; state: import("@/shared/domain/valueObjects").StateVector; energy: { kinetic: number; potential: number; total: number }; derived: { x1: number; y1: number; x2: number; y2: number }; simTime: number }
   | { type: "butterfly:workerReady"; side: "A" | "B"; ready: boolean }
   | { type: "butterfly:error"; side: "A" | "B"; simTime: number }
   | { type: "butterfly:crash"; side: "A" | "B" }

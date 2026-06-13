@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { PendulumParams, StateVector } from "@/shared/types";
+import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
 
 // ─── 类型定义 ────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useAppStore } from "../useAppStore";
-import { MODE_REGISTRY } from "@/shared/types";
-import type { AppMode } from "@/shared/types";
+import { MODE_REGISTRY } from "@/shared/domain/valueObjects";
+import type { AppMode } from "@/shared/domain/valueObjects";
 
 function resetStore(): void {
   useAppStore.setState({

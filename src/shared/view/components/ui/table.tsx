@@ -1,4 +1,4 @@
-import { cn } from "@/shared/lib/cn";
+import { cn } from "@/shared/infrastructure/cn";
 import type { HTMLAttributes, ThHTMLAttributes, TdHTMLAttributes } from "react";
 
 function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {

@@ -1,4 +1,4 @@
-import { cn } from "@/shared/lib/cn";
+import { cn } from "@/shared/infrastructure/cn";
 import { useExploreStore } from "../store";
 
 type TrailLength = 50 | 200 | 1000 | 0 | -1;

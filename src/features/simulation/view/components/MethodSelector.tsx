@@ -4,8 +4,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
-import type { IntegratorMethod } from "@/shared/types";
+} from "@/shared/view/components/ui/select";
+import type { IntegratorMethod } from "@/shared/domain/valueObjects";
 import { useSimulationStore } from "../../store";
 
 const METHOD_OPTIONS: {

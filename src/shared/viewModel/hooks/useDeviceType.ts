@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import type { DeviceType, DeviceInfo, DegradationRules } from "@/shared/types";
+import type { DeviceType, DeviceInfo, DegradationRules } from "@/shared/domain/valueObjects";
 import { BREAKPOINTS } from "@/shared/constants/breakpoints";
 
 export { BREAKPOINTS };

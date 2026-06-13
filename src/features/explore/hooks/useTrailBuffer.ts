@@ -3,7 +3,7 @@ import { Vector3 } from "three";
 import { RingBuffer } from "@/features/data";
 import { useSimulationStore, ball2Position, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
-import type { PendulumParams, StateVector } from "@/shared/types";
+import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
 
 // ─── 类型定义 ────────────────────────────────────
 

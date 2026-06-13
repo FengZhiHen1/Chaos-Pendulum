@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { useDeviceType } from "@/shared/hooks/useDeviceType";
+import { useDeviceType } from "@/shared/viewModel/hooks/useDeviceType";
 
 interface DeviceProviderProps {
   children: ReactNode;

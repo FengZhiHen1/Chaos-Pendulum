@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { Badge } from "@/shared/components/ui/badge";
-import { Skeleton } from "@/shared/components/ui/skeleton";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/view/components/ui/select";
+import { Badge } from "@/shared/view/components/ui/badge";
+import { Skeleton } from "@/shared/view/components/ui/skeleton";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/view/components/ui/table";
 import { useLabStore } from "@/features/lab/store";
 import { useSimulationStore } from "@/features/simulation/store";
-import { FORCE_STRIDE, ForceField } from "@/shared/types";
+import { FORCE_STRIDE, ForceField } from "@/shared/domain/valueObjects";
 
 type CoordSys = "cartesian" | "polar" | "natural";
 

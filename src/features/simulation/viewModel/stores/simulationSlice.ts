@@ -7,14 +7,14 @@ import type {
   ParamFieldMeta,
   ValidationResult,
   StateVector,
-} from "@/shared/types";
+} from "@/shared/domain/valueObjects";
 import {
   DEFAULT_PARAMS,
   DEFAULT_INITIAL_CONDITIONS,
   DEFAULT_METHOD,
   PARAM_META,
-} from "@/shared/types";
-import { FRAME_STRIDE, FrameField } from "@/shared/types";
+} from "@/shared/domain/valueObjects";
+import { FRAME_STRIDE, FrameField } from "@/shared/domain/valueObjects";
 
 const DRIFT_THRESHOLD = 0.005;
 /** 总能量绝对值低于此阈值时，改用绝对漂移判定 */

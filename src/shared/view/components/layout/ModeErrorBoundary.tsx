@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from "react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@/shared/view/components/ui/button";
 import { useAppStore } from "@/stores/useAppStore";
 
 interface Props {

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useSimulationStore } from "../store";
-import { cn } from "@/shared/lib/cn";
+import { cn } from "@/shared/infrastructure/cn";
 
 export interface UseEnergyMonitorAPI {
   driftPercent: string;

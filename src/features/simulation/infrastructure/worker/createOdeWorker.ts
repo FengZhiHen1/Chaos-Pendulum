@@ -1,5 +1,5 @@
-import type { WorkerResponse } from "@/shared/types";
-import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, DEFAULT_METHOD } from "@/shared/types";
+import type { WorkerResponse } from "@/shared/domain/valueObjects";
+import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, DEFAULT_METHOD } from "@/shared/domain/valueObjects";
 
 let globalWorker: Worker | null = null;
 
@@ -21,7 +21,7 @@ export function createOdeWorker(timeoutMs = 3000): Promise<Worker> {
 
     try {
       const worker = new Worker(
-        new URL("@/features/simulation/worker/ode-worker.ts", import.meta.url),
+        new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url),
         { type: "module" },
       );
 

@@ -1,4 +1,4 @@
-import type { PendulumParams, IntegratorMethod } from "@/shared/types";
+import type { PendulumParams, IntegratorMethod } from "@/shared/domain/valueObjects";
 import { odeRhs, angularAcceleration } from "./derivatives";
 
 // ─── Integrator 策略接口 ──────────────────────────

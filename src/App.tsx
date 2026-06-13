@@ -1,11 +1,11 @@
 import { DeviceProvider } from "@/shared/view/components/DeviceProvider";
-import { BootManager } from "@/features/simulation/ui/BootManager";
-import { AppShell } from "@/shared/components/layout/AppShell";
+import { BootManager } from "@/features/simulation/view/components/BootManager";
+import { AppShell } from "@/shared/view/components/layout/AppShell";
 import { ExplorePage } from "@/features/explore";
 import { AnalyzeModePage } from "@/features/analyze";
 import { LabPage } from "@/features/lab";
 import { StoryPage } from "@/features/story/StoryPage";
-import { DebugPanel } from "@/shared/components/debug";
+import { DebugPanel } from "@/shared/view/components/debug";
 import { ToastProvider } from "@/shared/view/components/ToastProvider";
 
 /**

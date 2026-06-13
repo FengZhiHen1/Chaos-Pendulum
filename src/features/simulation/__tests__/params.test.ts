@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSimulationStore } from "../store";
-import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, DEFAULT_METHOD } from "@/shared/types";
+import { DEFAULT_PARAMS, DEFAULT_INITIAL_CONDITIONS, DEFAULT_METHOD } from "@/shared/domain/valueObjects";
 
 // 重置 store 的辅助函数
 function resetStore(): void {

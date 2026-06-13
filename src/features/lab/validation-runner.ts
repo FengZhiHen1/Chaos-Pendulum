@@ -1,5 +1,5 @@
-import { integratorStep } from "@/features/simulation/engine/integrators";
-import type { PendulumParams, IntegratorMethod } from "@/shared/types";
+import { integratorStep } from "@/features/simulation/domain/services/integrators";
+import type { PendulumParams, IntegratorMethod } from "@/shared/domain/valueObjects";
 
 // ─── 类型 ─────────────────────────────────────────
 

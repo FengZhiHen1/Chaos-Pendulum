@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { LyapunovLayerType, HoverTooltipData, LoadStatus } from "@/features/analyze/types";
-import type { PoincareSectionCondition, PoincarePoint } from "@/shared/types";
+import type { PoincareSectionCondition, PoincarePoint } from "@/shared/domain/valueObjects";
 
 export type AnalysisView = "lyapunov" | "bifurcation" | "poincare" | "energy-landscape";
 

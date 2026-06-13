@@ -1,4 +1,4 @@
-import { openDB, putStore, getStore } from "@/shared/lib/cache/indexed-db";
+import { openDB, putStore, getStore } from "@/shared/infrastructure/storage/indexed-db";
 
 const DB_NAME = "chaos-pendulum-snapshots";
 const DB_VERSION = 1;

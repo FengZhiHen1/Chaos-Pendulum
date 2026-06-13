@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { cn } from "@/shared/lib/cn";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/shared/components/ui/tabs";
-import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/infrastructure/cn";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/shared/view/components/ui/tabs";
+import { Button } from "@/shared/view/components/ui/button";
 import { useAppStore } from "@/stores/useAppStore";
 import { Bug, X, Copy, Trash2, Activity, AlertTriangle, Clock } from "lucide-react";
 

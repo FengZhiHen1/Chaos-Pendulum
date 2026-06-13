@@ -1,4 +1,4 @@
-import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/types";
+import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/domain/valueObjects";
 import { useRootStore } from "@/stores/rootStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { getScheduler } from "./scheduler";

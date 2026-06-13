@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
-import type { AppMode } from "@/shared/types";
+import type { AppMode } from "@/shared/domain/valueObjects";
 
 const SHORTCUT_MAP: Record<string, AppMode> = {
   "1": "explore",

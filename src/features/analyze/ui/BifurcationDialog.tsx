@@ -1,4 +1,4 @@
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@/shared/view/components/ui/button";
 import { useSimulationStore } from "@/features/simulation";
 import type { BifurcationData } from "../types";
 import { classifyRegime, resolveStoreParam } from "../types";

@@ -1,4 +1,4 @@
-import { openDB, getStore, putStore } from "@/shared/lib/cache/indexed-db";
+import { openDB, getStore, putStore } from "@/shared/infrastructure/storage/indexed-db";
 import {
   PYODIDE_CACHE_DB_NAME,
   PYODIDE_CACHE_DB_VERSION,

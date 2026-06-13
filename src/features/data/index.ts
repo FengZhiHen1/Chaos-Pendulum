@@ -1,8 +1,8 @@
 export { useDataStore } from "./store";
-export { RingBuffer } from "./ring-buffer/ring-buffer";
-export { saveSnapshot, loadSnapshot, listSnapshots } from "./snapshot/snapshot-db";
-export type { Snapshot } from "./snapshot/snapshot-db";
-export { generateThumbnail } from "./snapshot/thumbnail";
-export { exportCSV } from "./export/csv-export";
-export { exportJSON } from "./export/json-export";
-export { exportPNG } from "./export/png-export";
+export { RingBuffer } from "./domain/valueObjects/RingBuffer";
+export { saveSnapshot, loadSnapshot, listSnapshots } from "./infrastructure/repositories/snapshotDb";
+export type { Snapshot } from "./infrastructure/repositories/snapshotDb";
+export { generateThumbnail } from "./infrastructure/storage/thumbnailGenerator";
+export { exportCSV } from "./infrastructure/export/csvExporter";
+export { exportJSON } from "./infrastructure/export/jsonExporter";
+export { exportPNG } from "./infrastructure/export/pngExporter";

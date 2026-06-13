@@ -1,4 +1,4 @@
-import type { PendulumParams } from "@/shared/types";
+import type { PendulumParams } from "@/shared/domain/valueObjects";
 
 /**
  * 分母近零保护阈值。
