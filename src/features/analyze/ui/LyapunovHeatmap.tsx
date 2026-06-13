@@ -5,7 +5,7 @@ import { useAnalyzeStore } from "../store";
 import { useSimulationStore } from "@/features/simulation";
 import { useAppStore } from "@/stores/useAppStore";
 import { useContainerSize } from "@/shared/hooks/useContainerSize";
-import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
+import { usePrecomputeData } from "@/features/analyze/hooks/usePrecomputeData";
 import { measure } from "@/shared/lib/observability/perf-mark";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Button } from "@/shared/components/ui/button";

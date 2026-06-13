@@ -1,5 +1,2 @@
-export { getAudioContext, resumeAudioContext, closeAudioContext } from "./audio-context";
-export { createSonificationEngine } from "./sonification";
-export type { SonificationParams, SonificationEngine } from "./sonification";
-export { createNoiseGenerator } from "./noise-generator";
-export type { NoiseGenerator } from "./noise-generator";
+/** @deprecated 请从 @/shared/infrastructure/audio 导入 */
+export * from "../infrastructure/audio/index";

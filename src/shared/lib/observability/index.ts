@@ -1,10 +1,2 @@
-export { ObservabilityCoordinator, observabilityCoordinator } from "./coordinator";
-export { FPSTracker } from "./fps-tracker";
-export { measure } from "./perf-mark";
-export { initErrorCapture, getErrors, clearErrors } from "./error-capture";
-export type {
-  WorkerLatencyRecord,
-  PyodideLoadPhase,
-  DebugPanelTab,
-  ObservabilityConfig,
-} from "./types";
+/** @deprecated 请从 @/shared/infrastructure/observability 导入 */
+export * from "../../infrastructure/observability/index";

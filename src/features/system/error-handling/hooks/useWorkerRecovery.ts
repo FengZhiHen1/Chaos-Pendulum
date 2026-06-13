@@ -63,7 +63,7 @@ export function useWorkerRecovery(
 
       workerRef.current?.terminate();
 
-      const newWorker = createOdeWorker();
+      const newWorker = await createOdeWorker();
       newWorker.postMessage({
         type: "init",
         params,

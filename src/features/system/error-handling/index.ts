@@ -1,26 +1,14 @@
 /**
- * SYS-02 运行时异常处理模块的公共接口。
- * 所有消费模块（ANL-01~04、SIM-01、LAB-03 等）从此文件导入。
+ * @deprecated 错误处理基础设施已迁至 shared/infrastructure/error-handling/
+ * 请从 @/shared/infrastructure/error-handling 导入纯函数，
+ * 从 @/shared/viewModel/hooks/ 导入 React Hook，
+ * 从 @/shared/view/components/ToastProvider 导入 ToastProvider。
  */
 
-// ---- Toast 通知 ----
-export { useToast } from "./hooks/useToast";
-export { notify } from "./notify";
-
-// ---- 错误翻译 ----
-export { translateError, inferErrorCodeFromMessage } from "./error-dictionary";
-
-// ---- 后台检测 ----
-export { useVisibilityChange } from "./hooks/useVisibilityChange";
-export { useAutoPause } from "./hooks/useAutoPause";
-
-// ---- 长运行降级 ----
-export { useLongRunningDetector } from "./hooks/useLongRunningDetector";
-
-// ---- Worker 崩溃恢复 ----
-export { useWorkerRecovery } from "./hooks/useWorkerRecovery";
-
-// ---- 类型导出 ----
+// 纯函数和类型 → shared/infrastructure/error-handling/
+export { notify } from "@/shared/infrastructure/error-handling/notify";
+export { translateError, inferErrorCodeFromMessage } from "@/shared/infrastructure/error-handling/error-dictionary";
+export { LONG_RUNNING_CONFIG } from "@/shared/infrastructure/error-handling/constants";
 export type {
   ErrorCode,
   ToastInput,
@@ -30,22 +18,27 @@ export type {
   VisibilityState,
   UseVisibilityChangeOptions,
   WorkerRecoverConfig,
-} from "./types";
+} from "@/shared/infrastructure/error-handling/types";
 
-export { LONG_RUNNING_CONFIG } from "./constants";
+// React Hook → shared/viewModel/hooks/
+export { useToast } from "@/shared/viewModel/hooks/useToast";
+export { useVisibilityChange } from "@/shared/viewModel/hooks/useVisibilityChange";
 
-// ---- INF-01 桥接初始化 ----
-import { inferErrorCodeFromMessage, translateError } from "./error-dictionary";
-import { notify } from "./notify";
+// 这些 Hook 已迁至 simulation，但仍从此 barrel 向后兼容导出
+export { useAutoPause } from "@/features/simulation/hooks/useAutoPause";
+export { useLongRunningDetector } from "@/features/simulation/hooks/useLongRunningDetector";
+export { useWorkerRecovery } from "@/features/simulation/hooks/useWorkerRecovery";
+
+// handleGlobalErrors 仍然在此定义（综合使用上述导出）
+import { inferErrorCodeFromMessage, translateError } from "@/shared/infrastructure/error-handling/error-dictionary";
+import { notify } from "@/shared/infrastructure/error-handling/notify";
 
 /**
  * 接收 INF-01 的全局错误捕获回调，自动翻译并 Toast。
- * 在 main.tsx 中通过 ObservabilityCoordinator.init 的第二个参数传入。
  */
 export function handleGlobalErrors(errors: string[]): void {
   if (!errors.length) return;
   const latest = errors[errors.length - 1]!;
-  // 解析时间戳前缀 `[ISO] message`
   const message = latest.replace(/^\[.*?\]\s*/, "");
   const code = inferErrorCodeFromMessage(message);
   const translated = translateError({ code, originalMessage: message });

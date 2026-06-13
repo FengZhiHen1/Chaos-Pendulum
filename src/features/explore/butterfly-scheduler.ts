@@ -2,7 +2,7 @@ import type { PendulumParams, StateVector, InitialConditions } from "@/shared/ty
 import type { WorkerResponse } from "@/shared/types";
 import { FRAME_STRIDE } from "@/shared/types";
 import { Float64Pool } from "@/features/simulation/worker/float64-pool";
-import { notify } from "@/features/system/error-handling/notify";
+import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { commandBus } from "@/stores/commandBus";
 import { useRootStore } from "@/stores/rootStore";
 import type { EnergySnapshot } from "@/stores/slices/butterflySlice";

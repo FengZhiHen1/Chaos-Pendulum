@@ -4,7 +4,7 @@ import { zoom as d3Zoom, zoomIdentity, type ZoomTransform } from "d3-zoom";
 import { select as d3Select } from "d3-selection";
 import { useContainerSize } from "@/shared/hooks/useContainerSize";
 import { useSimulationStore } from "@/features/simulation";
-import { usePrecomputeData } from "@/shared/lib/cache/precomputeCache";
+import { usePrecomputeData } from "@/features/analyze/hooks/usePrecomputeData";
 import { measure } from "@/shared/lib/observability/perf-mark";
 import { Button } from "@/shared/components/ui/button";
 import type { BifurcationData, BifurcationHoverData, BifurcationCursor } from "../types";

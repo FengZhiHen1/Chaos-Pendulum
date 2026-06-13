@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useEnergyMonitor } from "../hooks/useEnergyMonitor";
 import { EnergyCanvas } from "./EnergyCanvas";
 import { cn } from "@/shared/lib/cn";
-import { notify } from "@/features/system/error-handling/notify";
+import { notify } from "@/shared/infrastructure/error-handling/notify";
 
 interface EnergyMonitorPanelProps {
   width?: number;

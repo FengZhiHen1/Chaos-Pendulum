@@ -1,11 +1,6 @@
-/**
- * 统一后台可见性检测 hook。
- * 已迁移至 SYS-02（src/features/system/error-handling）。
- */
-export {
-  useVisibilityChange,
-} from "@/features/system/error-handling/hooks/useVisibilityChange";
+/** @deprecated 请从 @/shared/viewModel/hooks/useVisibilityChange 导入 */
+export { useVisibilityChange } from "@/shared/viewModel/hooks/useVisibilityChange";
 export type {
   UseVisibilityChangeOptions,
   VisibilityState,
-} from "@/features/system/error-handling/types";
+} from "@/shared/infrastructure/error-handling/types";

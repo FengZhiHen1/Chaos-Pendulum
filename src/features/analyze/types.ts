@@ -1,4 +1,4 @@
-import type { ErrorCode } from "@/features/system/error-handling/types";
+import type { ErrorCode } from "@/shared/infrastructure/error-handling/types";
 
 // ─── ANL-01 / ANL-02 共享类型定义 ──────────────────
 

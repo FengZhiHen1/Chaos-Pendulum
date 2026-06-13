@@ -1,12 +1,12 @@
 import { DeviceProvider } from "@/components/DeviceProvider";
-import { BootManager } from "@/features/system/init";
+import { BootManager } from "@/features/simulation/ui/BootManager";
 import { AppShell } from "@/shared/components/layout/AppShell";
 import { ExplorePage } from "@/features/explore";
 import { AnalyzeModePage } from "@/features/analyze";
 import { LabPage } from "@/features/lab";
 import { StoryPage } from "@/features/story/StoryPage";
 import { DebugPanel } from "@/shared/components/debug";
-import { ToastProvider } from "@/features/system/error-handling/components/ToastProvider";
+import { ToastProvider } from "@/shared/view/components/ToastProvider";
 
 /**
  * App 根组件。

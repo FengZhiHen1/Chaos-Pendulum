@@ -4,7 +4,7 @@ import { useSimulationStore, useSimulationHistory, getSimulationHistory, ball2Po
 import { useExploreStore } from "../store";
 import { commandBus } from "@/stores/commandBus";
 import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
-import { notify } from "@/features/system/error-handling/notify";
+import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { Dialog } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import type { DriftSample, ReversalMode } from "../store";

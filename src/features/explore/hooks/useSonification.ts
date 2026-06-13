@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "../store";
 import { useAppStore } from "@/stores/useAppStore";
-import { notify } from "@/features/system/error-handling/notify";
+import { notify } from "@/shared/infrastructure/error-handling/notify";
 import {
   getAudioContext,
   createSonificationEngine,
