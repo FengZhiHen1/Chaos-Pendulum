@@ -15,10 +15,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-from scipy.integrate import solve_ivp
-
 from config import BIFURCATION_SCAN, FIXED_PARAMS, INTEGRATION, OUTPUT_DIR, SOLVER_VERSION
-from common import double_pendulum_ode, detect_local_maxima, compute_grid_hash, safe_json_dump
+from common import (
+    rkf45_adaptive,
+    detect_local_maxima,
+    compute_grid_hash,
+    safe_json_dump,
+)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -124,41 +127,31 @@ def main():
             continue
 
         try:
-            # 积分瞬态阶段
-            sol_transient = solve_ivp(
-                double_pendulum_ode,
-                (0.0, transient_time),
-                y0,
-                args=(params,),
-                method="RK45",
-                rtol=1e-9,
-                atol=1e-12,
-                max_step=dt * 10,
-            )
-            if not sol_transient.success:
+            # 积分瞬态阶段：使用 rkf45_adaptive 逐步积分，与 JS Worker 完全一致
+            y = y0.copy().astype(np.float64)
+            transient_failed = False
+            for _ in range(transient_steps):
+                rkf45_adaptive(y, dt, params)
+                if np.isnan(y).any():
+                    transient_failed = True
+                    break
+            if transient_failed:
                 samples.append([])
                 continue
 
-            y_steady = sol_transient.y[:, -1]
-
-            # 积分采样阶段
-            t_eval_sample = np.arange(0.0, sample_time, dt)
-            sol_sample = solve_ivp(
-                double_pendulum_ode,
-                (0.0, sample_time),
-                y_steady,
-                args=(params,),
-                t_eval=t_eval_sample,
-                method="RK45",
-                rtol=1e-9,
-                atol=1e-12,
-                max_step=dt * 10,
-            )
-            if not sol_sample.success:
+            # 积分采样阶段：逐步积分，记录每步的 θ₂ 值
+            theta2_series = np.zeros(sample_steps)
+            sample_failed = False
+            for step in range(sample_steps):
+                rkf45_adaptive(y, dt, params)
+                if np.isnan(y).any():
+                    sample_failed = True
+                    break
+                theta2_series[step] = float(y[2])  # θ₂
+            if sample_failed:
                 samples.append([])
                 continue
 
-            theta2_series = sol_sample.y[2, :]  # θ₂ 序列
             maxima = detect_local_maxima(theta2_series, order=5)
             samples.append(maxima.tolist())
 

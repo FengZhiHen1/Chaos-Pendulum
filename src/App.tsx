@@ -1,4 +1,4 @@
-import { DeviceProvider } from "@/components/DeviceProvider";
+import { DeviceProvider } from "@/shared/view/components/DeviceProvider";
 import { BootManager } from "@/features/simulation/ui/BootManager";
 import { AppShell } from "@/shared/components/layout/AppShell";
 import { ExplorePage } from "@/features/explore";
