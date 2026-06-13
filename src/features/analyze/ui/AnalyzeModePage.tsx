@@ -5,6 +5,7 @@ import type { DampingSlice } from "../types";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
+import { EnergyLandscape } from "./EnergyLandscape";
 import { AnalysisControls } from "./AnalysisControls";
 import { BarChart3, Activity, ScatterChart, Mountain } from "lucide-react";
 
@@ -154,13 +155,7 @@ export function AnalyzeModePage() {
             <BifurcationPlot dataPath={bifurcationPath} />
           )}
           {activeView === "poincare" && <PoincareSection />}
-          {activeView === "energy-landscape" && (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-on-surface-variant">
-              <Mountain className="w-10 h-10 opacity-30" />
-              <p className="text-sm">能量景观 — 待实现 (P2)</p>
-              <p className="text-xs opacity-60">3D 势能曲面地形图，R3F 独立渲染</p>
-            </div>
-          )}
+          {activeView === "energy-landscape" && <EnergyLandscape />}
         </div>
       </div>
 
@@ -169,7 +164,7 @@ export function AnalyzeModePage() {
         <div className="h-10 shrink-0 flex items-center justify-center bg-surface-container-low border-t border-white/5 text-xs text-on-surface-variant/70">
           <span className="flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-on-surface-variant/40" />
-            分析参数选择 — 折叠面板适配开发中
+            分析参数选择 — 点击展开
           </span>
         </div>
       )}
