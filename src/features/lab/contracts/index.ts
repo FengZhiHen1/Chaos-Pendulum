@@ -1,19 +1,21 @@
 /**
- * lab.contracts — 受力拆解视图功能域的契约聚合出口。
+ * lab.contracts — 受力拆解视图 + 物理验证套件功能域的契约聚合出口。
  *
- * 核心接口：
+ * LAB-01 受力拆解：
  *   - IForceDecompositionController: 受力拆解控制器
- *   - FORCE_ARROW_REGISTRY: 8 个力矢量箭头定义（上/下摆×重/张/惯切/惯法）
- *   - FORCE_DISPLAY_COLORS: 力矢量颜色方案
+ *   - FORCE_ARROW_REGISTRY: 8 个力矢量箭头定义
+ *   - FORCE_DISPLAY_COLORS / FORCE_DECOMPOSITION_DEFAULTS
  *
- * 常量：
- *   - FORCE_DECOMPOSITION_DEFAULTS: 箭头几何参数 + 移动端降级
+ * LAB-02 物理验证：
+ *   - IValidationRunner / IValidationController: 验证运行器+生命周期
+ *   - ValidationTestKey / ValidationStatus / IValidationResult: 类型定义
+ *   - VALIDATION_THRESHOLDS / VALIDATION_DEFAULTS: 阈值常量
  *
  * Usage:
- *     import { IForceDecompositionController } from "@/features/lab/contracts";
- *     import { FORCE_ARROW_REGISTRY, FORCE_DISPLAY_COLORS } from "@/features/lab/contracts";
+ *     import { IForceDecompositionController, IValidationRunner } from "@/features/lab/contracts";
  */
 
+// ─── LAB-01 受力拆解 ──────────────────────────
 export type {
   ForceKind,
   CoordinateSystem,
@@ -26,3 +28,16 @@ export {
   FORCE_DISPLAY_COLORS,
   FORCE_DECOMPOSITION_DEFAULTS,
 } from "./force-decomposition.contract";
+
+// ─── LAB-02 物理验证 ──────────────────────────
+export type {
+  ValidationTestKey,
+  ValidationStatus,
+  IValidationResult,
+  IValidationRunner,
+  IValidationController,
+} from "./physics-validation.contract";
+export {
+  VALIDATION_THRESHOLDS,
+  VALIDATION_DEFAULTS,
+} from "./physics-validation.contract";
