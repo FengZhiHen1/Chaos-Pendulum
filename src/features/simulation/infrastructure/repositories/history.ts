@@ -1,5 +1,51 @@
 import type { StateVector } from "@/shared/domain/valueObjects";
+import type { IHistoryRepository } from "../../contracts";
 import { useRootStore } from "@/stores/rootStore";
+
+/**
+ * 仿真历史数据仓储——实现 IHistoryRepository 契约接口。
+ *
+ * 内部委托给 Zustand Store 的 history slice 进行增删查改。
+ * 录制暂停期间 push() 静默忽略，确保反演期间反向帧不污染正向历史。
+ */
+export class SimulationHistoryRepository implements IHistoryRepository {
+  /** 追加一帧状态到历史。录制暂停时静默忽略。 */
+  push(state: StateVector): void {
+    useRootStore.getState().pushHistory(state);
+  }
+
+  /** 暂停录制——反演期间调用，防止反向帧污染正向历史 */
+  pauseRecording(): void {
+    useRootStore.getState().pauseHistory();
+  }
+
+  /** 恢复录制 */
+  resumeRecording(): void {
+    useRootStore.getState().resumeHistory();
+  }
+
+  /** 获取完整正向历史（时间顺序副本） */
+  toArray(): readonly StateVector[] {
+    return useRootStore.getState().getHistoryArray();
+  }
+
+  /** 当前历史帧数 */
+  get length(): number {
+    return useRootStore.getState().getHistoryLength();
+  }
+
+  /** 清空全部历史 */
+  clear(): void {
+    useRootStore.getState().clearHistory();
+  }
+
+  /** 录制是否活跃 */
+  get isRecording(): boolean {
+    return !useRootStore.getState()._recordingPaused;
+  }
+}
+
+// ─── 保持原有函数式 API（向后兼容）──────────────
 
 /** 追加正向轨迹历史帧（由调度器每帧调用） */
 export function pushSimulationHistory(state: StateVector): void {

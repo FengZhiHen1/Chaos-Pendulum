@@ -1,18 +1,9 @@
 import type { PendulumParams } from "@/shared/domain/valueObjects";
+import type { IEnergyCalculator, IEnergyProjector, EnergyDataPoint, DerivedValues } from "../../contracts";
 import { angularAcceleration } from "./derivatives";
 
-/** 计算后的派生值 */
-export interface DerivedValues {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  kineticEnergy: number;
-  potentialEnergy: number;
-  totalEnergy: number;
-  alpha1: number;
-  alpha2: number;
-}
+// 重新导出契约类型，供 simulation/index.ts 使用
+export type { DerivedValues } from "../../contracts";
 
 // ─── 能量计算（computeDerived 与 projectEnergy 共享）──
 
@@ -22,7 +13,7 @@ interface EnergyComponents {
   totalEnergy: number;
 }
 
-function computeEnergies(state: Float64Array, p: PendulumParams): EnergyComponents {
+function computeEnergies(state: Float64Array, p: { m1: number; m2: number; L1: number; L2: number; g: number }): EnergyComponents {
   const t1 = state[0]!, w1 = state[1]!;
   const t2 = state[2]!, w2 = state[3]!;
   const { L1, L2, m1, m2, g } = p;
@@ -38,6 +29,42 @@ function computeEnergies(state: Float64Array, p: PendulumParams): EnergyComponen
   const K = 0.5 * m1 * (v1x * v1x + v1y * v1y) + 0.5 * m2 * (v2x * v2x + v2y * v2y);
 
   return { kineticEnergy: K, potentialEnergy: V, totalEnergy: K + V };
+}
+
+// ─── 契约接口实现 ──────────────────────────────────
+
+/**
+ * 能量计算器——实现 IEnergyCalculator 契约接口。
+ *
+ * 内部委托给 computeEnergies() 纯函数。
+ */
+export class EnergyCalculator implements IEnergyCalculator {
+  /** 计算当前帧的能量数据 */
+  compute(
+    state: Float64Array,
+    params: { m1: number; m2: number; L1: number; L2: number; g: number },
+    t: number,
+  ): EnergyDataPoint {
+    const { kineticEnergy, potentialEnergy, totalEnergy } = computeEnergies(state, params);
+    return { t, K: kineticEnergy, V: potentialEnergy, E: totalEnergy };
+  }
+}
+
+/**
+ * 能量投影器——实现 IEnergyProjector 契约接口。
+ *
+ * 等比缩放角速度使总能量回到目标值（保守系统专用）。
+ * 内部委托给 projectEnergy() 纯函数。
+ */
+export class EnergyProjector implements IEnergyProjector {
+  /** 投影角速度使能量回到目标值。返回校正量 */
+  project(
+    state: Float64Array,
+    params: { m1: number; m2: number; L1: number; L2: number; g: number },
+    targetEnergy: number,
+  ): number {
+    return projectEnergy(state, params, targetEnergy);
+  }
 }
 
 // ─── 派生量计算 ──────────────────────────────────
@@ -98,7 +125,7 @@ export function ball2Position(
  */
 export function projectEnergy(
   state: Float64Array,
-  p: PendulumParams,
+  p: { m1: number; m2: number; L1: number; L2: number; g: number },
   targetEnergy: number,
 ): number {
   const w1 = state[1]!, w2 = state[3]!;

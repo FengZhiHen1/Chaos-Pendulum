@@ -1,7 +1,7 @@
 import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/domain/valueObjects";
 import { useRootStore } from "@/stores/rootStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
-import { getScheduler } from "./scheduler";
+import { getScheduler } from "./scheduler-factory";
 
 let workerReady = false;
 const pendingCommands: Array<{ type: string; data: unknown }> = [];

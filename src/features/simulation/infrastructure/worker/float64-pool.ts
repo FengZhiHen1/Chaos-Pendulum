@@ -1,11 +1,15 @@
+import type { IFloat64Pool } from "../../contracts";
+
 const POOL_COUNT = 10;
 const POOL_SIZE = 4000; // > BUFFER_LENGTH (1680)
 
 /**
  * Float64Array 对象池。
  * 主线程 acquire() 获取 buffer → transfer 到 Worker → Worker transfer 回 → release() 归还。
+ *
+ * 实现 IFloat64Pool 契约接口。
  */
-export class Float64Pool {
+export class Float64Pool implements IFloat64Pool {
   private buffers: (Float64Array | null)[];
   private free: number[];
   /** WeakMap 用于从 buffer 引用反向查找池索引，供 release 时使用 */

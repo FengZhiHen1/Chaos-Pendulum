@@ -1,7 +1,7 @@
 import { usePhaseSpace } from "../../hooks/usePhaseSpace";
 import { useAppStore } from "@/stores/useAppStore";
 import { PhaseSpaceCanvas } from "./PhaseSpaceCanvas";
-import type { PhaseVariable } from "./PhaseSpaceCanvas";
+import type { PhaseVariable } from "../../contracts";
 
 interface PhaseSpacePanelProps {
   size?: number;

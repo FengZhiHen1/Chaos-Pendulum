@@ -1,24 +1,58 @@
 import type { PendulumParams, IntegratorMethod } from "@/shared/domain/valueObjects";
+import type { IIntegrator, IIntegratorRegistry } from "../../contracts";
 import { odeRhs, angularAcceleration } from "./derivatives";
-
-// ─── Integrator 策略接口 ──────────────────────────
-
-export interface Integrator {
-  readonly method: IntegratorMethod;
-  /** 原地更新 state: Float64Array(4) = [θ₁, ω₁, θ₂, ω₂]，零堆分配 */
-  step(state: Float64Array, p: PendulumParams, dt: number): void;
-}
 
 // ─── 注册表 ─────────────────────────────────────
 
-const registry = new Map<IntegratorMethod, Integrator>();
+/**
+ * 积分器注册表——全局策略分发中心。
+ *
+ * 实现 IIntegratorRegistry 契约接口。
+ * 前置: 所有内置积分器已在模块加载时注册
+ * 后置: get() 返回对应 method 的积分器或默认 RKF45
+ * 输入约束: method 为 "RKF45" | "VelocityVerlet" | "Euler"
+ * 输出约束: 永不返回 undefined（未注册时返回默认 RKF45）
+ */
+export class IntegratorRegistry implements IIntegratorRegistry {
+  private readonly registry = new Map<IntegratorMethod, IIntegrator>();
+  private defaultIntegrator: IIntegrator | null = null;
 
-export function registerIntegrator(integrator: Integrator): void {
-  registry.set(integrator.method, integrator);
+  /** 注册一个积分器策略 */
+  register(integrator: IIntegrator): void {
+    this.registry.set(integrator.method, integrator);
+  }
+
+  /** 获取指定方法的积分器；不存在时返回默认 RKF45 */
+  get(method: IntegratorMethod): IIntegrator {
+    return this.registry.get(method) ?? this.getDefault();
+  }
+
+  /** 获取并缓存默认积分器 */
+  private getDefault(): IIntegrator {
+    if (!this.defaultIntegrator) {
+      const existing = this.registry.get("RKF45");
+      if (existing) {
+        this.defaultIntegrator = existing;
+      } else {
+        this.defaultIntegrator = new RKF45Integrator();
+        this.registry.set("RKF45", this.defaultIntegrator);
+      }
+    }
+    return this.defaultIntegrator;
+  }
 }
 
-export function getIntegrator(method: IntegratorMethod): Integrator | undefined {
-  return registry.get(method);
+/** 模块级注册表单例 */
+const globalRegistry = new IntegratorRegistry();
+
+/** 注册积分器到全局注册表（向后兼容的函数式 API） */
+export function registerIntegrator(integrator: IIntegrator): void {
+  globalRegistry.register(integrator);
+}
+
+/** 从全局注册表获取积分器（向后兼容的函数式 API） */
+export function getIntegrator(method: IntegratorMethod): IIntegrator | undefined {
+  return globalRegistry.get(method);
 }
 
 // ─── Butcher 表系数 (Fehlberg 4(5) 嵌入对) ───────
@@ -56,7 +90,13 @@ const B45 = -1 / 5;
 
 const RKF45_DEFAULT_TOL = 1e-7;
 
-export class RKF45Integrator implements Integrator {
+/**
+ * RKF45 (Runge-Kutta-Fehlberg 4(5)) 自适应步长积分器。
+ * 使用 Fehlberg 嵌入对进行误差估计和步长控制。
+ *
+ * 实现 IIntegrator 契约接口。
+ */
+export class RKF45Integrator implements IIntegrator {
   readonly method: IntegratorMethod = "RKF45";
 
   private readonly tol: number;
@@ -83,7 +123,6 @@ export class RKF45Integrator implements Integrator {
     const dir = dt >= 0 ? 1 : -1;
     let remaining = Math.abs(dt);
     let h = remaining;
-    let prevErr = 1e-7;
 
     while (remaining > 1e-14) {
       h = Math.min(h, remaining);
@@ -94,9 +133,8 @@ export class RKF45Integrator implements Integrator {
       if (err < this.tol) {
         remaining -= h;
         this.save.set(state);
-        prevErr = Math.max(err, 1e-15);
 
-        const fac = Math.min(5, 0.9 * Math.pow(this.tol / prevErr, 0.2));
+        const fac = Math.min(5, 0.9 * Math.pow(this.tol / Math.max(err, 1e-15), 0.2));
         h = Math.min(remaining, h * (err < this.tol * 0.01 ? Math.min(fac, 3) : fac));
       } else {
         state.set(this.save);
@@ -150,7 +188,12 @@ export class RKF45Integrator implements Integrator {
 
 // ─── Velocity Verlet 积分器 ──────────────────────
 
-export class VelocityVerletIntegrator implements Integrator {
+/**
+ * Velocity Verlet 辛积分器——能量守恒优于 RKF45。
+ *
+ * 实现 IIntegrator 契约接口。
+ */
+export class VelocityVerletIntegrator implements IIntegrator {
   readonly method: IntegratorMethod = "VelocityVerlet";
 
   private readonly alphaBuf0 = new Float64Array(2);
@@ -170,7 +213,12 @@ export class VelocityVerletIntegrator implements Integrator {
 
 // ─── Euler（显式欧拉，教育用途）───────────────────
 
-export class EulerIntegrator implements Integrator {
+/**
+ * 显式欧拉法积分器——仅用于教学演示，精度最低。
+ *
+ * 实现 IIntegrator 契约接口。
+ */
+export class EulerIntegrator implements IIntegrator {
   readonly method: IntegratorMethod = "Euler";
 
   private readonly tmp = new Float64Array(4);
@@ -191,16 +239,11 @@ registerIntegrator(new EulerIntegrator());
 
 // ─── 公开入口 ───────────────────────────────────
 
-let _defaultIntegrator: Integrator | null = null;
-
-function getDefaultIntegrator(): Integrator {
-  if (!_defaultIntegrator) _defaultIntegrator = new RKF45Integrator();
-  return _defaultIntegrator;
-}
-
 /**
  * 单步积分，根据 method 选择对应实现。
  * 原地更新 state: Float64Array(4) -> [θ₁, ω₁, θ₂, ω₂]。
+ *
+ * 向后兼容的函数式 API，内部委托给 IntegratorRegistry。
  */
 export function integratorStep(
   state: Float64Array,
@@ -208,7 +251,7 @@ export function integratorStep(
   dt: number,
   method: IntegratorMethod,
 ): void {
-  const integrator = registry.get(method) ?? getDefaultIntegrator();
+  const integrator = globalRegistry.get(method);
   integrator.step(state, p, dt);
 }
 

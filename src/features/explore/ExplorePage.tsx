@@ -14,7 +14,7 @@ import { useSimulationControls } from "@/features/simulation/hooks/useSimulation
 import { useButterflyMode } from "./hooks/useButterflyMode";
 import { useAppStore } from "@/stores/useAppStore";
 import { useLabStore } from "@/features/lab/store";
-import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler";
+import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";
 import { DecompositionPanel } from "@/features/lab/components/DecompositionPanel";
 import { Button } from "@/shared/view/components/ui/button";
 

@@ -23,8 +23,9 @@ export { usePhaseSpace } from "./hooks/usePhaseSpace";
 
 // ─── Infrastructure — Worker ──────────────────────
 export { Float64Pool } from "./infrastructure/worker/float64-pool";
-export { SimulationScheduler, getScheduler } from "./infrastructure/worker/scheduler";
+export { SimulationScheduler } from "./infrastructure/worker/scheduler";
 export type { InterpSnapshot } from "./infrastructure/worker/scheduler";
+export { getScheduler, releaseScheduler } from "./infrastructure/worker/scheduler-factory";
 export { setupSimulationBridge, setWorkerReady, setWorkerNotReady } from "./infrastructure/worker/bridge";
 
 // ─── Infrastructure — History ─────────────────────
@@ -45,7 +46,7 @@ export { EnergyMonitorPanel } from "./view/components/EnergyMonitorPanel";
 export { EnergyCanvas } from "./view/components/EnergyCanvas";
 export type { EnergyDataPoint } from "./view/components/EnergyCanvas";
 export { PhaseSpacePanel, exportPhaseSpaceImage } from "./view/components/PhaseSpacePanel";
-export type { PhaseVariable } from "./view/components/PhaseSpacePanel";
+export type { PhaseVariable } from "./contracts";
 export { PhaseSpaceCanvas } from "./view/components/PhaseSpaceCanvas";
 
 // ─── View — Boot ──────────────────────────────────

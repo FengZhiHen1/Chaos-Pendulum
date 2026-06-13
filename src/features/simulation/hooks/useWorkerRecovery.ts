@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { RefObject } from "react";
 import { useSimulationStore } from "@/features/simulation/store";
-import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler";
+import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";
 import { createOdeWorker } from "@/features/simulation/infrastructure/worker/createOdeWorker";
 import type { WorkerRecoverConfig } from "@/shared/infrastructure/error-handling/types";
 import { notify } from "@/shared/infrastructure/error-handling/notify";

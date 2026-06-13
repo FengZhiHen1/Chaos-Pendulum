@@ -3,7 +3,7 @@ import { useAppStore } from "@/stores/useAppStore";
 import { observabilityCoordinator } from "@/shared/infrastructure/observability";
 import { initErrorCapture } from "@/shared/infrastructure/observability";
 import { handleGlobalErrors } from "@/shared/infrastructure/error-handling";
-import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler";
+import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";
 import { createOdeWorker } from "@/features/simulation/infrastructure/worker/createOdeWorker";
 import { prefetchPrecomputeData } from "@/shared/infrastructure/storage/precomputePrefetch";
 import {

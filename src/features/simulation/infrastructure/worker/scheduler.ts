@@ -7,13 +7,15 @@ import type {
   PoincarePoint,
 } from "@/shared/domain/valueObjects";
 import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/domain/valueObjects";
-import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useRootStore } from "@/stores/rootStore";
 import { observabilityCoordinator } from "@/shared/infrastructure/observability";
+import type { IWorkerGateway, IFloat64Pool, IWorkerRecoveryPolicy } from "../../contracts";
+import { ISimulationScheduler } from "../../contracts";
 
 const TIMEOUT_MS = 2000;
-const MAX_CRASH_RECOVERY = 1;
+const TICK_DT = 1 / 60;
+const MAX_TICKS_PER_FRAME = 3;
 
 /** 供渲染层插值使用的坐标快照 */
 export interface InterpSnapshot {
@@ -23,57 +25,146 @@ export interface InterpSnapshot {
   y2: number;
 }
 
-export class SimulationScheduler {
-  private worker: Worker | null = null;
-  private pool: Float64Pool;
-  /** 当前正在消费的缓冲区 */
+/**
+ * 仿真调度器——管理仿真生命周期、双缓冲帧消费、Worker 通信协调。
+ * 继承 ISimulationScheduler 抽象基类，实现所有抽象方法和钩子。
+ */
+export class SimulationScheduler extends ISimulationScheduler {
+  // 帧缓冲
   private activeBuffer: Float64Array | null = null;
-  /** activeBuffer 的消费位置 */
   private activeIndex = 0;
-  /** activeBuffer 的实际帧数（通常 = FRAMES_PER_BATCH，末批可能更少） */
   private activeFrameCount = FRAMES_PER_BATCH;
-  /** activeBuffer 对应的池槽位索引，用于归还 */
   private activePoolIndex = -1;
-  /** 提前到达的下一批次缓冲区（等待 activeBuffer 消费完毕后提升） */
   private nextBuffer: Float64Array | null = null;
-  /** nextBuffer 的帧数 */
   private nextFrameCount = 0;
-  /** nextBuffer 对应的池槽位索引 */
   private nextPoolIndex = -1;
-  /** nextBuffer 关联的力数据（延迟转发） */
   private nextForceData: Float64Array | null = null;
-  /** nextBuffer 关联的庞加莱截面点（延迟转发） */
   private nextPoincarePoints: PoincarePoint[] | null = null;
   private pendingBatch = false;
-  /** 当前 pending 请求使用的池槽位索引 */
   private pendingPoolIndex = -1;
+  /** 批次序列号——每次 requestNextBatch 递增，handleMessage 中校验以防御 Worker 超时后旧批次竞态 */
+  private batchSequence = 0;
+  /** 当前等待中的批次序列号（-1 表示无挂起批次） */
+  private pendingSequence = -1;
+
+  // 生命周期
+  private _running = false;
   private rafId = 0;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
-  private crashCount = 0;
-  private running = false;
+
+  // 回调
   private readyCallbacks: Array<() => void> = [];
   private poincareCondition: PoincareSectionCondition | null = null;
   private poincareCallbacks: Array<(pts: PoincarePoint[]) => void> = [];
   private externalTick = false;
   private prefetchCallback: (() => void) | null = null;
-  /** prefetchBatch 调用时若 pendingBatch 为 true，标记到达的旧批次应丢弃 */
   private discardNextBatch = false;
 
-  // 渲染插值用的前后帧快照（由 consumeOneFrame 维护）
+  // 插值快照
   private prevSnapshot: InterpSnapshot | null = null;
   private currSnapshot: InterpSnapshot | null = null;
 
-  constructor() {
-    this.pool = new Float64Pool();
+  // delta 累积
+  private tickAcc = 0;
+
+  constructor(
+    workerGateway: IWorkerGateway,
+    pool: IFloat64Pool,
+    recoveryPolicy: IWorkerRecoveryPolicy,
+  ) {
+    super(workerGateway, pool, recoveryPolicy);
+    this.workerGateway.onMessage((resp) => this.handleMessage(resp));
   }
 
-  /** 注册 Worker ready 回调 */
-  onReady(cb: () => void): void {
-    this.readyCallbacks.push(cb);
+  // ═══ 抽象方法 (ISimulationScheduler) ═══
+
+  override pause(): void {
+    this._running = false;
+    this.cancelLoop();
+    this.cancelTimer();
   }
 
-  /** 注册庞加莱截面点到达回调，返回取消注册函数 */
-  onPoincarePoints(cb: (pts: PoincarePoint[]) => void): () => void {
+  override resume(): void {
+    if (this._running) return;
+    this._running = true;
+    if (!this.externalTick) this.rafId = requestAnimationFrame(() => this.loop());
+  }
+
+  override destroy(): void {
+    this.pause();
+    this.releaseBuffers();
+    this.activeIndex = 0;
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
+    this.pendingBatch = false;
+    this.recoveryPolicy.resetCounter();
+    this.poincareCondition = null;
+    this.prevSnapshot = null;
+    this.currSnapshot = null;
+    this.workerGateway.destroy();
+  }
+
+  override reset(ic: InitialConditions, simTime?: number): void {
+    this.releaseBuffers();
+    this.activeIndex = 0;
+    this.nextForceData = null;
+    this.nextPoincarePoints = null;
+    this.pendingBatch = false;
+    this.prevSnapshot = null;
+    this.currSnapshot = null;
+    this.workerGateway.sendReset(ic, simTime);
+  }
+
+  override updateParams(params: Partial<PendulumParams>): void {
+    this.workerGateway.sendUpdateParams(params);
+  }
+
+  override setMethod(method: IntegratorMethod): void {
+    this.workerGateway.sendMethod(method);
+  }
+
+  override setDirection(direction: 1 | -1): void {
+    this.workerGateway.sendDirection(direction);
+  }
+
+  override setPoincareCondition(cond: PoincareSectionCondition | null): void {
+    this.poincareCondition = cond;
+  }
+
+  override enableExternalTick(): void {
+    this.externalTick = true;
+    this.cancelLoop();
+  }
+
+  override disableExternalTick(): void {
+    this.externalTick = false;
+  }
+
+  override tick(): boolean {
+    if (!this._running) return false;
+    return this.consumeOneFrame();
+  }
+
+  override tickDelta(delta: number): number {
+    if (!this._running) return 0;
+    this.tickAcc += delta;
+    let consumed = 0;
+    while (this.tickAcc >= TICK_DT && consumed < MAX_TICKS_PER_FRAME) {
+      if (this.consumeOneFrame()) { this.tickAcc -= TICK_DT; consumed++; }
+      else break;
+    }
+    return consumed;
+  }
+
+  override getInterpolationFrames(): { prev: InterpSnapshot | null; curr: InterpSnapshot | null } {
+    return { prev: this.prevSnapshot, curr: this.currSnapshot };
+  }
+
+  override get isRunning(): boolean { return this._running; }
+
+  override onReady(cb: () => void): void { this.readyCallbacks.push(cb); }
+
+  override onPoincarePoints(cb: (pts: PoincarePoint[]) => void): () => void {
     this.poincareCallbacks.push(cb);
     return () => {
       const idx = this.poincareCallbacks.indexOf(cb);
@@ -81,319 +172,88 @@ export class SimulationScheduler {
     };
   }
 
-  /** 设置当前庞加莱截面条件 */
-  setPoincareCondition(cond: PoincareSectionCondition | null): void {
-    this.poincareCondition = cond;
-  }
+  // ═══ 钩子 (ISimulationScheduler protected abstract) ═══
 
-  /** 启用外部 tick 模式：start/resume 不再启动内部 rAF，由渲染层驱动 */
-  enableExternalTick(): void {
-    this.externalTick = true;
-    if (this.rafId) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = 0;
-    }
-  }
-
-  /** 禁用外部 tick 模式，恢复内部 rAF 循环 */
-  disableExternalTick(): void {
-    this.externalTick = false;
-  }
-
-  // ─── 公开 API ────────────────────────────────
-
-  /** 注入外部已创建的 Worker 实例（供 SYS-04 启动流程使用） */
-  injectWorker(worker: Worker): void {
-    if (this.worker) {
-      this.worker.terminate();
-    }
-    this.worker = worker;
-    this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      this.handleWorkerMessage(e.data);
-    };
-    this.worker.onerror = (event) => {
-      this.handleWorkerCrash(event);
-    };
-  }
-
-  /** 启动仿真 */
-  start(
-    params: PendulumParams,
-    initialConditions: InitialConditions,
-    method: IntegratorMethod,
-  ): void {
-    if (this.running) return;
-    this.running = true;
-
-    if (!this.worker) {
-      this.createWorker();
-    }
-
-    // 丢弃 reset 阶段预取的旧批次，避免与 init 后的新批次产生位置跳跃
-    if (this.activeBuffer) {
-      this.pool.release(this.activePoolIndex, this.activeBuffer);
-      this.activeBuffer = null;
-      this.activePoolIndex = -1;
-    }
-    if (this.nextBuffer) {
-      this.pool.release(this.nextPoolIndex, this.nextBuffer);
-      this.nextBuffer = null;
-      this.nextPoolIndex = -1;
-    }
-    this.activeIndex = 0;
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
-    }
-    this.pendingBatch = false;
-    if (this.pendingPoolIndex >= 0) {
-      this.pool.release(this.pendingPoolIndex);
-      this.pendingPoolIndex = -1;
-    }
-
+  protected override onStart(): void {
+    this._running = true;
+    this.recoveryPolicy.resetCounter();
     commandBus.emit({ type: "history:clear" });
     this.prevSnapshot = null;
     this.currSnapshot = null;
-    this.send({
-      type: "init",
-      params,
-      initialConditions,
-      method,
-    });
-    if (!this.externalTick) {
-      this.rafId = requestAnimationFrame(() => this.loop());
+    if (!this.externalTick) this.rafId = requestAnimationFrame(() => this.loop());
+  }
+
+  protected override _do_requestBatch(): void { this.requestNextBatch(); }
+
+  protected override _do_handleBatch(buffer: Float64Array, frameCount: number): void {
+    if (this.activeBuffer !== null && this.activeIndex < FRAMES_PER_BATCH) {
+      if (this.nextBuffer) this.pool.release(this.nextPoolIndex, this.nextBuffer);
+      this.nextBuffer = buffer;
+      this.nextFrameCount = frameCount;
+      this.nextPoolIndex = this.pendingPoolIndex;
+      this.pendingPoolIndex = -1;
     }
   }
 
-  /** 暂停仿真 */
-  pause(): void {
-    this.running = false;
-    if (this.rafId) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = 0;
-    }
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
-    }
-  }
-
-  /** 恢复仿真 */
-  resume(): void {
-    if (this.running || !this.worker) return;
-    this.running = true;
-    if (!this.externalTick) {
-      this.rafId = requestAnimationFrame(() => this.loop());
-    }
-  }
-
-  /** 停止并销毁 */
-  destroy(): void {
-    this.pause();
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-    }
-    if (this.activeBuffer) {
-      this.pool.release(this.activePoolIndex);
-      this.activeBuffer = null;
-      this.activePoolIndex = -1;
-    }
-    if (this.nextBuffer) {
-      this.pool.release(this.nextPoolIndex);
-      this.nextBuffer = null;
-      this.nextPoolIndex = -1;
-    }
+  protected override discardBuffers(): void {
+    this.releaseBuffers();
+    this.activeIndex = 0;
+    this.cancelTimer();
+    this.pendingBatch = false;
     if (this.pendingPoolIndex >= 0) {
       this.pool.release(this.pendingPoolIndex);
       this.pendingPoolIndex = -1;
     }
-    this.activeIndex = 0;
-    this.nextForceData = null;
-    this.nextPoincarePoints = null;
-    this.pendingBatch = false;
-    this.crashCount = 0;
-    this.poincareCondition = null;
-    this.prevSnapshot = null;
-    this.currSnapshot = null;
   }
 
-  /** 更新物理参数 */
-  updateParams(params: Partial<PendulumParams>): void {
-    this.send({ type: "updateParams", params });
+  // ═══ 扩展方法 ═══
+
+  /** 注入外部已创建的 Worker 实例（向后兼容 useBootSequence） */
+  injectWorker(worker: Worker): void {
+    this.workerGateway.injectWorker(worker);
+    worker.onerror = (event) => this.handleCrash(event);
   }
 
-  /** 更改积分方法 */
-  setMethod(method: IntegratorMethod): void {
-    this.send({ type: "setMethod", method });
-  }
-
-  /** 切换积分方向 */
-  setDirection(direction: 1 | -1): void {
-    this.send({ type: "setDirection", direction });
-  }
-
-  /** 开关力计算（LAB-01 受力分析） */
+  /** 开关力计算 */
   setComputeForces(active: boolean): void {
-    this.send({ type: "config", computeForces: active });
+    this.workerGateway.sendConfig(active);
   }
 
-  /** 重置仿真。simTime 可选，用于将 Worker 内部时间同步到指定值（如时间反演需要从显示时间开始反向积分）。 */
-  reset(initialConditions: InitialConditions, simTime?: number): void {
-    if (this.activeBuffer) {
-      this.pool.release(this.activePoolIndex);
-      this.activeBuffer = null;
-      this.activePoolIndex = -1;
-    }
-    if (this.nextBuffer) {
-      this.pool.release(this.nextPoolIndex);
-      this.nextBuffer = null;
-      this.nextPoolIndex = -1;
-    }
-    if (this.pendingPoolIndex >= 0) {
-      this.pool.release(this.pendingPoolIndex);
-      this.pendingPoolIndex = -1;
-    }
-    this.activeIndex = 0;
-    this.nextForceData = null;
-    this.nextPoincarePoints = null;
-    this.pendingBatch = false;
-    this.prevSnapshot = null;
-    this.currSnapshot = null;
-    this.send({ type: "reset", initialConditions, simTime });
-  }
-
-  /** 外部驱动：消费一帧数据（external tick 模式下由 useFrame 调用）。
-   * @returns 是否实际消费了一帧（activeBuffer 非空时消费成功） */
-  tick(): boolean {
-    if (!this.running) return false;
-    return this.consumeOneFrame();
-  }
-
-  private tickAcc = 0;
-  private readonly TICK_DT = 1 / 60;
-  private readonly MAX_TICKS_PER_FRAME = 3;
-
-  /** 由渲染层调用，传入 delta time，内部做累积并消费多帧 */
-  tickDelta(delta: number): number {
-    if (!this.running) return 0;
-    this.tickAcc += delta;
-    let consumed = 0;
-    while (this.tickAcc >= this.TICK_DT && consumed < this.MAX_TICKS_PER_FRAME) {
-      if (this.consumeOneFrame()) {
-        this.tickAcc -= this.TICK_DT;
-        consumed++;
-      } else {
-        break;
-      }
-    }
-    return consumed;
-  }
-
-  get isRunning(): boolean {
-    return this.running;
-  }
-
-  /** 暂停态下预取一批数据（绕过 running 检查）。完成后回调 onDone。
-   * 清空所有未消费的旧批次缓冲区，确保反演开始时不会因
-   * 残余正向帧导致小球"闪现"。
-   * 若 Worker 中尚有正向批次正在计算，标记丢弃并在其到达后自动续发反向请求。 */
+  /** 暂停态下预取一批数据，完成后回调 onDone */
   prefetchBatch(onDone: () => void): void {
-    if (!this.worker) { onDone(); return; }
-
-    // 丢弃 activeBuffer / nextBuffer 中未消费的正向帧
-    if (this.activeBuffer) {
-      this.pool.release(this.activePoolIndex, this.activeBuffer);
-      this.activeBuffer = null;
-      this.activePoolIndex = -1;
-    }
-    if (this.nextBuffer) {
-      this.pool.release(this.nextPoolIndex, this.nextBuffer);
-      this.nextBuffer = null;
-      this.nextPoolIndex = -1;
-    }
+    this.releaseBuffers();
     this.activeIndex = 0;
     this.nextForceData = null;
     this.nextPoincarePoints = null;
-
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
-    }
-
+    this.cancelTimer();
     this.prefetchCallback = onDone;
 
-    if (this.pendingBatch) {
-      // 正向批次正在 Worker 中计算 —— 标记丢弃，待其到达后
-      // handleWorkerMessage 会自动续发一次反向请求，确保回调在反向数据就绪后触发
-      this.discardNextBatch = true;
-      return;
-    }
-
+    if (this.pendingBatch) { this.discardNextBatch = true; return; }
     this.requestNextBatch();
   }
 
-  // ─── 内部实现 ────────────────────────────────
+  // ═══ Worker 消息处理 ═══
 
-  private createWorker(): void {
-    if (this.worker) {
-      this.worker.terminate();
-    }
-    this.worker = new Worker(
-      new URL("./ode-worker.ts", import.meta.url),
-      { type: "module" },
-    );
-
-    this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      this.handleWorkerMessage(e.data);
-    };
-
-    this.worker.onerror = (event) => {
-      this.handleWorkerCrash(event);
-    };
-  }
-
-  private send(cmd: {
-    type: string;
-    buffer?: Float64Array;
-    poincare?: PoincareSectionCondition | null;
-    [key: string]: unknown;
-  }): void {
-    if (!this.worker) return;
-    if (cmd.type === "step" && cmd.buffer) {
-      this.worker.postMessage(cmd, [cmd.buffer.buffer]);
-    } else {
-      this.worker.postMessage(cmd);
-    }
-  }
-
-  private handleWorkerMessage(resp: WorkerResponse): void {
+  private handleMessage(resp: WorkerResponse): void {
     switch (resp.type) {
       case "ready": {
         for (const cb of this.readyCallbacks) cb();
-        if (this.timeoutId) {
-          clearTimeout(this.timeoutId);
-          this.timeoutId = null;
-        }
-        // 仅在仿真运行中才预取批次，避免暂停态产生无用批次
-        if (this.running) {
-          this.requestNextBatch();
-        }
+        this.cancelTimer();
+        if (this._running) this.requestNextBatch();
         break;
       }
-
       case "batchReady": {
-        // 丢弃过期批次：reset() 清空了 pendingBatch / timeoutId / activeBuffer，
-        // 旧 Worker 残余批次在 activeBuffer===null 时到达说明调度器已重置，不应激活
-        if (!this.pendingBatch && !this.timeoutId && this.activeBuffer === null) {
+        // 序列号校验：防御超时后旧 Worker 的 batchReady 在新批次到达后污染缓冲
+        if (this.pendingSequence >= 0 && this.pendingSequence !== this.batchSequence) {
+          // 过期批次——归还 buffer 并静默丢弃
+          this.pool.release(this.pendingPoolIndex, resp.buffer);
+          this.pendingPoolIndex = -1;
           return;
         }
+        if (!this.pendingBatch && !this.timeoutId && this.activeBuffer === null) return;
+        this.cancelTimer();
 
-        if (this.timeoutId) {
-          clearTimeout(this.timeoutId);
-          this.timeoutId = null;
-        }
-
+        // 性能测量
         if (typeof performance?.mark === "function") {
           try {
             performance.mark("worker-step-end");
@@ -401,22 +261,23 @@ export class SimulationScheduler {
             observabilityCoordinator.recordWorkerLatency(m.duration);
             performance.clearMarks("worker-step-start");
             performance.clearMarks("worker-step-end");
-          } catch { /* 静默忽略 */ }
+          } catch { /* 静默 */ }
         }
 
         this.pendingBatch = false;
-        const completedPoolIndex = this.pendingPoolIndex;
+        this.pendingSequence = -1;
+        const idx = this.pendingPoolIndex;
         this.pendingPoolIndex = -1;
 
-        // prefetchBatch 场景：丢弃旧的正向批次，续发反向请求
+        // 丢弃正向后续发反向
         if (this.discardNextBatch) {
           this.discardNextBatch = false;
-          this.pool.release(completedPoolIndex, resp.buffer);
+          this.pool.release(idx, resp.buffer);
           this.requestNextBatch();
           return;
         }
 
-        // 元数据可立即更新（不依赖双缓冲状态）
+        // 元数据
         if (resp.energyCorrection !== undefined) {
           commandBus.emit({ type: "worker:batchReady", energyCorrection: resp.energyCorrection });
         }
@@ -424,57 +285,32 @@ export class SimulationScheduler {
           commandBus.emit({ type: "worker:batchReady", lyapunovExponent: resp.lyapunovExponent });
         }
 
-        // 双缓冲：若 activeBuffer 仍在消费中，新批次暂存到 nextBuffer
+        // 双缓冲
         if (this.activeBuffer !== null && this.activeIndex < FRAMES_PER_BATCH) {
-          // 旧批次仍有未消费帧 → 暂存新批次，不覆盖
-          if (this.nextBuffer) {
-            this.pool.release(this.nextPoolIndex, this.nextBuffer);
-          }
+          if (this.nextBuffer) this.pool.release(this.nextPoolIndex, this.nextBuffer);
           this.nextBuffer = resp.buffer;
           this.nextFrameCount = resp.frameCount;
-          this.nextPoolIndex = completedPoolIndex;
+          this.nextPoolIndex = idx;
           this.nextForceData = resp.forceData ?? null;
           this.nextPoincarePoints = resp.poincarePoints ?? null;
         } else {
-          // 旧批次已消费完毕（或无活跃批次）→ 直接激活新批次
-          if (this.activeBuffer) {
-            this.pool.release(this.activePoolIndex, this.activeBuffer);
-          }
+          if (this.activeBuffer) this.pool.release(this.activePoolIndex, this.activeBuffer);
           this.activeBuffer = resp.buffer;
           this.activeIndex = 0;
           this.activeFrameCount = resp.frameCount;
-          this.activePoolIndex = completedPoolIndex;
+          this.activePoolIndex = idx;
 
-          // 转发力数据（直接激活的新批次）
           if (resp.forceData) {
             commandBus.emit({ type: "lab:forceData", data: resp.forceData, extrema: resp.forceExtrema });
           }
-
-          // 转发庞加莱截面点（直接激活的新批次）
           if (resp.poincarePoints && resp.poincarePoints.length > 0) {
             for (const cb of this.poincareCallbacks) cb(resp.poincarePoints);
           }
-
-          // 转发延迟的力数据
-          if (this.nextForceData) {
-            commandBus.emit({
-              type: "lab:forceData",
-              data: this.nextForceData,
-            });
-            this.nextForceData = null;
-          }
-
-          // 转发延迟的庞加莱截面点
-          if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
-            for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);
-            this.nextPoincarePoints = null;
-          }
+          this.flushDelayed();
         }
 
         if (resp.frameCount < FRAMES_PER_BATCH) {
-          console.warn(
-            `[scheduler] 收到部分批次: ${resp.frameCount}/${FRAMES_PER_BATCH} 帧, simTime=${resp.simTime.toFixed(2)}`,
-          );
+          console.warn(`[scheduler] 部分批次: ${resp.frameCount}/${FRAMES_PER_BATCH} 帧, t=${resp.simTime.toFixed(2)}`);
         }
 
         if (this.prefetchCallback) {
@@ -484,124 +320,86 @@ export class SimulationScheduler {
         }
         break;
       }
-
       case "error": {
         this.pendingBatch = false;
         this.pendingPoolIndex = -1;
-        if (this.timeoutId) {
-          clearTimeout(this.timeoutId);
-          this.timeoutId = null;
-        }
+        this.cancelTimer();
         if (typeof performance?.clearMarks === "function") {
-          try {
-            performance.clearMarks("worker-step-start");
-            performance.clearMarks("worker-step-end");
-          } catch { /* 静默 */ }
+          try { performance.clearMarks("worker-step-start"); performance.clearMarks("worker-step-end"); }
+          catch { /* 静默 */ }
         }
-
-        commandBus.emit({
-          type: "worker:error",
-          code: resp.code,
-          message: resp.message,
-          simTime: resp.simTime,
-        });
-
-        if (resp.code === "DIVERGED") {
-          this.running = false;
-        }
+        commandBus.emit({ type: "worker:error", code: resp.code, message: resp.message, simTime: resp.simTime });
+        if (resp.code === "DIVERGED") this._running = false;
         break;
       }
     }
   }
 
-  private handleWorkerCrash(event: ErrorEvent): void {
-    console.error("[scheduler] Worker 崩溃", event);
+  // ═══ 崩溃恢复 ═══
 
-    if (this.crashCount >= MAX_CRASH_RECOVERY) {
-      console.error("[scheduler] 连续崩溃，停止重建");
-      commandBus.emit({
-        type: "worker:crash",
-        event,
-      });
-      this.running = false;
-      return;
-    }
+  private handleCrash(cause: ErrorEvent | Error): void {
+    const causeMsg = cause instanceof ErrorEvent
+      ? `Worker 错误: ${cause.message}`
+      : cause.message;
+    console.error("[scheduler] Worker 崩溃:", causeMsg);
 
-    this.crashCount++;
-    const store = useRootStore.getState();
+    const s = useRootStore.getState();
+    const params: PendulumParams = { ...s.params };
+    const ic: InitialConditions = {
+      theta1: s.state.theta1, theta1Dot: s.state.omega1,
+      theta2: s.state.theta2, theta2Dot: s.state.omega2,
+    };
 
-    if (this.activeBuffer) {
-      this.pool.release(this.activePoolIndex);
-      this.activeBuffer = null;
-      this.activePoolIndex = -1;
-    }
-    if (this.nextBuffer) {
-      this.pool.release(this.nextPoolIndex);
-      this.nextBuffer = null;
-      this.nextPoolIndex = -1;
-    }
-    if (this.pendingPoolIndex >= 0) {
-      this.pool.release(this.pendingPoolIndex);
-      this.pendingPoolIndex = -1;
-    }
+    this.releaseBuffers();
     this.nextForceData = null;
     this.nextPoincarePoints = null;
+    this.pendingSequence = -1;
 
-    this.worker?.terminate();
-    this.createWorker();
-    this.pendingBatch = false;
-    this.activeIndex = 0;
-
-    this.send({
-      type: "init",
-      params: store.params,
-      initialConditions: {
-        theta1: store.state.theta1,
-        theta1Dot: store.state.omega1,
-        theta2: store.state.theta2,
-        theta2Dot: store.state.omega2,
-      },
-      method: store.method,
-    });
-
-    commandBus.emit({
-      type: "engine:recovered",
-      message: "仿真引擎已自动恢复",
-    });
+    try {
+      this.recoveryPolicy.recover(params, ic, s.method);
+      this.pendingBatch = false;
+      this.activeIndex = 0;
+      commandBus.emit({ type: "engine:recovered", message: "仿真引擎已自动恢复" });
+    } catch (e) {
+      if (e instanceof Error) {
+        if (e.name === "WorkerCrashError") {
+          commandBus.emit({ type: "worker:crash", event: new ErrorEvent("error", { message: causeMsg }) });
+        } else {
+          commandBus.emit({ type: "worker:crash", event: new ErrorEvent("error", { message: `恢复失败: ${e.message}` }) });
+        }
+        this._running = false;
+      }
+    }
   }
 
-  // ─── 帧调度循环 ─────────────────────────────
+  // ═══ 帧调度 ═══
 
   private loop(): void {
     this.consumeOneFrame();
     this.rafId = requestAnimationFrame(() => this.loop());
   }
 
-  /** 消费一帧数据（内部 rAF 和外部 tick 共用）。
-   * @returns 是否实际消费了一帧 */
   private consumeOneFrame(): boolean {
     if (this.activeBuffer) {
-      // 将当前快照降级为前一帧快照
-      if (this.currSnapshot) {
-        this.prevSnapshot = { ...this.currSnapshot };
-      }
+      if (this.currSnapshot) this.prevSnapshot = { ...this.currSnapshot };
 
-      const frameOffset = this.activeIndex * FRAME_STRIDE;
-      const state = {
-        theta1: this.activeBuffer[frameOffset + FrameField.THETA1]!,
-        omega1: this.activeBuffer[frameOffset + FrameField.THETA1_DOT]!,
-        theta2: this.activeBuffer[frameOffset + FrameField.THETA2]!,
-        omega2: this.activeBuffer[frameOffset + FrameField.THETA2_DOT]!,
-      };
-
+      const off = this.activeIndex * FRAME_STRIDE;
       commandBus.emit({ type: "frame:consume", buffer: this.activeBuffer, frameIndex: this.activeIndex });
-      commandBus.emit({ type: "history:push", state });
+      commandBus.emit({
+        type: "history:push",
+        state: {
+          theta1: this.activeBuffer[off + FrameField.THETA1]!,
+          omega1: this.activeBuffer[off + FrameField.THETA1_DOT]!,
+          theta2: this.activeBuffer[off + FrameField.THETA2]!,
+          omega2: this.activeBuffer[off + FrameField.THETA2_DOT]!,
+        },
+      });
 
       this.currSnapshot = {
-        x1: this.activeBuffer[frameOffset + FrameField.X1]!,
-        y1: this.activeBuffer[frameOffset + FrameField.Y1]!,
-        x2: this.activeBuffer[frameOffset + FrameField.X2]!,
-        y2: this.activeBuffer[frameOffset + FrameField.Y2]!,
+        x1: this.activeBuffer[off + FrameField.X1]!,
+        y1: this.activeBuffer[off + FrameField.Y1]!,
+        x2: this.activeBuffer[off + FrameField.X2]!,
+        y2: this.activeBuffer[off + FrameField.Y2]!,
       };
 
       this.activeIndex++;
@@ -611,10 +409,7 @@ export class SimulationScheduler {
       }
 
       if (this.activeIndex >= this.activeFrameCount) {
-        // 归还旧缓冲区到池，同时传入新的 buffer 引用以更新池槽位
         this.pool.release(this.activePoolIndex, this.activeBuffer);
-
-        // 提升 nextBuffer 为 activeBuffer（若存在）
         if (this.nextBuffer) {
           this.activeBuffer = this.nextBuffer;
           this.activeIndex = 0;
@@ -622,26 +417,8 @@ export class SimulationScheduler {
           this.activePoolIndex = this.nextPoolIndex;
           this.nextBuffer = null;
           this.nextPoolIndex = -1;
-
-          // 转发延迟的力数据
-          if (this.nextForceData) {
-            commandBus.emit({
-              type: "lab:forceData",
-              data: this.nextForceData,
-            });
-            this.nextForceData = null;
-          }
-
-          // 转发延迟的庞加莱截面点
-          if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
-            for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);
-            this.nextPoincarePoints = null;
-          }
-
-          // 若新批次消费到阈值且有空间预取下一批
-          if (this.activeIndex < BATCH_PREFETCH_THRESHOLD && !this.pendingBatch) {
-            this.requestNextBatch();
-          }
+          this.flushDelayed();
+          if (this.activeIndex < BATCH_PREFETCH_THRESHOLD && !this.pendingBatch) this.requestNextBatch();
         } else {
           this.activeBuffer = null;
           this.activeIndex = 0;
@@ -656,54 +433,57 @@ export class SimulationScheduler {
     return false;
   }
 
-  /** 获取供渲染插值用的前后帧快照 */
-  getInterpolationFrames(): { prev: InterpSnapshot | null; curr: InterpSnapshot | null } {
-    return { prev: this.prevSnapshot, curr: this.currSnapshot };
-  }
-
   private requestNextBatch(): void {
-    if (this.pendingBatch || !this.worker) return;
-
+    if (this.pendingBatch) return;
     const slot = this.pool.acquire();
-    if (!slot) {
-      return;
-    }
+    if (!slot) return;
 
+    const seq = ++this.batchSequence;
     this.pendingBatch = true;
     this.pendingPoolIndex = slot.index;
+    this.pendingSequence = seq;
 
     if (typeof performance?.mark === "function") {
-      try {
-        performance.mark("worker-step-start");
-      } catch { /* 静默 */ }
+      try { performance.mark("worker-step-start"); } catch { /* 静默 */ }
     }
 
-    this.worker.postMessage(
-      {
-        type: "step",
-        buffer: slot.buffer,
-        poincare: this.poincareCondition,
-      },
-      [slot.buffer.buffer],
-    );
+    this.workerGateway.sendStep(slot.buffer, this.poincareCondition);
 
     this.timeoutId = setTimeout(() => {
       console.error("[scheduler] Worker 积分超时 2s");
+      // 仅当序列号匹配时才处理超时（防御旧超时在新批次已到达后触发）
+      if (this.pendingSequence !== seq) return;
       this.pendingBatch = false;
-      // 超时的 buffer 已被 transfer 到 Worker，Worker 已无响应，槽位作废
-      this.pool.release(slot.index);
+      this.pendingSequence = -1;
       this.pendingPoolIndex = -1;
-      this.handleWorkerCrash(new ErrorEvent("timeout"));
+      this.pool.release(slot.index);
+      // 使用 WorkerCrashError 而非 ErrorEvent，确保 catch 块中 instanceof Error 正确匹配
+      this.handleCrash(new Error("Worker 积分超时 2s"));
     }, TIMEOUT_MS);
   }
-}
 
-/** 全局单例 */
-let globalScheduler: SimulationScheduler | null = null;
+  // ═══ 工具 ═══
 
-export function getScheduler(): SimulationScheduler {
-  if (!globalScheduler) {
-    globalScheduler = new SimulationScheduler();
+  private flushDelayed(): void {
+    if (this.nextForceData) {
+      commandBus.emit({ type: "lab:forceData", data: this.nextForceData });
+      this.nextForceData = null;
+    }
+    if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
+      for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);
+      this.nextPoincarePoints = null;
+    }
   }
-  return globalScheduler;
+
+  private releaseBuffers(): void {
+    if (this.activeBuffer) { this.pool.release(this.activePoolIndex, this.activeBuffer); this.activeBuffer = null; this.activePoolIndex = -1; }
+    if (this.nextBuffer) { this.pool.release(this.nextPoolIndex, this.nextBuffer); this.nextBuffer = null; this.nextPoolIndex = -1; }
+    this.pendingSequence = -1;
+  }
+
+  private cancelLoop(): void { if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = 0; } }
+
+  private cancelTimer(): void { if (this.timeoutId) { clearTimeout(this.timeoutId); this.timeoutId = null; } }
 }
+
+// 工厂函数见 scheduler-factory.ts（分离以避免循环依赖：factory 依赖 scheduler 类）
