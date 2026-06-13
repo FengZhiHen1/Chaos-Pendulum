@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { cn } from "@/shared/infrastructure/cn";
 import { Slider } from "@/shared/view/components/ui/slider";
 import { Input } from "@/shared/view/components/ui/input";
@@ -11,6 +12,14 @@ interface ParamSliderProps {
   meta: ParamFieldMeta;
 }
 
+/**
+ * 单个参数滑块组件。
+ *
+ * 双模式行为：
+ *   - 连续参数（system/environment group）：拖拽即时更新 Worker 参数值
+ *   - 初始条件参数（initial group）：拖拽时叠加半透明预览摆，
+ *     松手后触发 Worker Reset + 尾迹清空，从新初值重启积分
+ */
 export function ParamSlider({ meta }: ParamSliderProps) {
   const value = useSimulationStore((s) => {
     if (meta.group === "initial")
@@ -25,11 +34,41 @@ export function ParamSlider({ meta }: ParamSliderProps) {
   const activeField = useSimulationStore((s) => s.activeField);
   const setActiveField = useSimulationStore((s) => s.setActiveField);
 
+  // 初始条件预览
+  const isInitialGroup = meta.group === "initial";
+  const beginPreview = useSimulationStore((s) => s.beginInitialConditionPreview);
+  const commitPreview = useSimulationStore((s) => s.commitInitialConditionPreview);
+  const cancelPreview = useSimulationStore((s) => s.cancelInitialConditionPreview);
+
   const isEditing = activeField === meta.key;
-  const handleChange =
-    meta.group === "initial"
-      ? (k: string, v: number) => setInitialCondition(k as keyof InitialConditions, v)
-      : (k: string, v: number) => setParam(k as keyof PendulumParams, v);
+
+  const handleChange = useCallback(
+    (k: string, v: number) => {
+      if (isInitialGroup) {
+        setInitialCondition(k as keyof InitialConditions, v);
+        // 拖拽初始条件时显示半透明预览摆
+        const ic = useSimulationStore.getState().initialConditions;
+        beginPreview(ic.theta1, ic.theta2);
+      } else {
+        setParam(k as keyof PendulumParams, v);
+      }
+    },
+    [isInitialGroup, setParam, setInitialCondition, beginPreview],
+  );
+
+  /** 滑块松手——初始条件参数触发 Worker Reset，连续参数仅失焦 */
+  const handleCommit = useCallback(() => {
+    if (isInitialGroup) {
+      commitPreview();
+    }
+    setActiveField(null);
+  }, [isInitialGroup, commitPreview, setActiveField]);
+
+  /** 键盘输入聚焦——取消预览（避免与滑块拖拽冲突） */
+  const handleFocus = useCallback(() => {
+    if (isInitialGroup) cancelPreview();
+    setActiveField(meta.key);
+  }, [isInitialGroup, cancelPreview, setActiveField, meta.key]);
 
   const displayValue = value;
 
@@ -49,7 +88,7 @@ export function ParamSlider({ meta }: ParamSliderProps) {
             const v = parseFloat(e.target.value);
             if (!isNaN(v)) handleChange(meta.key, v);
           }}
-          onFocus={() => setActiveField(meta.key)}
+          onFocus={handleFocus}
           onBlur={() => setActiveField(null)}
           disabled={paramDisabled}
           className={cn(
@@ -82,7 +121,7 @@ export function ParamSlider({ meta }: ParamSliderProps) {
         onValueChange={([v]) => {
           if (v !== undefined) handleChange(meta.key, v);
         }}
-        onValueCommit={() => setActiveField(null)}
+        onValueCommit={handleCommit}
         disabled={paramDisabled}
         className="w-full"
       />

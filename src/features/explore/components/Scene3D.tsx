@@ -352,6 +352,9 @@ function SceneContent({
   const viewPreset = useExploreStore((s) => s.viewPreset);
   const params = useSimulationStore((s) => s.params);
   const resetTrigger = useSimulationStore((s) => s.resetTrigger);
+  const isPreviewActive = useSimulationStore((s) => s.isPreviewActive);
+  const previewTheta1 = useSimulationStore((s) => s.previewTheta1);
+  const previewTheta2 = useSimulationStore((s) => s.previewTheta2);
 
   const materialConfig = MATERIAL_CONFIGS[pendulumMaterial];
   const ballMaterialColor = ballColor ?? materialConfig.color;
@@ -686,6 +689,36 @@ function SceneContent({
           />
         )}
       </mesh>
+
+      {/* 半透明预览摆——初始条件参数拖拽时叠加显示新初值位置 */}
+      {isPreviewActive && (
+        <group>
+          <mesh position={[0, 0, 0]} rotation={[0, 0, previewTheta1 - Math.PI / 2]}>
+            <cylinderGeometry args={[0.015, 0.015, params.L1, 16]} />
+            <meshStandardMaterial color={ballMaterialColor} transparent opacity={0.35} depthWrite={false} />
+          </mesh>
+          <mesh
+            position={[params.L1 * Math.sin(previewTheta1), -params.L1 * Math.cos(previewTheta1), 0]}
+            rotation={[0, 0, previewTheta2 - Math.PI / 2]}
+          >
+            <cylinderGeometry args={[0.015, 0.015, params.L2, 16]} />
+            <meshStandardMaterial color={ballMaterialColor} transparent opacity={0.35} depthWrite={false} />
+          </mesh>
+          <mesh position={[params.L1 * Math.sin(previewTheta1), -params.L1 * Math.cos(previewTheta1), 0]}>
+            <sphereGeometry args={[0.06, 24, 24]} />
+            <meshStandardMaterial color={ballMaterialColor} transparent opacity={0.4} depthWrite={false} />
+          </mesh>
+          <mesh
+            position={[
+              params.L1 * Math.sin(previewTheta1) + params.L2 * Math.sin(previewTheta2),
+              -params.L1 * Math.cos(previewTheta1) - params.L2 * Math.cos(previewTheta2), 0,
+            ]}
+          >
+            <sphereGeometry args={[0.06, 24, 24]} />
+            <meshStandardMaterial color={ballMaterialColor} transparent opacity={0.4} depthWrite={false} />
+          </mesh>
+        </group>
+      )}
 
       {/* 受力分析矢量叠加（LAB-01） */}
       <ForceArrows3D />

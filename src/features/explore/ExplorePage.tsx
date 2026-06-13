@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, GitCompare, X, Eye } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Play, Pause, RotateCcw, GitCompare, X, Eye, ChevronUp } from "lucide-react";
 import { Scene3D } from "./components/Scene3D";
 import { TimeReversal } from "./components/TimeReversal";
 import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajectory";
@@ -17,6 +17,82 @@ import { useLabStore } from "@/features/lab/store";
 import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";
 import { DecompositionPanel } from "@/features/lab/components/DecompositionPanel";
 import { Button } from "@/shared/view/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
+
+/** 平板/手机底部可展开面板——Tab 切换参数/能量/相空间 */
+function TabletBottomPanel() {
+  const deviceType = useAppStore((s) => s.deviceType);
+  const [expanded, setExpanded] = useState(false);
+  const [tab, setTab] = useState<string>("params");
+
+  // 手机端仅显示收起状态的基本信息
+  if (deviceType === "mobile") {
+    return (
+      <div className="h-10 shrink-0 flex items-center justify-center gap-2 bg-surface-container-low border-t border-white/5 text-[10px] text-on-surface-variant/60">
+        <button onClick={() => { setExpanded(true); setTab("params"); }}
+          className="px-2 py-1 rounded hover:bg-white/5 transition-colors">
+          <ChevronUp className="h-3 w-3 inline mr-1" />参数
+        </button>
+        {expanded && (
+          <div className="absolute bottom-10 left-0 right-0 bg-surface-container-low border-t border-white/10 p-3 max-h-[50vh] overflow-y-auto z-50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold">{
+                tab === "params" ? "参数" : tab === "energy" ? "能量" : "相空间"
+              }</span>
+              <button onClick={() => setExpanded(false)} className="text-on-surface-variant/50 hover:text-on-surface">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex gap-1 mb-2">
+              {["params","energy","phase"].map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  className={"px-2 py-0.5 text-[10px] rounded " + (tab === t ? "bg-primary/20 text-primary" : "text-on-surface-variant")}>
+                  {t === "params" ? "参数" : t === "energy" ? "能量" : "相空间"}
+                </button>
+              ))}
+            </div>
+            {tab === "params" && <ParamPanel />}
+            {tab === "energy" && <EnergyMonitorPanel width={window.innerWidth - 32} height={140} />}
+            {tab === "phase" && <PhaseSpacePanel size={Math.min(window.innerWidth - 32, 280)} />}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 平板端
+  return (
+    <div className="shrink-0 bg-surface-container-low border-t border-white/5">
+      {!expanded ? (
+        <button onClick={() => setExpanded(true)}
+          className="w-full h-10 flex items-center justify-center gap-2 text-xs text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors">
+          <ChevronUp className="h-3 w-3" />
+          参数控制面板
+        </button>
+      ) : (
+        <div className="max-h-[45vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <TabsList className="w-full grid grid-cols-3 h-8">
+                <TabsTrigger value="params" className="text-[11px]">参数</TabsTrigger>
+                <TabsTrigger value="energy" className="text-[11px]">能量</TabsTrigger>
+                <TabsTrigger value="phase" className="text-[11px]">相空间</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <button onClick={() => setExpanded(false)} className="ml-2 p-1 rounded hover:bg-white/10">
+              <ChevronUp className="h-4 w-4 rotate-180 text-on-surface-variant" />
+            </button>
+          </div>
+          <div className="px-2 py-2">
+            {tab === "params" && <ParamPanel />}
+            {tab === "energy" && <EnergyMonitorPanel width={700} height={140} />}
+            {tab === "phase" && <PhaseSpacePanel size={280} />}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ExplorePage() {
   const {
@@ -35,6 +111,7 @@ export function ExplorePage() {
   } = useSimulationControls();
 
   const isDesktop = useAppStore((s) => s.deviceType === "desktop");
+
 
   // 受力分析模式（LAB-01）
   const forceActive = useLabStore((s) => s.forceDecomposition.active);
@@ -201,14 +278,9 @@ export function ExplorePage() {
         </Button>
       </div>
 
-      {/* 平板 / 手机：控制面板以底部 Sheet 形式 (占位提示) */}
+      {/* 平板：可展开底部面板（参数/能量/相空间 Tab 切换） */}
       {!isDesktop && (
-        <div className="h-10 shrink-0 flex items-center justify-center bg-surface-container-low border-t border-white/5 text-xs text-on-surface-variant/70">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-on-surface-variant/40" />
-            参数控制面板 (上滑展开) — 平板适配开发中
-          </span>
-        </div>
+        <TabletBottomPanel />
       )}
     </div>
   );

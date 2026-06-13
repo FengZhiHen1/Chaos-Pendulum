@@ -87,6 +87,20 @@ export interface SimulationSlice extends SimulationFrame {
   /** 参数面板有未应用更改（重置后才生效） */
   paramsDirty: boolean;
 
+  // ── 初始条件预览摆（design: 拖拽θ时叠加半透明静态预览摆，松手后Reset）──
+  /** 半透明预览摆是否可见（仅在拖动初始条件参数时） */
+  isPreviewActive: boolean;
+  /** 预览摆的上摆角度 (rad) */
+  previewTheta1: number;
+  /** 预览摆的下摆角度 (rad) */
+  previewTheta2: number;
+  /** 开始预览——显示半透明摆体在新初值位置 */
+  beginInitialConditionPreview: (theta1: number, theta2: number) => void;
+  /** 提交预览——松手后实体化预览摆 + Worker Reset + 尾迹清空 */
+  commitInitialConditionPreview: () => void;
+  /** 取消预览——隐藏预览摆，不触发 Reset */
+  cancelInitialConditionPreview: () => void;
+
   // ── SIM-01 Actions ──
   setParams: (patch: Partial<PendulumParams>) => void;
   setMethod: (method: IntegratorMethod) => void;
@@ -217,6 +231,10 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
   isPanelExpanded: true,
   paramsDirty: false,
 
+  isPreviewActive: false,
+  previewTheta1: 0,
+  previewTheta2: 0,
+
   energyInitial: null,
   energyDrift: 0,
   driftExceeded: false,
@@ -233,6 +251,32 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
   isPendulumStopped: false,
 
   runPhase: "idle",
+
+  // ── 初始条件预览 Actions ──
+
+  beginInitialConditionPreview: (theta1, theta2) =>
+    set({ isPreviewActive: true, previewTheta1: theta1, previewTheta2: theta2 }),
+
+  commitInitialConditionPreview: () => {
+    const s = get();
+    if (!s.isPreviewActive) return;
+    set({
+      isPreviewActive: false,
+      isRunning: false,
+      runPhase: 'idle',
+      resetTrigger: s.resetTrigger + 1,
+      paramsDirty: false,
+      energyInitial: null, energyDrift: 0, driftExceeded: false,
+      energyMin: 0, energyMax: 0, isSimulationActive: false,
+      consumedFrameIndex: 0, _nanSkipCount: 0,
+      _stoppedFrameCount: 0, isPendulumStopped: false,
+      // 注意：实际 theta1/theta2 在 consumeFrameFromBuffer 中更新
+      // 这里仅触发 resetTrigger 让 bridge.ts 的 isResetAction 分支执行 reset + start
+    });
+  },
+
+  cancelInitialConditionPreview: () =>
+    set({ isPreviewActive: false }),
 
   // ── SIM-01 Actions ──
 
