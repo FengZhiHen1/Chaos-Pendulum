@@ -11,7 +11,10 @@ vi.mock("@react-three/fiber", () => ({
   Canvas: ({ children, onCreated, style }: any) => {
     if (onCreated) {
       const canvas = document.createElement("canvas");
-      const mockGl = { domElement: canvas } as any;
+      const mockGl = {
+        domElement: canvas,
+        shadowMap: { type: 0, enabled: false },
+      } as any;
       onCreated({ gl: mockGl });
     }
     return (
