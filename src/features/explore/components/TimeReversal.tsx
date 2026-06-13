@@ -1,247 +1,42 @@
+/**
+ * 模块: explore.components.TimeReversal
+ * 职责: 时间反演实验 UI 组件——双模式反演（精确/数值）、漂移曲线展示、教学注释。
+ *       EXP-05 的核心交互：以当前状态为初值反向积分 ODE，可视化混沌的数值不可逆性。
+ * 边界:
+ *   - 依赖: contracts (ReversalMode, ReversalPhase, DriftSample, InsufficientHistoryError)
+ *           domain/drift-calculator (漂移距离纯计算)
+ *           simulation (useSimulationStore, useSimulationHistory 等)
+ *   - 被依赖: ExplorePage
+ * 禁止行为:
+ *   - 禁止在精确反演中访问 Worker——仅使用历史 RingBuffer 插值
+ *   - 禁止反演过程中修改正向历史数据
+ *   - 禁止教学注释在已关闭后自动重新弹出
+ */
+
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
-import { useSimulationStore, useSimulationHistory, getSimulationHistory, ball2Position, pauseHistoryRecording, resumeHistoryRecording } from "@/features/simulation";
+import {
+  useSimulationStore,
+  useSimulationHistory,
+  getSimulationHistory,
+  ball2Position,
+  pauseHistoryRecording,
+  resumeHistoryRecording,
+} from "@/features/simulation";
 import { useExploreStore } from "../store";
 import { commandBus } from "@/shared/infrastructure/commandBus";
-import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
+import {
+  updateTrajectoryData,
+  clearTrajectoryData,
+  startTrajectoryFadeOut,
+} from "./TimeReversalTrajectory";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { Dialog } from "@/shared/view/components/ui/dialog";
 import { Button } from "@/shared/view/components/ui/button";
-import type { DriftSample, ReversalMode } from "../store";
-
-// ═══════════════════════════════════════════════════
-// 常量
-// ═══════════════════════════════════════════════════
-
-const MIN_HISTORY_FRAMES = 120; // 2s @ 60fps
-const TEACHING_THRESHOLD = 0.05; // 首次相空间漂移 > 0.05 弹出教学注释
-const REVERSAL_FPS = 60;
-
-/** 两个状态向量的相空间距离（含角速度），角速度散度远早于位置散度 */
-function computeDrift(
-  stateA: { theta1: number; omega1: number; theta2: number; omega2: number },
-  stateB: { theta1: number; omega1: number; theta2: number; omega2: number },
-): number {
-  const d1 = stateA.theta1 - stateB.theta1;
-  const w1 = stateA.omega1 - stateB.omega1;
-  const d2 = stateA.theta2 - stateB.theta2;
-  const w2 = stateA.omega2 - stateB.omega2;
-  return Math.sqrt(d1 * d1 + w1 * w1 + d2 * d2 + w2 * w2);
-}
-
-// ═══════════════════════════════════════════════════
-// 漂移曲线 Canvas 2D
-// ═══════════════════════════════════════════════════
-
-interface DriftCurvePanelProps {
-  driftHistory: DriftSample[];
-  maxReversalTime: number;
-  mode: ReversalMode;
-  visible: boolean;
-  engineError: boolean;
-}
-
-function DriftCurvePanel({ driftHistory, maxReversalTime, mode, visible, engineError }: DriftCurvePanelProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [logScale, setLogScale] = useState(false);
-  const W = 320;
-  const H = 200;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = `${W}px`;
-    canvas.style.height = `${H}px`;
-    ctx.scale(dpr, dpr);
-
-    // 背景
-    ctx.fillStyle = "rgba(10, 10, 20, 0.88)";
-    ctx.fillRect(0, 0, W, H);
-
-    const pad = { top: 28, right: 14, bottom: 34, left: 48 };
-    const pw = W - pad.left - pad.right;
-    const ph = H - pad.top - pad.bottom;
-
-    // 空数据提示
-    if (driftHistory.length < 2) {
-      ctx.fillStyle = "#777";
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("等待反演数据…", W / 2, H / 2);
-      return;
-    }
-
-    const maxDrift = Math.max(0.1, ...driftHistory.map((d) => d.driftDistance)) * 1.1;
-    const maxTime = Math.max(1, maxReversalTime);
-
-    const xS = (t: number) => pad.left + (t / maxTime) * pw;
-
-    const yLinear = (d: number) => pad.top + ph - (d / maxDrift) * ph;
-    const yLog = (d: number) => {
-      if (d <= 0) return pad.top + ph;
-      const logMax = Math.log10(maxDrift);
-      const logMin = Math.log10(Math.max(1e-6, maxDrift * 1e-5));
-      const logD = Math.log10(Math.max(d, 1e-6));
-      const ratio = (logD - logMin) / (logMax - logMin);
-      return pad.top + ph - Math.max(0, Math.min(1, ratio)) * ph;
-    };
-    const yS = logScale ? yLog : yLinear;
-
-    // 坐标轴
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, pad.top);
-    ctx.lineTo(pad.left, pad.top + ph);
-    ctx.lineTo(pad.left + pw, pad.top + ph);
-    ctx.stroke();
-
-    // 教学阈值虚线
-    if (mode === "numerical") {
-      const thY = yS(TEACHING_THRESHOLD);
-      if (thY > pad.top && thY < pad.top + ph) {
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(pad.left, thY);
-        ctx.lineTo(pad.left + pw, thY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.font = "9px sans-serif";
-        ctx.fillText("0.05", pad.left + pw - 26, thY - 4);
-      }
-    }
-
-    // 轴标签
-    ctx.fillStyle = "#999";
-    ctx.font = "10px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("反演时间 (s)", pad.left + pw / 2, H - 4);
-    ctx.save();
-    ctx.translate(12, pad.top + ph / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(logScale ? "相空间距离 (log)" : "相空间距离", 0, 0);
-    ctx.restore();
-
-    // 模式标题
-    ctx.fillStyle = "#ddd";
-    ctx.font = "bold 11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(
-      mode === "exact" ? "精确反演 — 理论完全重合" : "数值反演 — 误差指数放大",
-      pad.left + pw / 2,
-      pad.top - 10,
-    );
-
-    // Y 轴刻度
-    ctx.fillStyle = "#777";
-    ctx.font = "9px sans-serif";
-    ctx.textAlign = "right";
-    for (let i = 0; i <= 4; i++) {
-      const ratio = i / 4;
-      const d = logScale
-        ? Math.pow(10, Math.log10(Math.max(1e-6, maxDrift * 1e-5)) + ratio * (Math.log10(maxDrift) - Math.log10(Math.max(1e-6, maxDrift * 1e-5))))
-        : (maxDrift * ratio);
-      const y = yS(d);
-      ctx.fillText(d < 0.01 ? d.toExponential(1) : d.toFixed(3), pad.left - 4, y + 3);
-    }
-
-    // 漂移曲线
-    ctx.strokeStyle = "#ff6644";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < driftHistory.length; i++) {
-      const d = driftHistory[i]!;
-      const x = xS(d.reversalTime);
-      const y = yS(d.driftDistance);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // 发散标记 — 基于 engineError 而非硬编码阈值
-    if (engineError && driftHistory.length > 0) {
-      const last = driftHistory[driftHistory.length - 1]!;
-      const lx = xS(last.reversalTime);
-      const ly = yS(last.driftDistance);
-      ctx.fillStyle = "#ff4444";
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("✕", lx + 8, ly + 4);
-    }
-  }, [driftHistory, maxReversalTime, mode, logScale, engineError]);
-
-  if (!visible) return null;
-
-  return (
-    <div
-      className="absolute right-2 bottom-2 z-20 rounded-lg overflow-hidden"
-      style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-    >
-      <canvas ref={canvasRef} style={{ display: "block" }} />
-      {/* Y 轴缩放切换 */}
-      <button
-        type="button"
-        onClick={() => setLogScale((v) => !v)}
-        className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
-      >
-        {logScale ? "线性" : "对数"}
-      </button>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
-// 教学注释弹窗
-// ═══════════════════════════════════════════════════
-
-function TeachingAnnotationPopup({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-}) {
-  if (!visible) return null;
-
-  return (
-    <div
-      className="absolute left-1/2 transform -translate-x-1/2 z-30 rounded-xl px-5 py-4 max-w-sm"
-      style={{
-        bottom: "22%",
-        background: "rgba(10, 10, 18, 0.93)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        backdropFilter: "blur(10px)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-      }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-on-surface text-sm font-semibold mb-2">
-            数值漂移 — 混沌的不可逆性
-          </h3>
-          <p className="text-gray-300 text-xs leading-relaxed">
-            哈密顿系统理论上可逆，但混沌使计算机的浮点误差被指数放大——这就是初值敏感性的计算物理体现。正向积分时累积的舍入误差在反向积分中无法被"撤销"，反而被进一步放大。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-gray-500 hover:text-on-surface text-base leading-none shrink-0 mt-0.5"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  );
-}
+import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../contracts";
+import { driftCalculator } from "../domain/drift-calculator";
+import { DriftCurvePanel } from "./DriftCurvePanel";
+import { TeachingAnnotationPopup } from "./TeachingAnnotationPopup";
 
 // ═══════════════════════════════════════════════════
 // 主组件
@@ -295,22 +90,24 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   const [completedOpen, setCompletedOpen] = useState(false);
 
   // ── 派生状态 ──
-  const historyInsufficient = history.length < MIN_HISTORY_FRAMES;
+  const minFrames = REVERSAL_DEFAULTS.minHistoryFrames;
+  const historyInsufficient = history.length < minFrames;
   const buttonDisabled = historyInsufficient || phase === "awaitingConfirm";
-  const tooltipText = phase === "awaitingConfirm"
-    ? "反向积分数据准备中…"
-    : historyInsufficient
-    ? `需要至少运行 2 秒才能反演（当前已运行 ${(history.length / 60).toFixed(1)} 秒）`
-    : mode === "exact"
-      ? "精确反演（对照）— 仅视觉回放，无误差"
-      : "数值反演（实验）— 真实反向积分，展示浮点误差指数放大";
+  const tooltipText =
+    phase === "awaitingConfirm"
+      ? "反向积分数据准备中…"
+      : historyInsufficient
+        ? `需要至少运行 2 秒才能反演（当前已运行 ${(history.length / 60).toFixed(1)} 秒）`
+        : mode === "exact"
+          ? "精确反演（对照）— 仅视觉回放，无误差"
+          : "数值反演（实验）— 真实反向积分，展示浮点误差指数放大";
 
   // 教学注释自动弹出
   const showAnnotation =
     mode === "numerical" &&
     phase === "reversing" &&
     !annotationDismissed &&
-    driftHistory.some((d) => d.driftDistance > TEACHING_THRESHOLD);
+    driftHistory.some((d) => d.driftDistance > REVERSAL_DEFAULTS.teachingThreshold);
 
   // ── 精确反演 RAF 循环 ──
   function exactPlaybackLoop() {
@@ -318,38 +115,41 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     const idx = exactFrameIdxRef.current;
 
     if (idx >= fwdArray.length) {
-      // 回放完成：回到历史起点，恢复正向仿真
       setPhase("completed");
       setActive(false);
       isReversingRef.current = false;
       const firstState = fwdArray[0]!;
-      commandBus.emit({ type: "scheduler:reset", initialConditions: {
-        theta1: firstState.theta1,
-        theta1Dot: firstState.omega1,
-        theta2: firstState.theta2,
-        theta2Dot: firstState.omega2,
-      }});
+      commandBus.emit({
+        type: "scheduler:reset",
+        initialConditions: {
+          theta1: firstState.theta1,
+          theta1Dot: firstState.omega1,
+          theta2: firstState.theta2,
+          theta2Dot: firstState.omega2,
+        },
+      });
       commandBus.emit({ type: "scheduler:resume" });
       return;
     }
 
     const sv = fwdArray[fwdArray.length - 1 - idx]!;
-    // 临时覆盖显示状态，驱动 Scene3D 更新
-    commandBus.emit({ type: "simulation:overrideState", state: {
-      theta1: sv.theta1,
-      omega1: sv.omega1,
-      theta2: sv.theta2,
-      omega2: sv.omega2,
-    }});
+    commandBus.emit({
+      type: "simulation:overrideState",
+      state: {
+        theta1: sv.theta1,
+        omega1: sv.omega1,
+        theta2: sv.theta2,
+        omega2: sv.omega2,
+      },
+    });
 
-    const reversalTime = idx / REVERSAL_FPS;
+    const reversalTime = idx / REVERSAL_DEFAULTS.reversalFps;
     useExploreStore.getState().appendDriftSample({
       reversalTime,
       driftDistance: 0,
       forwardSimTime: startSimTimeRef.current - reversalTime,
     });
 
-    // 追加 3D 反演轨迹点
     const pos = ball2Position(sv, useSimulationStore.getState().params);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({
@@ -365,7 +165,10 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     const store = useSimulationStore.getState();
     const fwdArray = history.toArray();
 
-    if (fwdArray.length < MIN_HISTORY_FRAMES) return;
+    // 契约要求：历史帧数不足时抛出 InsufficientHistoryError
+    if (fwdArray.length < minFrames) {
+      throw new InsufficientHistoryError(fwdArray.length, minFrames);
+    }
 
     reversalStartRef.current = { ...store.state };
     startSimTimeRef.current = store.t;
@@ -380,7 +183,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     // 保存正向历史快照（防止反向帧污染后续 drift 计算）
     fwdSnapshotRef.current = getSimulationHistory();
 
-    // 初始化 3D 轨迹叠加：先清空旧轨迹再设置新数据
+    // 初始化 3D 轨迹叠加
     clearTrajectoryData();
     const fwdPts = fwdArray.map((sv) => {
       const p = ball2Position(sv, store.params);
@@ -400,13 +203,11 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       commandBus.emit({ type: "scheduler:pause" });
       exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
     } else {
-      // 数值反演：暂停 → 同步 Worker 状态到显示帧 → 反向 → prefetchBatch → 就绪后确认
+      // 数值反演流程
       awaitingConfirmRef.current = true;
       setPhase("awaitingConfirm");
       pauseHistoryRecording();
       commandBus.emit({ type: "scheduler:pause" });
-      // 将 Worker 内部状态同步到屏幕当前显示的状态与时间，
-      // 避免 Worker 从超前的内部状态开始反向积分导致小球位置跳跃
       commandBus.emit({
         type: "scheduler:reset",
         initialConditions: {
@@ -420,25 +221,20 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       commandBus.emit({ type: "scheduler:setDirection", direction: -1 });
       setDialogPhase("loading");
       setConfirmOpen(true);
-      // 通过 prefetchBatch 获取反向数据，不恢复仿真
       commandBus.emit({ type: "scheduler:prefetchBatch" });
       void commandBus.once("scheduler:prefetchReady", () => {
         if (!awaitingConfirmRef.current) return;
         awaitingConfirmRef.current = false;
         setDialogPhase("ready");
       });
-      // 如果取消反演，此 once 订阅会在组件卸载或取消时自动释放
-      // 这里不需要显式保存 unsub，因为 once 触发后自动取消，
-      // 且组件卸载时 commandBus 的 handler 会被 GC（无强引用）
     }
-  }, [mode, history, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
+  }, [mode, history, minFrames, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
 
-  // ── 确认开始反演 / 取消 ──
+  // ── 确认 / 取消反演 ──
 
   const handleConfirmReversal = useCallback(() => {
     setConfirmOpen(false);
     setPhase("reversing");
-    // 直接恢复 scheduler，反演正式开始
     commandBus.emit({ type: "scheduler:resume" });
   }, [setPhase]);
 
@@ -454,7 +250,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     clearDriftHistory();
   }, [setPhase, setActive, clearDriftHistory]);
 
-  // ── 停止反演（反演自然结束或用户手动停止）──
+  // ── 停止反演 ──
   const stopReversal = useCallback(() => {
     isReversingRef.current = false;
 
@@ -462,12 +258,15 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       cancelAnimationFrame(exactRafRef.current);
       const start = reversalStartRef.current;
       if (start) {
-        commandBus.emit({ type: "scheduler:reset", initialConditions: {
-          theta1: start.theta1,
-          theta1Dot: start.omega1,
-          theta2: start.theta2,
-          theta2Dot: start.omega2,
-        }});
+        commandBus.emit({
+          type: "scheduler:reset",
+          initialConditions: {
+            theta1: start.theta1,
+            theta1Dot: start.omega1,
+            theta2: start.theta2,
+            theta2Dot: start.omega2,
+          },
+        });
       }
       commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
       commandBus.emit({ type: "scheduler:resume" });
@@ -475,7 +274,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       setPhase("completed");
       setActive(false);
     } else {
-      // 数值反演：停止仿真 + 恢复正向方向 + 弹窗（轨迹保持，由用户选择淡化或清除）
       resumeHistoryRecording();
       commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
       commandBus.emit({ type: "simulation:setRunning", isRunning: false });
@@ -485,18 +283,12 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     }
   }, [mode, setPhase, setActive]);
 
-  // ── 反演完成后：恢复 / 重置 ──
+  // ── 反演完成后操作 ──
 
   const handleRestoreState = useCallback(() => {
     setCompletedOpen(false);
     const start = reversalStartRef.current;
     if (start) {
-      // 将反演开始时的状态写入 store initialConditions，
-      // 再通过 applyCurrentSettings 触发 resetTrigger 递增，
-      // 让 bridge 走 isResetAction → s.start() 路径：
-      //   1. history:clear — 清空旧正向历史
-      //   2. Worker init — 从当前状态完整重新初始化
-      // 避免直接 emit scheduler:reset 造成的 store/worker 状态不一致。
       useSimulationStore.setState({
         initialConditions: {
           theta1: start.theta1,
@@ -506,7 +298,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
         },
       });
       useSimulationStore.getState().applyCurrentSettings();
-      // 反演轨迹快速淡化消失
       startTrajectoryFadeOut();
     }
   }, []);
@@ -524,7 +315,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     const store = useSimulationStore.getState();
     const currentSimTime = store.t;
 
-    // simTime 应递减；第一次更新时跳过（prev 还未初始化）
     if (prevSimTimeRef.current > 0 && currentSimTime >= prevSimTimeRef.current) {
       prevSimTimeRef.current = currentSimTime;
       return;
@@ -551,11 +341,14 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
     const fwdArray = fwdSnapshotRef.current;
     const reversalTime = startSimTimeRef.current - currentSimTime;
-    const fwdIdx = Math.round(fwdArray.length - 1 - reversalTime * REVERSAL_FPS);
+    const fwdIdx = Math.round(
+      fwdArray.length - 1 - reversalTime * REVERSAL_DEFAULTS.reversalFps,
+    );
 
     let drift = 0;
     if (fwdIdx >= 0 && fwdIdx < fwdArray.length) {
-      drift = computeDrift(store.state, fwdArray[fwdIdx]!);
+      // 委托漂移计算给 domain/drift-calculator 纯函数
+      drift = driftCalculator.compute(store.state, fwdArray[fwdIdx]!);
     }
 
     useExploreStore.getState().appendDriftSample({
@@ -570,7 +363,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
   }, [mode, phase, simTime, params, history, stopReversal]);
 
-  // 检查 phase 重新进入 reversing 时初始化
+  // phase 重新进入 reversing 时初始化
   useEffect(() => {
     if (phase === "reversing") {
       isReversingRef.current = true;
@@ -579,12 +372,10 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   }, [phase]);
 
   // ── 仿真重置 → 同步清空反演状态 ──
-
   const prevResetTriggerRef = useRef(resetTrigger);
   useEffect(() => {
     if (resetTrigger !== prevResetTriggerRef.current) {
       prevResetTriggerRef.current = resetTrigger;
-      // 仿真已重置，关闭反演
       if (isReversingRef.current && mode === "numerical") {
         commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
       }
@@ -611,16 +402,13 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   // ── UI 渲染 ──
   return (
     <div className={`pointer-events-none ${className}`}>
-      {/* 控制栏 — pointer-events 恢复 */}
+      {/* 控制栏 */}
       <div
         className="absolute top-2 right-2 z-30 pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-lg"
         style={{ background: "rgba(10, 10, 20, 0.85)", border: "1px solid #1a1a2e" }}
       >
         {/* 模式切换 */}
-        <div
-          className="flex rounded overflow-hidden"
-          style={{ border: "1px solid #444" }}
-        >
+        <div className="flex rounded overflow-hidden" style={{ border: "1px solid #444" }}>
           <button
             type="button"
             onClick={() => !active && setMode("exact")}
@@ -663,7 +451,11 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           }`}
           title={tooltipText}
         >
-          {phase === "awaitingConfirm" ? "准备中…" : active ? "停止反演" : "⌛ 时间倒流"}
+          {phase === "awaitingConfirm"
+            ? "准备中…"
+            : active
+              ? "停止反演"
+              : "⌛ 时间倒流"}
         </button>
 
         {/* 历史帧数指示 */}
@@ -672,7 +464,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
             historyInsufficient ? "text-gray-600" : "text-gray-500"
           }`}
         >
-          {history.length}<span className="text-gray-700">/6000</span>
+          {history.length}
+          <span className="text-gray-700">/6000</span>
         </span>
       </div>
 
@@ -707,7 +500,9 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           {dialogPhase === "loading" ? (
             <div className="flex items-center justify-center py-4">
               <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="ml-3 text-xs text-on-surface-variant">等待 Worker 反向积分…</span>
+              <span className="ml-3 text-xs text-on-surface-variant">
+                等待 Worker 反向积分…
+              </span>
             </div>
           ) : (
             <div className="flex justify-end gap-2 mt-2">
@@ -757,7 +552,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           className="absolute bottom-2 left-2 z-20 pointer-events-auto px-3 py-1.5 rounded text-xs text-gray-400"
           style={{ background: "rgba(10, 10, 15, 0.85)" }}
         >
-          最近一次反演（{mode === "exact" ? "精确反演" : "数值反演"}）— 漂移曲线已保留
+          最近一次反演（{mode === "exact" ? "精确反演" : "数值反演"}
+          ）— 漂移曲线已保留
         </div>
       )}
     </div>

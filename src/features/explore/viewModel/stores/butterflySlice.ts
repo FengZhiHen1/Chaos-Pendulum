@@ -1,34 +1,29 @@
+/**
+ * 模块: explore.viewModel.stores.butterflySlice
+ * 职责: 蝴蝶效应 Zustand Slice——管理 A/B 两侧仿真状态、分离度、Delta/编辑模式。
+ *       分离度计算委托给 domain/separation-calculator（纯函数），
+ *       类型定义统一从 contracts 导入。
+ * 边界:
+ *   - 依赖: contracts (SimSideState, SeparationMetrics, EnergySnapshot, DeltaEditMode)
+ *           domain/separation-calculator (分离度纯计算)
+ *   - 被依赖: butterfly-store (Zustand hook wrapper)
+ * 禁止行为:
+ *   - 禁止在 slice 中重复定义 contract 类型
+ *   - 禁止分离度计算使用二元判定——使用连续置信度分数
+ */
+
 import type { StateCreator } from "zustand";
 import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
+import type {
+  DeltaEditMode,
+  EnergySnapshot,
+  SimSideState,
+  SeparationMetrics,
+} from "../../contracts";
+import { BUTTERFLY_DEFAULTS } from "../../contracts";
+import { separationCalculator } from "../../domain/separation-calculator";
 
-// ─── 类型定义 ────────────────────────────────────
-
-export type DeltaEditMode = "synced" | "a-only" | "b-only";
-
-export interface EnergySnapshot {
-  kinetic: number;
-  potential: number;
-  total: number;
-}
-
-export interface SimSideState {
-  state: StateVector;
-  params: PendulumParams;
-  energy: EnergySnapshot;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  workerReady: boolean;
-  simTime: number;
-}
-
-export interface SeparationMetrics {
-  currentSeparation: number;
-  isFullyDecoupled: boolean;
-  maxSeparation: number;
-  decoupledAt: number | null;
-}
+// ─── Slice 接口 ──────────────────────────────────
 
 export interface ButterflySlice {
   deltaDeg: number;
@@ -57,14 +52,17 @@ export interface ButterflySlice {
   signalTrailClear: () => void;
 }
 
-// ─── 默认值 ──────────────────────────────────────
+// ─── 工厂函数 ────────────────────────────────────
 
 function defaultSideState(): SimSideState {
   return {
     state: { theta1: 0, omega1: 0, theta2: 0, omega2: 0 },
     params: { m1: 1.0, m2: 1.0, L1: 1.0, L2: 1.0, g: 9.81, damping: 0 },
     energy: { kinetic: 0, potential: 0, total: 0 },
-    x1: 0, y1: 0, x2: 0, y2: 0,
+    x1: 0,
+    y1: 0,
+    x2: 0,
+    y2: 0,
     workerReady: false,
     simTime: 0,
   };
@@ -79,13 +77,13 @@ function defaultSeparation(): SeparationMetrics {
   };
 }
 
-// ─── Slice ──────────────────────────────────────
+// ─── Slice 实现 ──────────────────────────────────
 
 export const createButterflySlice: StateCreator<ButterflySlice, [], [], ButterflySlice> = (
   set,
   get,
 ) => ({
-  deltaDeg: 0.001,
+  deltaDeg: BUTTERFLY_DEFAULTS.defaultDeltaDeg,
   editMode: "synced",
   sideA: defaultSideState(),
   sideB: defaultSideState(),
@@ -101,6 +99,8 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
       theta2: baseState.theta2,
       omega2: baseState.omega2,
     };
+
+    separationCalculator.reset();
 
     set({
       deltaDeg,
@@ -132,6 +132,8 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
       omega2: sideA.state.omega2,
     };
 
+    separationCalculator.reset();
+
     set({
       sideA: { ...defaultSideState(), state: { ...sideA.state }, params: { ...sideA.params } },
       sideB: { ...defaultSideState(), state: stateB, params: { ...sideA.params } },
@@ -155,10 +157,11 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
     }
   },
 
+  /** 委托分离度计算给 domain/separation-calculator 纯函数 */
   _updateSide: (side, state, energy, derived) => {
     const current = get();
     const sideKey = side === "A" ? "sideA" : "sideB";
-    const otherKey = side === "A" ? "sideB" : "sideA";
+
     const updatedSide: SimSideState = {
       ...current[sideKey],
       state: { ...state },
@@ -167,28 +170,27 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
       y1: derived.y1,
       x2: derived.x2,
       y2: derived.y2,
+      simTime: performance.now(), // TODO: 由调度器传入真实 simTime
     };
 
-    // 计算分离度
-    const otherState = current[otherKey].state;
-    const dTheta1 = updatedSide.state.theta1 - otherState.theta1;
-    const dTheta2 = updatedSide.state.theta2 - otherState.theta2;
-    const currentSeparation = Math.sqrt(dTheta1 * dTheta1 + dTheta2 * dTheta2);
-    const isFullyDecoupled = currentSeparation > Math.PI / 2;
+    // 委托给纯函数分离度计算器
+    const newSeparation = separationCalculator.compute(
+      side === "A" ? updatedSide : current.sideA,
+      side === "B" ? updatedSide : current.sideB,
+    );
 
+    // 补全 decoupledAt（纯函数不追踪时间）
     const prevSep = current.separation;
-    const maxSeparation = Math.max(prevSep.maxSeparation, currentSeparation);
     const decoupledAt =
-      !prevSep.isFullyDecoupled && isFullyDecoupled
+      !prevSep.isFullyDecoupled && newSeparation.isFullyDecoupled
         ? performance.now()
         : prevSep.decoupledAt;
 
     set({
       [sideKey]: updatedSide,
       separation: {
-        currentSeparation,
-        isFullyDecoupled,
-        maxSeparation,
+        ...newSeparation,
+        maxSeparation: Math.max(prevSep.maxSeparation, newSeparation.maxSeparation),
         decoupledAt,
       },
     } as Partial<ButterflySlice>);
@@ -203,8 +205,15 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
   setEditMode: (editMode) => set({ editMode }),
 
   setDelta: (deltaDeg) => {
-    const clamped = Math.max(0, Math.min(10.0, deltaDeg));
+    const clamped = Math.max(
+      0,
+      Math.min(BUTTERFLY_DEFAULTS.maxDeltaDeg, deltaDeg),
+    );
     set({ deltaDeg: clamped });
   },
+
   signalTrailClear: () => set((s) => ({ trailClearSignal: s.trailClearSignal + 1 })),
 });
+
+// 重新导出契约类型——兼容旧导入路径
+export type { DeltaEditMode, EnergySnapshot, SimSideState, SeparationMetrics };

@@ -1,3 +1,18 @@
+/**
+ * 模块: explore.hooks.useSonification
+ * 职责: 声音化引擎 Hook——管理音频引擎生命周期，将仿真状态映射为实时音频。
+ *       EXP-03 的核心交互：使混沌可听。
+ * 边界:
+ *   - 依赖: contracts (SonificationParams, ISonificationEngine, SONIFICATION_DEFAULTS)
+ *           simulation (useSimulationStore, normalizeAngle)
+ *           shared/infrastructure/audio (AudioContext, 引擎工厂)
+ *   - 被依赖: SonificationToggle, ExplorePage
+ * 禁止行为:
+ *   - 禁止在移动端激活音频引擎——自动禁用
+ *   - 禁止在无用户手势的情况下创建 AudioContext
+ *   - 默认静音——声音化需用户主动开启
+ */
+
 import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "../store";
@@ -10,12 +25,8 @@ import {
   closeAudioContext,
 } from "@/shared/infrastructure/audio";
 import type { SonificationEngine } from "@/shared/infrastructure/audio";
-
-// ─── 常量 ──────────────────────────────────────────
-
-const MAX_ENERGY_EMA_ALPHA = 0.0005; // 半衰期 ≈ 33 秒
-const MAX_ENERGY_MIN = 0.1;
-const MAX_ENGINE_REBUILDS = 1;
+import { SONIFICATION_DEFAULTS } from "../contracts";
+import type { SonificationParams } from "../contracts";
 
 // ─── Hook 返回类型 ─────────────────────────────────
 
@@ -39,7 +50,7 @@ export function useSonification(): UseSonificationAPI {
   const setSonificationEnabled = useExploreStore((s) => s.setSonificationEnabled);
 
   const engineRef = useRef<SonificationEngine | null>(null);
-  const maxObservedEnergyRef = useRef(MAX_ENERGY_MIN);
+  const maxObservedEnergyRef = useRef<number>(SONIFICATION_DEFAULTS.maxEnergyMin);
   const initializedRef = useRef(false);
   const rebuildCountRef = useRef(0);
 
@@ -128,30 +139,41 @@ export function useSonification(): UseSonificationAPI {
     const { state, kineticEnergy } = store;
     const angleBetween = Math.abs(normalizeAngle(state.theta2 - state.theta1));
 
-    // 更新 maxObservedEnergy（EMA 衰减避免历史峰值永久拉高归一化上限）
+    // 更新 maxObservedEnergy（EMA 衰减，使用契约默认值）
+    const alpha = SONIFICATION_DEFAULTS.maxEnergyEmaAlpha;
+    const minEnergy = SONIFICATION_DEFAULTS.maxEnergyMin;
     maxObservedEnergyRef.current = Math.max(
-      maxObservedEnergyRef.current * (1 - MAX_ENERGY_EMA_ALPHA) + kineticEnergy * MAX_ENERGY_EMA_ALPHA,
+      maxObservedEnergyRef.current * (1 - alpha) + kineticEnergy * alpha,
       kineticEnergy,
-      MAX_ENERGY_MIN,
+      minEnergy,
     );
 
     // 混沌检测：从 store 读取（由 useChaosUpdater 统一计算）
     const variance = useExploreStore.getState().chaosVariance;
 
+    // 构建符合契约的 SonificationParams（类型约束增强）
+    const audioParams: SonificationParams = {
+      theta2Dot: state.omega2,
+      armAngle: angleBetween,
+      totalEnergy: kineticEnergy,
+      lyapunovExponent: variance,
+    };
+
     // 更新引擎（带 InvalidStateError 捕获与自动重建）
     try {
       engineRef.current.update({
-        omega2: state.omega2,
-        angleBetween,
-        kineticEnergy,
-        omega2Variance: variance,
+        omega2: audioParams.theta2Dot,
+        angleBetween: audioParams.armAngle,
+        kineticEnergy: audioParams.totalEnergy,
+        omega2Variance: audioParams.lyapunovExponent,
         maxObservedEnergy: maxObservedEnergyRef.current,
       });
     } catch (err) {
       if (err instanceof Error && err.name === "InvalidStateError") {
         console.error("EXP-03: Oscillator stopped unexpectedly, reinitializing engine");
         const engine = engineRef.current;
-        if (rebuildCountRef.current >= MAX_ENGINE_REBUILDS) {
+        const maxRebuilds = SONIFICATION_DEFAULTS.maxEngineRebuilds;
+        if (rebuildCountRef.current >= maxRebuilds) {
           engine?.setEnabled(false);
           setSonificationEnabled(false);
           notify({

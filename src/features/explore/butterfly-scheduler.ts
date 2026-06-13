@@ -1,11 +1,35 @@
+/**
+ * 模块: explore.butterfly-scheduler
+ * 职责: 蝴蝶效应双 Worker 调度器——实现 IButterflyScheduler 契约。
+ *       管理 A/B 两侧独立的 ODE Worker 实例，负责帧数据接收与分发。
+ * 边界:
+ *   - 依赖: simulation (Float64Pool, ode-worker), shared (valueObjects, commandBus, notify)
+ *   - 被依赖: hooks/useButterflySimulation (Hook 层控制生命周期)
+ * 禁止行为:
+ *   - 禁止直接修改 Store——通过 commandBus 异步推送帧数据
+ *   - 禁止在 delta 未校验时创建 Worker
+ */
+
 import type { PendulumParams, StateVector, InitialConditions } from "@/shared/domain/valueObjects";
 import type { WorkerResponse } from "@/shared/domain/valueObjects";
 import { FRAME_STRIDE } from "@/shared/domain/valueObjects";
 import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { commandBus } from "@/shared/infrastructure/commandBus";
-import { useRootStore } from "@/stores/rootStore";
-import type { EnergySnapshot } from "@/features/explore/viewModel/stores/butterflySlice";
+import type {
+  IButterflyScheduler,
+  DeltaEditMode,
+  EnergySnapshot,
+} from "./contracts";
+import {
+  BUTTERFLY_DEFAULTS,
+  ButterflyWorkerError,
+  InvalidDeltaError,
+} from "./contracts";
+
+// ═══════════════════════════════════════════════════
+// 常量
+// ═══════════════════════════════════════════════════
 
 const TIMEOUT_MS = 2000;
 const INIT_TIMEOUT_MS = 5000;
@@ -13,6 +37,10 @@ const POOL_COUNT = 10;
 const POOL_SIZE = 4000;
 const MAX_CRASH_RECOVERY = 1;
 const MAX_POOL_EXHAUST = 10;
+
+// ═══════════════════════════════════════════════════
+// 内部类型
+// ═══════════════════════════════════════════════════
 
 interface SideWorker {
   worker: Worker;
@@ -23,28 +51,58 @@ interface SideWorker {
   crashCount: number;
   initRetries: number;
   currentSimTime: number;
+  /** 初始化超时定时器 ID（收到 ready 后清除） */
+  initTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
-export class ButterflyScheduler {
+// ═══════════════════════════════════════════════════
+// ButterflyScheduler — 实现 IButterflyScheduler
+// ═══════════════════════════════════════════════════
+
+export class ButterflyScheduler implements IButterflyScheduler {
   private sideA: SideWorker | null = null;
   private sideB: SideWorker | null = null;
   private rafId = 0;
   private running = false;
   private poolExhaustCount = 0;
 
-  // ── 公开 API ──
+  /** 存储最近一次 start() 传入的基础参数（用于 setDelta 重算 B 侧初值） */
+  private baseParams: PendulumParams | null = null;
+  /** 存储最近一次 start() 传入的基础状态 */
+  private baseState: StateVector | null = null;
+  // ── 公开 API ──────────────────────────────────
 
   start(baseParams: PendulumParams, baseState: StateVector, deltaDeg: number): void {
+    // 校验 Delta 合法性
+    if (
+      !Number.isFinite(deltaDeg) ||
+      deltaDeg < BUTTERFLY_DEFAULTS.minDeltaDeg ||
+      deltaDeg > BUTTERFLY_DEFAULTS.maxDeltaDeg
+    ) {
+      throw new InvalidDeltaError(deltaDeg);
+    }
+
     if (this.running) return;
+
+    // 清理可能残留的旧 Worker
+    this.sideA?.worker.terminate();
+    this.sideB?.worker.terminate();
+
+    this.baseParams = { ...baseParams };
+    this.baseState = { ...baseState };
 
     const deltaRad = deltaDeg * (Math.PI / 180);
     const icA: InitialConditions = {
-      theta1: baseState.theta1, theta1Dot: baseState.omega1,
-      theta2: baseState.theta2, theta2Dot: baseState.omega2,
+      theta1: baseState.theta1,
+      theta1Dot: baseState.omega1,
+      theta2: baseState.theta2,
+      theta2Dot: baseState.omega2,
     };
     const icB: InitialConditions = {
-      theta1: baseState.theta1 + deltaRad, theta1Dot: baseState.omega1,
-      theta2: baseState.theta2, theta2Dot: baseState.omega2,
+      theta1: baseState.theta1 + deltaRad,
+      theta1Dot: baseState.omega1,
+      theta2: baseState.theta2,
+      theta2Dot: baseState.omega2,
     };
 
     this.sideA = this.createSideWorker(icA, baseParams, "A");
@@ -69,41 +127,60 @@ export class ButterflyScheduler {
     }
   }
 
-  destroy(): void {
+  /** 重置——销毁两侧 Worker 并清空状态（契约签名无参数） */
+  reset(): void {
     this.pause();
     this.sideA?.worker.terminate();
     this.sideB?.worker.terminate();
     this.sideA = null;
     this.sideB = null;
+    this.baseParams = null;
+    this.baseState = null;
+    this.poolExhaustCount = 0;
   }
 
-  reset(baseParams: PendulumParams, baseState: StateVector, deltaDeg: number): void {
-    this.pause();
-    this.sideA?.worker.terminate();
-    this.sideB?.worker.terminate();
-
-    const deltaRad = deltaDeg * (Math.PI / 180);
-    const icA: InitialConditions = {
-      theta1: baseState.theta1, theta1Dot: baseState.omega1,
-      theta2: baseState.theta2, theta2Dot: baseState.omega2,
-    };
-    const icB: InitialConditions = {
-      theta1: baseState.theta1 + deltaRad, theta1Dot: baseState.omega1,
-      theta2: baseState.theta2, theta2Dot: baseState.omega2,
-    };
-
-    this.sideA = this.createSideWorker(icA, baseParams, "A");
-    this.sideB = this.createSideWorker(icB, baseParams, "B");
+  /** 销毁——释放所有资源 */
+  destroy(): void {
+    this.reset();
   }
 
-  updateParams(patch: Partial<PendulumParams>): void {
-    const editMode = useRootStore.getState().editMode;
+  updateParams(patch: Partial<PendulumParams>, mode: DeltaEditMode): void {
+    // 更新本地缓存的参数
+    if (this.baseParams) {
+      Object.assign(this.baseParams, patch);
+    }
+
     const cmd = { type: "updateParams" as const, params: patch };
-    if (editMode === "synced" || editMode === "a-only") {
+    if (mode === "synced" || mode === "a-only") {
       this.sideA?.worker.postMessage(cmd);
     }
-    if (editMode === "synced" || editMode === "b-only") {
+    if (mode === "synced" || mode === "b-only") {
       this.sideB?.worker.postMessage(cmd);
+    }
+  }
+
+  /** 更新 Delta 值——校验后如 B 侧 Worker 存在则重算初值并发送 reset */
+  setDelta(deltaDeg: number): void {
+    if (
+      !Number.isFinite(deltaDeg) ||
+      deltaDeg < BUTTERFLY_DEFAULTS.minDeltaDeg ||
+      deltaDeg > BUTTERFLY_DEFAULTS.maxDeltaDeg
+    ) {
+      throw new InvalidDeltaError(deltaDeg);
+    }
+
+    if (this.sideB && this.baseParams && this.baseState) {
+      const deltaRad = deltaDeg * (Math.PI / 180);
+      const icB: InitialConditions = {
+        theta1: this.baseState.theta1 + deltaRad,
+        theta1Dot: this.baseState.omega1,
+        theta2: this.baseState.theta2,
+        theta2Dot: this.baseState.omega2,
+      };
+      this.sideB.worker.postMessage({
+        type: "reset",
+        initialConditions: icB,
+      });
     }
   }
 
@@ -111,7 +188,7 @@ export class ButterflyScheduler {
     return this.running;
   }
 
-  // ── Worker 创建 ──
+  // ── Worker 创建 ───────────────────────────────
 
   private createSideWorker(
     ic: InitialConditions,
@@ -132,6 +209,7 @@ export class ButterflyScheduler {
       crashCount: 0,
       initRetries: 0,
       currentSimTime: 0,
+      initTimeoutId: null,
     };
 
     worker.onmessage = (e: MessageEvent<WorkerResponse>) =>
@@ -146,7 +224,7 @@ export class ButterflyScheduler {
     });
 
     // 初始化超时检测
-    const initTimeout = setTimeout(() => {
+    sw.initTimeoutId = setTimeout(() => {
       if (sw.initRetries >= 1) {
         commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
         notify({
@@ -175,20 +253,19 @@ export class ButterflyScheduler {
       });
     }, INIT_TIMEOUT_MS);
 
-    // 收到 ready 时清除超时（在 handleMessage 的 ready 分支处理）
-    (sw as any).__initTimeout = initTimeout;
-
     return sw;
   }
 
-  // ── Worker 消息处理 ──
+  // ── Worker 消息处理 ───────────────────────────
 
   private handleMessage(resp: WorkerResponse, sw: SideWorker, side: "A" | "B"): void {
     switch (resp.type) {
       case "ready": {
         // 清除初始化超时
-        const timeout = (sw as any).__initTimeout;
-        if (timeout) { clearTimeout(timeout); (sw as any).__initTimeout = null; }
+        if (sw.initTimeoutId !== null) {
+          clearTimeout(sw.initTimeoutId);
+          sw.initTimeoutId = null;
+        }
         commandBus.emit({ type: "butterfly:workerReady", side, ready: true });
         this.tryRequestBatch(sw, side);
         break;
@@ -197,7 +274,6 @@ export class ButterflyScheduler {
       case "batchReady": {
         sw.pendingBatch = false;
 
-        // 解析最后一帧用于 Store 更新
         const lastFrameIdx = resp.frameCount - 1;
         const offset = lastFrameIdx * FRAME_STRIDE;
         const buf = resp.buffer;
@@ -230,7 +306,7 @@ export class ButterflyScheduler {
           derived,
           simTime: buf[offset]!,
         });
-        sw.currentSimTime = buf[offset]!; // t 在第一列
+        sw.currentSimTime = buf[offset]!;
 
         // 归还 buffer
         sw.pool.releaseBuffer(resp.buffer);
@@ -258,6 +334,8 @@ export class ButterflyScheduler {
     }
   }
 
+  // ── Worker 崩溃恢复 ───────────────────────────
+
   private handleCrash(
     _event: ErrorEvent,
     sw: SideWorker,
@@ -268,6 +346,14 @@ export class ButterflyScheduler {
     console.error(`EXP-04: Worker ${side} crash`, _event);
 
     if (sw.crashCount >= MAX_CRASH_RECOVERY) {
+      // 超出恢复上限——构造 ButterflyWorkerError 用于诊断
+      const workerError = new ButterflyWorkerError(
+        `摆 ${side} 仿真引擎崩溃`,
+        side,
+        sw.crashCount,
+      );
+      console.error(workerError);
+
       commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
       this.running = false;
       commandBus.emit({ type: "butterfly:pause" });
@@ -281,9 +367,15 @@ export class ButterflyScheduler {
     }
 
     sw.crashCount++;
+
+    // 清除旧的 initTimeout
+    if (sw.initTimeoutId !== null) {
+      clearTimeout(sw.initTimeoutId);
+      sw.initTimeoutId = null;
+    }
     sw.worker.terminate();
 
-    // 重建
+    // 重建 Worker
     sw.worker = new Worker(
       new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url),
       { type: "module" },
@@ -303,7 +395,7 @@ export class ButterflyScheduler {
     });
   }
 
-  // ── 批次调度 ──
+  // ── 批次调度 ──────────────────────────────────
 
   private tryRequestBatch(sw: SideWorker, side: "A" | "B"): void {
     if (sw.pendingBatch || !this.running) return;
@@ -311,7 +403,9 @@ export class ButterflyScheduler {
     const slot = sw.pool.acquire();
     if (!slot) {
       this.poolExhaustCount++;
-      console.warn(`EXP-04: Worker ${side} pool exhausted (${this.poolExhaustCount}/${MAX_POOL_EXHAUST})`);
+      console.warn(
+        `EXP-04: Worker ${side} pool exhausted (${this.poolExhaustCount}/${MAX_POOL_EXHAUST})`,
+      );
       if (this.poolExhaustCount >= MAX_POOL_EXHAUST) {
         console.error("EXP-04: Pool exhausted 10 consecutive frames, auto-pausing");
         this.pause();
@@ -336,7 +430,7 @@ export class ButterflyScheduler {
     }, TIMEOUT_MS);
   }
 
-  // ── rAF 循环 ──
+  // ── rAF 循环 ──────────────────────────────────
 
   private loop(): void {
     if (!this.running) return;

@@ -56,7 +56,8 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
 
     const simStore = useSimulationStore.getState();
     useRootStore.getState().reset();
-    schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
+    schedulerRef.current.reset();
+    schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
   // 卸载清理
@@ -72,7 +73,8 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
   const handleReset = useCallback(() => {
     const simStore = useSimulationStore.getState();
     useRootStore.getState().reset();
-    schedulerRef.current.reset(simStore.params, simStore.state, butterflyDelta);
+    schedulerRef.current.reset();
+    schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
   const handleDeltaChange = useCallback(
