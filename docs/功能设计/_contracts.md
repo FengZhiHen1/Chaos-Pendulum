@@ -233,12 +233,12 @@
 
 ## SYS-03 — 预计算数据管线
 - **输入**: Parameter grid config (from `scripts/precompute/config.py`)
-- **输出**: `LyapunovGrid` JSON (100×100 浮点矩阵), `BifurcationData` JSON (采样序列) → `src/shared/data/` → Vite build → dist/assets/ → IndexedDB cache (键 `{type}-{gridHash}`, LRU ≤10)
+- **输出**: `LyapunovGrid` JSON (100×100 浮点矩阵 + 阻尼多切片), `BifurcationData` JSON (采样序列) → `public/assets/` → Vite build → dist/assets/ → IndexedDB cache (键 `{type}-{gridHash}`, LRU ≤10)
 - **状态机**: 无（离线 pipeline + 前端缓存层）
 - **模块依赖**: 无（离线数据生产者，不依赖运行时模块）
-- **外部依赖**: Python 3.11+, NumPy ≥1.24, SciPy ≥1.10 (solve_ivp), hashlib (SHA-256), IndexedDB, Web Crypto API
+- **外部依赖**: Python 3.11+, NumPy ≥1.24, SciPy ≥1.10 (scipy.signal only), hashlib (SHA-256), IndexedDB, Web Crypto API; 自实现 RKF45 Fehlberg 4(5) 积分器（与 JS Worker 一致）
 - **技术栈**: Python 3.11 + NumPy + SciPy (离线); TypeScript 5.x + IndexedDB (前端)
-- **更新时间**: `2026-04-30 19:48:09`
+- **更新时间**: `2026-06-13`
 
 ## SYS-04 — 应用初始化加载
 - **输入**: BootConfig {pyodideLoadStrategy: "lazy", enablePrecomputePrefetch, showQuotes}
