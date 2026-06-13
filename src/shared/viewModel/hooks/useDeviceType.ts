@@ -17,7 +17,7 @@ const DEBOUNCE_MS = 150;
  * 根据视口宽度计算设备类型（纯函数，可在 Node 环境直接测试）。
  */
 export function classifyDevice(width: number): DeviceType {
-  if (width >= BREAKPOINTS.DESKTOP_COMPACT) return "desktop";
+  if (width >= BREAKPOINTS.DESKTOP) return "desktop";
   if (width >= BREAKPOINTS.TABLET) return "tablet";
   return "mobile";
 }

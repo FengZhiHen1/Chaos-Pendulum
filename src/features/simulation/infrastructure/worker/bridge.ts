@@ -1,4 +1,5 @@
 import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/domain/valueObjects";
+import { PARAM_META } from "@/shared/domain/valueObjects";
 import { useRootStore } from "@/stores/rootStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { getScheduler } from "./scheduler-factory";
@@ -222,8 +223,9 @@ export function setupSimulationBridge(): () => void {
     const isResetAction = state.resetTrigger !== prevState.resetTrigger;
 
     // ── params 变更 ──
-    // paramsDirty 时跳过即时同步，由 resetTrigger 分支在重置时统一应用
-    if (state.params !== prevState.params && !state.paramsDirty) {
+    // 连续参数（system/environment group）即时去抖同步到 Worker，不等待 reset
+    // 初始条件参数（initial group）保留 paramsDirty 语义，由 resetTrigger 统一处理
+    if (state.params !== prevState.params) {
       const diff: Partial<PendulumParams> = {};
       for (const k of Object.keys(state.params) as (keyof PendulumParams)[]) {
         if (state.params[k] !== lastSyncedParams[k]) {
@@ -237,11 +239,22 @@ export function setupSimulationBridge(): () => void {
           const d = { ...pendingUpdateDiff };
           pendingUpdateDiff = {};
           if (Object.keys(d).length === 0) return;
-          lastSyncedParams = { ...useRootStore.getState().params };
-          if (workerReady) {
-            getScheduler().updateParams(d);
-          } else {
-            enqueue("updateParams", d);
+          // 仅发送连续参数（system+environment group），初始条件等待 reset
+          const syncDiff: Partial<PendulumParams> = {};
+          for (const k of Object.keys(d) as (keyof PendulumParams)[]) {
+            if (PARAM_META.find(m => m.key === k)?.group !== 'initial') {
+              syncDiff[k] = d[k]!;
+            }
+          }
+          for (const k of Object.keys(syncDiff) as (keyof PendulumParams)[]) {
+            lastSyncedParams[k] = syncDiff[k]!;
+          }
+          if (Object.keys(syncDiff).length > 0) {
+            if (workerReady) {
+              getScheduler().updateParams(syncDiff);
+            } else {
+              enqueue('updateParams', syncDiff);
+            }
           }
         }, DEBOUNCE_MS);
       }

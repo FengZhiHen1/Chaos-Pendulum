@@ -22,8 +22,14 @@ interface AppState {
   previousMode: AppMode | null;
   modeRegistry: ModeDefinition[];
 
+  // ── SIM-03 导航锁定 ──
+  isNavigationLocked: boolean;
+  navigationLockReason: string;
+
   // ── Actions ──
   setMode: (newMode: AppMode) => void;
+  lockNavigation: (reason: string) => void;
+  unlockNavigation: () => void;
   setDeviceType: (type: DeviceType) => void;
   setLoadingState: (state: LoadingState) => void;
   updateDebugInfo: (patch: Partial<DebugInfo>) => void;
@@ -43,15 +49,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeMode: "explore",
   previousMode: null,
   modeRegistry: MODE_REGISTRY,
+  isNavigationLocked: false,
+  navigationLockReason: "",
 
   setMode: (newMode) => {
-    const { activeMode } = get();
+    const { activeMode, isNavigationLocked, navigationLockReason } = get();
     // 幂等：相同模式不触发
     if (newMode === activeMode) return;
 
     // 模式名有效性校验
     if (!MODE_REGISTRY.some((m) => m.id === newMode)) {
       console.warn(`[SIM-03] 非法 mode 值: ${newMode}`);
+      return;
+    }
+
+    // 导航锁检查：故事模式自动播放期间锁定
+    if (isNavigationLocked) {
+      console.warn(`[SIM-03] 导航已锁定(${navigationLockReason})，拒绝切换至 ${newMode}`);
       return;
     }
 
@@ -62,6 +76,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     set({ previousMode: activeMode, activeMode: newMode });
+  },
+
+  /** 锁定导航（故事模式调用）。阻止手动切换，显示脉冲动画引导。 */
+  lockNavigation: (reason) => {
+    console.info("navigation_locked", { reason, timestamp: Date.now() });
+    set({ isNavigationLocked: true, navigationLockReason: reason });
+  },
+
+  /** 解锁导航。故事结束或用户打断后恢复。 */
+  unlockNavigation: () => {
+    console.info("navigation_unlocked", { timestamp: Date.now() });
+    set({ isNavigationLocked: false, navigationLockReason: "" });
   },
 
   setDeviceType: (type) => {

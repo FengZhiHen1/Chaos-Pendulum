@@ -1,6 +1,5 @@
 import { useRef, useMemo } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
-import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { useAppStore } from "@/stores/useAppStore";
 import type { TrailPoint } from "../hooks/useTrailBuffer";
@@ -129,38 +128,6 @@ function velocityToColor(
 }
 
 // ─── 移动端降级：固定宽度 Line ───────────────────
-
-function MobileTrailLine({
-  points,
-  colorMode,
-  solidColor,
-  opacity,
-  colorGradient,
-}: TrailRendererProps) {
-  const gradient = colorGradient ?? DEFAULT_COLOR_STOPS;
-  const solidRgb = useMemo(() => hexToRgb(solidColor ?? "#f0c040"), [solidColor]);
-  const maxVelocityRef = useMemo(() => ({ current: MAX_OBSERVED_VELOCITY }), []);
-
-  const linePoints = points.map((p) => p.position.toArray());
-  const lineColors = points.map((p) => {
-    if (colorMode === "velocity") {
-      const c = velocityToColor(p.velocity, gradient, maxVelocityRef);
-      return [c.r, c.g, c.b] as [number, number, number];
-    }
-    return [solidRgb.r, solidRgb.g, solidRgb.b] as [number, number, number];
-  });
-
-  return (
-    <Line
-      points={linePoints as [number, number, number][]}
-      color={colorMode === "solid" ? solidColor : undefined}
-      vertexColors={colorMode === "velocity" ? lineColors : undefined}
-      lineWidth={1}
-      transparent
-      opacity={opacity ?? DEFAULT_OPACITY}
-    />
-  );
-}
 
 // ─── 桌面端/平板端：圆角粗线三角形带 ──────────────
 
@@ -478,17 +445,8 @@ function TrailRendererImpl({
 
   if (points.length < 2) return null;
 
-  if (isMobile) {
-    return (
-      <MobileTrailLine
-        points={points}
-        colorMode={colorMode}
-        solidColor={solidColor}
-        opacity={opacity}
-        colorGradient={colorGradient}
-      />
-    );
-  }
+  // 手机端完全关闭尾迹（设计文档要求 + 性能降级）
+  if (isMobile) return null;
 
   return (
     <RoundCapTrail
