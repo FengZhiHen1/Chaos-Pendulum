@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { ExploreSlice, ReversalMode, ReversalPhase, DriftSample } from "@/stores/slices/exploreSlice";
+import type { ExploreSlice, ReversalMode, ReversalPhase, DriftSample } from "./viewModel/stores/exploreSlice";
 
 function useExploreStore(): ExploreSlice;
 function useExploreStore<T>(selector: (state: ExploreSlice) => T): T;

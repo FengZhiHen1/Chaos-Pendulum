@@ -1,6 +1,6 @@
 import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/types";
 import { useRootStore } from "@/stores/rootStore";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { getScheduler } from "./scheduler";
 
 let workerReady = false;

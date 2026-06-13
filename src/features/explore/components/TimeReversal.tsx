@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useSimulationStore, useSimulationHistory, getSimulationHistory, ball2Position, pauseHistoryRecording, resumeHistoryRecording } from "@/features/simulation";
 import { useExploreStore } from "../store";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { updateTrajectoryData, clearTrajectoryData, startTrajectoryFadeOut } from "./TimeReversalTrajectory";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { Dialog } from "@/shared/components/ui/dialog";

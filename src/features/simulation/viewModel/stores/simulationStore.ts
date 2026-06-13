@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { SimulationSlice, SimulationFrame } from "@/stores/slices/simulationSlice";
+import type { SimulationSlice, SimulationFrame } from "./simulationSlice";
 
 function useSimulationStore(): SimulationSlice;
 function useSimulationStore<T>(selector: (state: SimulationSlice) => T): T;
@@ -18,4 +18,4 @@ useSimulationStore.subscribe = (listener: (state: SimulationSlice, prevState: Si
 
 export { useSimulationStore };
 export type { SimulationFrame };
-export { readFrameField, getFrameSlice } from "@/stores/slices/simulationSlice";
+export { readFrameField, getFrameSlice } from "./simulationSlice";

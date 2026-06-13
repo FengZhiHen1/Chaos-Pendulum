@@ -5,7 +5,7 @@ import { useLabStore } from "@/features/lab/store";
 import { useRootStore } from "@/stores/rootStore";
 import { FRAMES_PER_BATCH, FRAME_STRIDE, FORCE_STRIDE, FORCE_BUFFER_LENGTH } from "@/shared/types";
 import type { ForceExtrema, PoincarePoint } from "@/shared/types";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 
 // ─── Command Bus 测试处理器 ─────────────────────
 

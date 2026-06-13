@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { AnalyzeSlice, AnalysisView } from "@/stores/slices/analyzeSlice";
+import type { AnalyzeSlice, AnalysisView } from "./viewModel/stores/analyzeSlice";
 
 function useAnalyzeStore(): AnalyzeSlice;
 function useAnalyzeStore<T>(selector: (state: AnalyzeSlice) => T): T;

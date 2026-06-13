@@ -4,7 +4,7 @@ import { OrbitControls, Grid, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 import { Vector3 } from "three";
 import { useSimulationStore, getScheduler } from "@/features/simulation";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useExploreStore } from "@/features/explore";
 import { useTrailBuffer } from "../hooks/useTrailBuffer";
 import { useSceneController } from "../hooks/useSceneController";

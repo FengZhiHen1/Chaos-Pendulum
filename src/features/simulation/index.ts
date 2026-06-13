@@ -14,7 +14,7 @@ export type { DerivedValues } from "./domain/services/stateVector";
 // ─── ViewModel ────────────────────────────────────
 export { useSimulationStore } from "./store";
 export type { SimulationFrame } from "./store";
-export { readFrameField, getFrameSlice } from "@/stores/slices/simulationSlice";
+export { readFrameField, getFrameSlice } from "./viewModel/stores/simulationSlice";
 
 // ─── ViewModel — Hooks ────────────────────────────
 export { useEnergyMonitor } from "./hooks/useEnergyMonitor";

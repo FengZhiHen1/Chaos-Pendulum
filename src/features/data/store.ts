@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { DataSlice } from "@/stores/slices/dataSlice";
+import type { DataSlice } from "./viewModel/stores/dataSlice";
 
 function useDataStore(): DataSlice;
 function useDataStore<T>(selector: (state: DataSlice) => T): T;

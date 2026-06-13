@@ -8,7 +8,7 @@ import type {
 } from "@/shared/types";
 import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/types";
 import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useRootStore } from "@/stores/rootStore";
 import { observabilityCoordinator } from "@/shared/lib/observability";
 

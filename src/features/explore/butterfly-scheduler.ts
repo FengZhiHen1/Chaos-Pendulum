@@ -3,9 +3,9 @@ import type { WorkerResponse } from "@/shared/types";
 import { FRAME_STRIDE } from "@/shared/types";
 import { Float64Pool } from "@/features/simulation/worker/float64-pool";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { useRootStore } from "@/stores/rootStore";
-import type { EnergySnapshot } from "@/stores/slices/butterflySlice";
+import type { EnergySnapshot } from "@/features/explore/viewModel/stores/butterflySlice";
 
 const TIMEOUT_MS = 2000;
 const INIT_TIMEOUT_MS = 5000;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "../store";
-import { commandBus } from "@/stores/commandBus";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 
 const WINDOW_SIZE = 300; // 5 秒 @ 60fps
 

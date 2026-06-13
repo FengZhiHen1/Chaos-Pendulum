@@ -5,7 +5,7 @@ import type {
   SeparationMetrics,
   SimSideState,
   EnergySnapshot,
-} from "@/stores/slices/butterflySlice";
+} from "@/features/explore/viewModel/stores/butterflySlice";
 
 function useButterflyStore(): ButterflySlice;
 function useButterflyStore<T>(selector: (state: ButterflySlice) => T): T;

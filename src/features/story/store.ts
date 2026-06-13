@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { StorySlice } from "@/stores/slices/storySlice";
+import type { StorySlice } from "./viewModel/stores/storySlice";
 
 function useStoryStore(): StorySlice;
 function useStoryStore<T>(selector: (state: StorySlice) => T): T;

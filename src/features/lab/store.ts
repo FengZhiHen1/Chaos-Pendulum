@@ -1,5 +1,5 @@
 import { useRootStore } from "@/stores/rootStore";
-import type { LabSlice } from "@/stores/slices/labSlice";
+import type { LabSlice } from "./viewModel/stores/labSlice";
 
 function useLabStore(): LabSlice;
 function useLabStore<T>(selector: (state: LabSlice) => T): T;
