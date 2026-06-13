@@ -1,9 +1,2 @@
-import { useEffect } from "react";
-import { setupSimulationBridge } from "@/features/simulation";
-
-export function useSimulationBridge() {
-  useEffect(() => {
-    const cleanup = setupSimulationBridge();
-    return cleanup;
-  }, []);
-}
+/** @deprecated 请从 @/features/simulation/viewModel/hooks/useSimulationBridge 导入 */
+export { useSimulationBridge } from "@/features/simulation/viewModel/hooks/useSimulationBridge";

@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useKeyboardShortcuts } from "@/shared/hooks/useKeyboardShortcuts";
-import { useSimulationBridge } from "@/shared/hooks/useSimulationBridge";
+import { useSimulationBridge } from "@/features/simulation/viewModel/hooks/useSimulationBridge";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import type { AppMode } from "@/shared/types";
 import { MODE_REGISTRY } from "@/shared/types";
