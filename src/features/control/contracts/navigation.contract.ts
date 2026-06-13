@@ -40,8 +40,8 @@ import type { AppMode } from "@/shared/domain/valueObjects";
  * 输入约束:
  *   - mode: "explore" | "analyze" | "lab" | "story"
  * 输出约束: 切换后 subscribe 到 activeMode 的组件自动重渲染
- * 异常:
- *   - NavigationLockedError: 故事模式锁定期间尝试切换
+ * 输出约束: 导航锁定时 switchTo() 静默拒绝（console.warn + return），不抛异常
+ * 异常: 无——锁定为静默拒绝，避免 UI 层 try-catch 负担
  * Side Effects: 更新 AppStore.activeMode；
  *   键盘快捷键注册/注销（useKeyboardShortcuts）
  */
@@ -140,7 +140,9 @@ export interface IKeyboardShortcuts {
 // @contract ResponsiveBreakpoints — 响应式断点
 // ───────────────────────────────────────────────
 
-/** 响应式布局断点（像素） */
+/** 响应式布局断点（像素）。
+ * 权威数据源: src/shared/constants/breakpoints.ts。
+ * 此常量仅为契约文档引用，确保契约读者无需跳转即可了解断点值。 */
 export const BREAKPOINTS = {
   /** 桌面端：≥ 1024px（三栏布局） */
   desktop: 1024,

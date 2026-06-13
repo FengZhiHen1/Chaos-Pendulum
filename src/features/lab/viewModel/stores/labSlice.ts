@@ -38,6 +38,7 @@ export interface LabSlice {
   setValidationDetail: (test: ValidationTestKey, detail: string) => void;
   setValidationRunning: (running: boolean) => void;
   setAllPassed: (passed: boolean) => void;
+  resetValidation: () => void;
   setCoordinateSystem: (sys: CoordinateSystem) => void;
   setReportGenerating: (generating: boolean) => void;
   setForceActive: (v: boolean) => void;
@@ -78,6 +79,13 @@ export const createLabSlice: StateCreator<LabSlice, [], [], LabSlice> = (set) =>
     set((s) => ({ validationDetails: { ...s.validationDetails, [test]: detail } })),
   setValidationRunning: (validationRunning) => set({ validationRunning }),
   setAllPassed: (allPassed) => set({ allPassed }),
+  resetValidation: () =>
+    set({
+      validationResults: { smallAngle: "idle", singlePendulum: "idle", energy: "idle" },
+      validationDetails: { smallAngle: "", singlePendulum: "", energy: "" },
+      validationRunning: false,
+      allPassed: false,
+    }),
   setCoordinateSystem: (coordinateSystem) => set({ coordinateSystem }),
   setReportGenerating: (reportGenerating) => set({ reportGenerating }),
 

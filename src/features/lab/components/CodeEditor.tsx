@@ -50,6 +50,12 @@ export function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // height 变更——更新编辑器容器样式（不重建编辑器）
+  useEffect(() => {
+    const el = containerRef.current?.querySelector(".cm-editor") as HTMLElement | null;
+    if (el) el.style.height = `${height}px`;
+  }, [height]);
+
   // 错误行高亮 + 滚动
   useEffect(() => {
     const view = viewRef.current;

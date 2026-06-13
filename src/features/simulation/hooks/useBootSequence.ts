@@ -14,7 +14,7 @@ import {
   downloadPyodideResource,
   cachePyodideResource,
   buildPyodideCdnUrl,
-} from "@/features/lab/pyodideCache";
+} from "@/features/lab/infrastructure/pyodideCache";
 import type { BootConfig, BootProgress, BootPhase, BootError } from "@/features/simulation/types.boot";
 import {
   BOOT_PHASE_WEIGHTS,
