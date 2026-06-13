@@ -54,3 +54,11 @@ export { BootManager } from "./view/components/BootManager";
 export { LoadingScreen } from "./view/components/LoadingScreen";
 export { ErrorScreen } from "./view/components/ErrorScreen";
 export { createOdeWorker } from "./infrastructure/worker/createOdeWorker";
+
+// ─── Control Contracts (参数面板契约由 simulation 模块承载) ──
+export type {
+  ParameterCategory,
+  IParameterValidator,
+  IParameterController,
+  IParameterPreview,
+} from "@/features/control/contracts";
