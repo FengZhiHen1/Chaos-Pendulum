@@ -194,7 +194,7 @@ export function DecompositionPanel() {
   const hasData = currentFrameData !== null;
 
   return (
-    <div className="w-80 shrink-0 border-l border-white/5 bg-surface-container-lowest/80 backdrop-blur flex flex-col h-full">
+    <div className="w-full h-full flex flex-col bg-surface-container-lowest/80 backdrop-blur">
       {/* 页头 */}
       <div className="px-3 py-2.5 border-b border-white/5 shrink-0">
         <div className="flex items-center justify-between mb-2">

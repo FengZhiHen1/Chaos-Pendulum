@@ -1,43 +1,52 @@
-import { useAppStore } from "@/stores/useAppStore";
-import { useSonification } from "../hooks/useSonification";
-
-// ─── 类型 ──────────────────────────────────────────
+import { Volume2, VolumeX } from "lucide-react";
+import { cn } from "@/shared/infrastructure/cn";
 
 interface SonificationToggleProps {
+  /** 声音化是否激活 */
+  isActive: boolean;
+  /** 切换回调 */
+  onToggle: () => void;
+  /** 是否为桌面端（非桌面端不渲染） */
+  isDesktop: boolean;
   className?: string;
   size?: "sm" | "md";
 }
 
 /**
- * 声音化开关按钮。
+ * 声效开关 —— 仅渲染为图标按钮的展示组件。
  *
- * 仅桌面端渲染。平板/手机自动隐藏。
- * 点击后通过浏览器自动播放策略验证，激活 Web Audio 引擎。
+ * 状态数据与切换回调由父组件通过 Props 注入。
  */
 export function SonificationToggle({
+  isActive,
+  onToggle,
+  isDesktop,
   className = "",
   size = "md",
 }: SonificationToggleProps) {
-  const deviceType = useAppStore((s) => s.deviceType);
-  const { isActive, toggle } = useSonification();
-
-  // 非桌面端不渲染
-  if (deviceType !== "desktop") return null;
+  if (!isDesktop) return null;
 
   const isSmall = size === "sm";
 
   return (
     <button
       type="button"
-      onClick={toggle}
-      className={`rounded font-medium transition-colors ${className} ${
+      onClick={onToggle}
+      title={isActive ? "关闭物理声效" : "开启物理声效"}
+      className={cn(
+        "flex items-center justify-center rounded-full border transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow",
         isActive
-          ? "border-green-500/60 text-green-300 bg-green-500/10 hover:bg-green-500/20"
-          : "border-gray-500/50 text-gray-400 bg-transparent hover:text-gray-200 hover:border-gray-400"
-      } ${isSmall ? "px-2 py-0.5 text-xs h-[32px]" : "px-3 py-1 text-sm h-[40px]"}`}
-      style={{ border: "1px solid" }}
+          ? "bg-primary-container border-primary/30 text-primary"
+          : "bg-surface/90 backdrop-blur border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary/30",
+        isSmall ? "w-8 h-8" : "w-10 h-10",
+        className,
+      )}
     >
-      {isActive ? "🔊 关闭物理声效" : "🔇 开启物理声效"}
+      {isActive ? (
+        <Volume2 className={isSmall ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      ) : (
+        <VolumeX className={isSmall ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      )}
     </button>
   );
 }

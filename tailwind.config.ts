@@ -41,6 +41,11 @@ export default {
           hover: "#6BB3FF",
           "focus-glow": "rgba(75, 159, 255, 0.25)",
         },
+        // ── Outlines ──
+        outline: {
+          DEFAULT: "#4A4E57",
+          variant: "rgba(155, 160, 170, 0.10)",
+        },
         // ── Semantic Data Colors ──
         "force-gravity": "#4ADE80",
         "force-tension": "#F87171",

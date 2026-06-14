@@ -16,8 +16,8 @@ import { ForceArrows3D } from "@/features/lab/components/ForceArrows3D";
 
 // ─── 类型定义 ────────────────────────────────────
 
-type PendulumMaterialType = "metal" | "wood" | "glass";
-type EnvironmentPreset = "dark-lab" | "white-teaching";
+export type PendulumMaterialType = "metal" | "wood" | "glass";
+export type EnvironmentPreset = "dark-lab" | "white-teaching" | "bright-stage";
 type ViewPreset = "side" | "top" | "chaos";
 
 export interface Scene3DProps {
@@ -119,6 +119,13 @@ const ENVIRONMENT_CONFIGS: Record<EnvironmentPreset, EnvironmentVisualConfig> = 
     spotIntensity: 0,
     spotPosition: new Vector3(0, 0, 0),
     gridColor: "#cccccc",
+  },
+  "bright-stage": {
+    background: "#EAECEF",
+    ambientIntensity: 0.7,
+    spotIntensity: 4,
+    spotPosition: new Vector3(3, 5, 2),
+    gridColor: "#d1d5db",
   },
 };
 

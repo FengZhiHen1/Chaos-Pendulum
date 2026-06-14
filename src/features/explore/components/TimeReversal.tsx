@@ -7,10 +7,6 @@
  *           domain/drift-calculator (漂移距离纯计算)
  *           simulation (useSimulationStore, useSimulationHistory 等)
  *   - 被依赖: ExplorePage
- * 禁止行为:
- *   - 禁止在精确反演中访问 Worker——仅使用历史 RingBuffer 插值
- *   - 禁止反演过程中修改正向历史数据
- *   - 禁止教学注释在已关闭后自动重新弹出
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -33,14 +29,11 @@ import {
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { Dialog } from "@/shared/view/components/ui/dialog";
 import { Button } from "@/shared/view/components/ui/button";
+import { cn } from "@/shared/infrastructure/cn";
 import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../contracts";
 import { driftCalculator } from "../domain/drift-calculator";
 import { DriftCurvePanel } from "./DriftCurvePanel";
 import { TeachingAnnotationPopup } from "./TeachingAnnotationPopup";
-
-// ═══════════════════════════════════════════════════
-// 主组件
-// ═══════════════════════════════════════════════════
 
 interface TimeReversalProps {
   className?: string;
@@ -102,7 +95,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
           ? "精确反演（对照）— 仅视觉回放，无误差"
           : "数值反演（实验）— 真实反向积分，展示浮点误差指数放大";
 
-  // 教学注释自动弹出
   const showAnnotation =
     mode === "numerical" &&
     phase === "reversing" &&
@@ -165,7 +157,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     const store = useSimulationStore.getState();
     const fwdArray = history.toArray();
 
-    // 契约要求：历史帧数不足时抛出 InsufficientHistoryError
     if (fwdArray.length < minFrames) {
       throw new InsufficientHistoryError(fwdArray.length, minFrames);
     }
@@ -180,10 +171,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     isReversingRef.current = true;
     prevSimTimeRef.current = store.t;
 
-    // 保存正向历史快照（防止反向帧污染后续 drift 计算）
     fwdSnapshotRef.current = getSimulationHistory();
 
-    // 初始化 3D 轨迹叠加
     clearTrajectoryData();
     const fwdPts = fwdArray.map((sv) => {
       const p = ball2Position(sv, store.params);
@@ -203,7 +192,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       commandBus.emit({ type: "scheduler:pause" });
       exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
     } else {
-      // 数值反演流程
       awaitingConfirmRef.current = true;
       setPhase("awaitingConfirm");
       pauseHistoryRecording();
@@ -231,7 +219,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   }, [mode, history, minFrames, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
 
   // ── 确认 / 取消反演 ──
-
   const handleConfirmReversal = useCallback(() => {
     setConfirmOpen(false);
     setPhase("reversing");
@@ -284,7 +271,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   }, [mode, setPhase, setActive]);
 
   // ── 反演完成后操作 ──
-
   const handleRestoreState = useCallback(() => {
     setCompletedOpen(false);
     const start = reversalStartRef.current;
@@ -321,13 +307,11 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     }
     prevSimTimeRef.current = currentSimTime;
 
-    // 到达时间起点
     if (currentSimTime <= 0.001) {
       stopReversal();
       return;
     }
 
-    // Worker 发散错误
     if (store.engineError) {
       notify({
         title: "数值反演发散",
@@ -347,7 +331,6 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
     let drift = 0;
     if (fwdIdx >= 0 && fwdIdx < fwdArray.length) {
-      // 委托漂移计算给 domain/drift-calculator 纯函数
       drift = driftCalculator.compute(store.state, fwdArray[fwdIdx]!);
     }
 
@@ -357,13 +340,11 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
       forwardSimTime: currentSimTime,
     });
 
-    // 追加 3D 反演轨迹点
     const pos = ball2Position(store.state, params);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
   }, [mode, phase, simTime, params, history, stopReversal]);
 
-  // phase 重新进入 reversing 时初始化
   useEffect(() => {
     if (phase === "reversing") {
       isReversingRef.current = true;
@@ -401,23 +382,25 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
   // ── UI 渲染 ──
   return (
-    <div className={`pointer-events-none ${className}`}>
+    <div className={cn("pointer-events-none", className)}>
       {/* 控制栏 */}
       <div
-        className="absolute top-2 right-2 z-30 pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-lg"
-        style={{ background: "rgba(10, 10, 20, 0.85)", border: "1px solid #1a1a2e" }}
+        className="absolute top-3 right-3 z-30 pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-lg
+                   bg-surface-container-high/95 backdrop-blur border border-outline-variant/20 shadow-card-hover"
       >
         {/* 模式切换 */}
-        <div className="flex rounded overflow-hidden" style={{ border: "1px solid #444" }}>
+        <div className="flex rounded-lg overflow-hidden border border-outline-variant/30">
           <button
             type="button"
             onClick={() => !active && setMode("exact")}
             disabled={active}
-            className={`px-2 py-1 text-xs font-medium transition-colors ${
+            className={cn(
+              "px-2.5 py-1 text-[11px] font-medium transition-colors",
               mode === "exact"
-                ? "bg-amber-700 text-amber-100"
-                : "bg-transparent text-gray-400 hover:text-gray-200"
-            } ${active ? "opacity-50 cursor-not-allowed" : ""}`}
+                ? "bg-amber-500/20 text-amber-300"
+                : "bg-transparent text-on-surface-variant hover:text-on-surface",
+              active && "opacity-50 cursor-not-allowed",
+            )}
             title="精确反演（对照）— 仅视觉回放，无误差"
           >
             精确反演
@@ -426,11 +409,13 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
             type="button"
             onClick={() => !active && setMode("numerical")}
             disabled={active}
-            className={`px-2 py-1 text-xs font-medium transition-colors ${
+            className={cn(
+              "px-2.5 py-1 text-[11px] font-medium transition-colors",
               mode === "numerical"
-                ? "bg-cyan-800 text-cyan-100"
-                : "bg-transparent text-gray-400 hover:text-gray-200"
-            } ${active ? "opacity-50 cursor-not-allowed" : ""}`}
+                ? "bg-primary-container text-primary"
+                : "bg-transparent text-on-surface-variant hover:text-on-surface",
+              active && "opacity-50 cursor-not-allowed",
+            )}
             title="数值反演（实验）— 真实反向积分，展示浮点误差指数放大"
           >
             数值反演
@@ -438,34 +423,33 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
         </div>
 
         {/* 反演启停按钮 */}
-        <button
-          type="button"
-          onClick={active ? stopReversal : startReversal}
+        <Button
+          variant={active ? "secondary" : "primary"}
+          size="sm"
           disabled={buttonDisabled}
-          className={`px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
-            active
-              ? "bg-red-700 text-red-100 hover:bg-red-600"
-              : historyInsufficient
-                ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                : "bg-primary text-[#0D1117] hover:opacity-90"
-          }`}
+          onClick={active ? stopReversal : startReversal}
           title={tooltipText}
+          className={cn(
+            "text-[11px] h-7",
+            active && "bg-separation-alert/15 text-separation-alert hover:bg-separation-alert/25 border border-separation-alert/20",
+          )}
         >
           {phase === "awaitingConfirm"
             ? "准备中…"
             : active
               ? "停止反演"
-              : "⌛ 时间倒流"}
-        </button>
+              : "时间倒流"}
+        </Button>
 
         {/* 历史帧数指示 */}
         <span
-          className={`text-xs font-mono ${
-            historyInsufficient ? "text-gray-600" : "text-gray-500"
-          }`}
+          className={cn(
+            "text-[10px] font-mono",
+            historyInsufficient ? "text-on-surface-variant/30" : "text-on-surface-variant",
+          )}
         >
           {history.length}
-          <span className="text-gray-700">/6000</span>
+          <span className="text-on-surface-variant/30">/6000</span>
         </span>
       </div>
 
@@ -548,12 +532,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
       {/* 完成标注 */}
       {phase === "completed" && driftHistory.length > 0 && !completedOpen && (
-        <div
-          className="absolute bottom-2 left-2 z-20 pointer-events-auto px-3 py-1.5 rounded text-xs text-gray-400"
-          style={{ background: "rgba(10, 10, 15, 0.85)" }}
-        >
-          最近一次反演（{mode === "exact" ? "精确反演" : "数值反演"}
-          ）— 漂移曲线已保留
+        <div className="absolute bottom-3 left-3 z-20 pointer-events-auto px-3 py-1.5 rounded-lg text-[11px] text-on-surface-variant bg-surface-container-high/95 border border-outline-variant/20">
+          最近一次反演（{mode === "exact" ? "精确反演" : "数值反演"}）— 漂移曲线已保留
         </div>
       )}
     </div>

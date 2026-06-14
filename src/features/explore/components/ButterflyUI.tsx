@@ -3,6 +3,8 @@ import { useButterflyStore } from "../butterfly-store";
 import { useExploreStore } from "@/features/explore";
 import { createNoiseGenerator, type NoiseGenerator } from "@/shared/infrastructure/audio/noise-generator";
 import { getAudioContext } from "@/shared/infrastructure/audio/audio-context";
+import { cn } from "@/shared/infrastructure/cn";
+import { Button } from "@/shared/view/components/ui/button";
 import type { DeltaEditMode } from "../butterfly-store";
 
 // ─── 全局噪声实例（跨组件生命周期共享） ──────────
@@ -30,15 +32,13 @@ function stopAlertNoise(): void {
   alertNoise = null;
 }
 
-// ─── 类型 ────────────────────────────────────────
+// ─── 分离警报 ────────────────────────────────────
 
 interface SeparationAlertProps {
   triggered: boolean;
   separationRad: number;
   message?: string;
 }
-
-// ─── 组件 ────────────────────────────────────────
 
 export function SeparationAlert({
   triggered,
@@ -48,7 +48,6 @@ export function SeparationAlert({
   const [dismissLevel, setDismissLevel] = useState(0);
   const sonificationEnabled = useExploreStore((s) => s.sonificationEnabled);
 
-  // triggered 从 false→true 时重置 dismiss + 触发噪声
   const prevTriggered = useRef(triggered);
   useEffect(() => {
     if (triggered && !prevTriggered.current) {
@@ -61,10 +60,7 @@ export function SeparationAlert({
     prevTriggered.current = triggered;
   }, [triggered, sonificationEnabled]);
 
-  // 卸载时清理噪声
-  useEffect(() => {
-    return () => stopAlertNoise();
-  }, []);
+  useEffect(() => () => stopAlertNoise(), []);
 
   if (!triggered || dismissLevel >= 2) return null;
 
@@ -73,29 +69,25 @@ export function SeparationAlert({
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-      <div
-        className="flex flex-col items-center gap-2 px-6 py-4 rounded-lg pointer-events-auto cursor-pointer transition-opacity duration-300"
-        style={{
-          background: "rgba(255, 0, 0, 0.15)",
-          border: "1px solid rgba(255, 0, 0, 0.3)",
-          animation: dismissLevel === 0 ? "pulse-alert 1.5s ease-in-out infinite" : undefined,
-          opacity,
-        }}
+      <button
+        type="button"
         onClick={() => setDismissLevel((l) => l + 1)}
         title="点击半透明，再次点击关闭"
+        className={cn(
+          "pointer-events-auto flex flex-col items-center gap-1 px-6 py-4 rounded-lg border transition-opacity duration-quick",
+          "bg-separation-alert/15 border-separation-alert/30 text-separation-alert",
+          dismissLevel === 0 && "animate-pulse",
+        )}
+        style={{ opacity }}
       >
-        <span className="text-lg font-bold" style={{ color: "#ff4444" }}>
-          ⚠ {message} — |Δθ| 已超过 90°
-        </span>
-        <span className="text-sm" style={{ color: "#ff8888" }}>
-          |Δθ| = {separationDeg.toFixed(1)}°
-        </span>
-      </div>
+        <span className="text-lg font-bold">⚠ {message}</span>
+        <span className="text-sm font-mono">|Δθ| = {separationDeg.toFixed(1)}°</span>
+      </button>
     </div>
   );
 }
 
-// ─── DeltaPanel ──────────────────────────────────
+// ─── Delta 控制面板 ──────────────────────────────
 
 interface DeltaPanelProps {
   editMode: DeltaEditMode;
@@ -103,6 +95,12 @@ interface DeltaPanelProps {
   onDeltaChange: (deltaDeg: number) => void;
   deltaDeg: number;
 }
+
+const EDIT_MODE_OPTIONS: { value: DeltaEditMode; label: string }[] = [
+  { value: "synced", label: "同步" },
+  { value: "a-only", label: "仅 A" },
+  { value: "b-only", label: "仅 B" },
+];
 
 export function DeltaPanel({
   editMode,
@@ -118,69 +116,65 @@ export function DeltaPanel({
   const maxSepDeg = (separation.maxSeparation * 180) / Math.PI;
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-4 px-4 py-2 text-xs font-mono rounded"
-      style={{ background: "#0d0d1a", color: "#aaaacc" }}
-    >
+    <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 rounded-lg bg-surface-container-low border border-white/5 text-xs font-mono">
       {/* Delta 调节 */}
-      <div className="flex items-center gap-2">
-        <span>δ:</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-on-surface-variant">δ:</span>
         <input
           type="number"
-          className="w-20 px-1 py-0.5 rounded text-xs bg-transparent border border-gray-600 text-on-surface"
-          value={deltaDeg}
           min={0}
           max={10}
           step={0.1}
+          value={deltaDeg}
           onChange={(e) => onDeltaChange(parseFloat(e.target.value) || 0)}
+          className="w-16 h-6 px-1 rounded bg-surface-container-high border border-outline-variant/30 text-on-surface text-[11px] focus-visible:outline-none focus-visible:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
         />
-        <span>°</span>
+        <span className="text-on-surface-variant">°</span>
       </div>
 
+      <span className="text-outline-variant">|</span>
+
       {/* 分离度 */}
-      <span className="text-gray-600">|</span>
-      <span>
+      <span className="text-on-surface-variant">
         |Δθ|:{" "}
-        <span className={separation.isFullyDecoupled ? "text-red-400" : "text-green-400"}>
+        <span className={separation.isFullyDecoupled ? "text-separation-alert" : "text-emerald-400"}>
           {sepDeg.toFixed(2)}°
         </span>
       </span>
-      <span>
-        max:{" "}
-        <span className="text-yellow-400">{maxSepDeg.toFixed(2)}°</span>
+      <span className="text-on-surface-variant">
+        max: <span className="text-amber-400">{maxSepDeg.toFixed(2)}°</span>
       </span>
 
+      <span className="text-outline-variant">|</span>
+
       {/* 角度对比 */}
-      <span className="text-gray-600">|</span>
-      <span>
+      <span className="text-on-surface-variant">
         θ₁:{" "}
         <span className="text-amber-300">{(sideA.state.theta1 * 180 / Math.PI).toFixed(1)}°</span>
         {" / "}
         <span className="text-purple-300">{(sideB.state.theta1 * 180 / Math.PI).toFixed(1)}°</span>
       </span>
-      <span>
+      <span className="text-on-surface-variant">
         θ₂:{" "}
         <span className="text-amber-300">{(sideA.state.theta2 * 180 / Math.PI).toFixed(1)}°</span>
         {" / "}
         <span className="text-purple-300">{(sideB.state.theta2 * 180 / Math.PI).toFixed(1)}°</span>
       </span>
 
+      <span className="text-outline-variant">|</span>
+
       {/* 编辑模式 */}
-      <span className="text-gray-600">|</span>
       <div className="flex gap-1">
-        {(["synced", "a-only", "b-only"] as DeltaEditMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onEditModeChange(mode)}
-            className={`px-2 py-0.5 rounded text-xs transition-colors ${
-              editMode === mode
-                ? "bg-primary text-[#0D1117]"
-                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-            }`}
+        {EDIT_MODE_OPTIONS.map((opt) => (
+          <Button
+            key={opt.value}
+            variant={editMode === opt.value ? "primary" : "tertiary"}
+            size="sm"
+            onClick={() => onEditModeChange(opt.value)}
+            className="h-6 text-[10px] px-2"
           >
-            {mode === "synced" ? "同步" : mode === "a-only" ? "仅A" : "仅B"}
-          </button>
+            {opt.label}
+          </Button>
         ))}
       </div>
     </div>

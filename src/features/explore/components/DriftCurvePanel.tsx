@@ -1,17 +1,15 @@
-/**
- * 模块: explore.components.DriftCurvePanel
- * 职责: 时间反演漂移曲线 Canvas 2D 面板——绘制相空间漂移距离随时间变化的曲线。
- *       支持线性/对数 Y 轴切换，在数值反演模式下显示教学阈值虚线。
- * 边界:
- *   - 依赖: contracts (DriftSample, ReversalMode)
- *   - 被依赖: TimeReversal (父组件)
- * 禁止行为:
- *   - 禁止漂移曲线使用线性坐标轴（混沌漂移是指数增长的）——默认对数轴
- */
-
 import { useEffect, useRef, useState } from "react";
 import type { DriftSample, ReversalMode } from "../contracts";
 import { REVERSAL_DEFAULTS } from "../contracts";
+
+// DESIGN.md token 色值（Canvas 2D 无法使用 Tailwind class，直接使用 token hex）
+const COLOR_BG = "rgba(42, 45, 52, 0.92)";        // surface-container-high
+const COLOR_TEXT = "#E8EAED";                       // on-surface
+const COLOR_TEXT_MUTED = "#9BA0AA";                 // on-surface-variant
+const COLOR_AXIS = "rgba(155, 160, 170, 0.35)";     // outline-variant
+const COLOR_GRID = "rgba(155, 160, 170, 0.15)";     // outline-variant lighter
+const COLOR_CURVE = "#4B9FFF";                      // primary
+const COLOR_ALERT = "#FF3B3B";                      // separation-alert
 
 interface DriftCurvePanelProps {
   driftHistory: readonly DriftSample[];
@@ -21,6 +19,11 @@ interface DriftCurvePanelProps {
   engineError: boolean;
 }
 
+/**
+ * 时间反演漂移曲线 Canvas 2D 面板。
+ *
+ * 支持线性/对数 Y 轴切换，在数值反演模式下显示教学阈值虚线。
+ */
 export function DriftCurvePanel({
   driftHistory,
   maxReversalTime,
@@ -47,7 +50,7 @@ export function DriftCurvePanel({
     ctx.scale(dpr, dpr);
 
     // 背景
-    ctx.fillStyle = "rgba(10, 10, 20, 0.88)";
+    ctx.fillStyle = COLOR_BG;
     ctx.fillRect(0, 0, W, H);
 
     const pad = { top: 28, right: 14, bottom: 34, left: 48 };
@@ -56,8 +59,8 @@ export function DriftCurvePanel({
 
     // 空数据提示
     if (driftHistory.length < 2) {
-      ctx.fillStyle = "#777";
-      ctx.font = "12px sans-serif";
+      ctx.fillStyle = COLOR_TEXT_MUTED;
+      ctx.font = "12px Manrope, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("等待反演数据…", W / 2, H / 2);
       return;
@@ -80,7 +83,7 @@ export function DriftCurvePanel({
     const yS = logScale ? yLog : yLinear;
 
     // 坐标轴
-    ctx.strokeStyle = "#555";
+    ctx.strokeStyle = COLOR_AXIS;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(pad.left, pad.top);
@@ -92,22 +95,22 @@ export function DriftCurvePanel({
     if (mode === "numerical") {
       const thY = yS(REVERSAL_DEFAULTS.teachingThreshold);
       if (thY > pad.top && thY < pad.top + ph) {
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.strokeStyle = COLOR_GRID;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(pad.left, thY);
         ctx.lineTo(pad.left + pw, thY);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.font = "9px sans-serif";
+        ctx.fillStyle = COLOR_TEXT_MUTED;
+        ctx.font = "9px JetBrains Mono, monospace";
         ctx.fillText("0.05", pad.left + pw - 26, thY - 4);
       }
     }
 
     // 轴标签
-    ctx.fillStyle = "#999";
-    ctx.font = "10px sans-serif";
+    ctx.fillStyle = COLOR_TEXT_MUTED;
+    ctx.font = "10px Manrope, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("反演时间 (s)", pad.left + pw / 2, H - 4);
     ctx.save();
@@ -117,8 +120,8 @@ export function DriftCurvePanel({
     ctx.restore();
 
     // 模式标题
-    ctx.fillStyle = "#ddd";
-    ctx.font = "bold 11px sans-serif";
+    ctx.fillStyle = COLOR_TEXT;
+    ctx.font = "bold 11px Manrope, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(
       mode === "exact" ? "精确反演 — 理论完全重合" : "数值反演 — 误差指数放大",
@@ -127,8 +130,8 @@ export function DriftCurvePanel({
     );
 
     // Y 轴刻度
-    ctx.fillStyle = "#777";
-    ctx.font = "9px sans-serif";
+    ctx.fillStyle = COLOR_TEXT_MUTED;
+    ctx.font = "9px JetBrains Mono, monospace";
     ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const ratio = i / 4;
@@ -144,8 +147,8 @@ export function DriftCurvePanel({
       ctx.fillText(d < 0.01 ? d.toExponential(1) : d.toFixed(3), pad.left - 4, y + 3);
     }
 
-    // 漂移曲线——绘制
-    ctx.strokeStyle = "#ff6644";
+    // 漂移曲线
+    ctx.strokeStyle = COLOR_CURVE;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i < driftHistory.length; i++) {
@@ -157,13 +160,13 @@ export function DriftCurvePanel({
     }
     ctx.stroke();
 
-    // 发散标记——基于 engineError 而非硬编码阈值
+    // 发散标记
     if (engineError && driftHistory.length > 0) {
       const last = driftHistory[driftHistory.length - 1]!;
       const lx = xS(last.reversalTime);
       const ly = yS(last.driftDistance);
-      ctx.fillStyle = "#ff4444";
-      ctx.font = "12px sans-serif";
+      ctx.fillStyle = COLOR_ALERT;
+      ctx.font = "12px Manrope, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("✕", lx + 8, ly + 4);
     }
@@ -173,15 +176,13 @@ export function DriftCurvePanel({
 
   return (
     <div
-      className="absolute right-2 bottom-2 z-20 rounded-lg overflow-hidden"
-      style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+      className="absolute right-2 bottom-2 z-20 rounded-lg overflow-hidden border border-outline-variant/20 shadow-card-hover"
     >
       <canvas ref={canvasRef} style={{ display: "block" }} />
-      {/* Y 轴缩放切换 */}
       <button
         type="button"
         onClick={() => setLogScale((v) => !v)}
-        className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+        className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors"
       >
         {logScale ? "线性" : "对数"}
       </button>

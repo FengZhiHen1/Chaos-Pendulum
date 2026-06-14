@@ -5,62 +5,61 @@ import { useButterflyStore } from "../butterfly-store";
 import { useButterflySimulation } from "../hooks/useButterflySimulation";
 import { Scene3D } from "./Scene3D";
 import { SeparationAlert, DeltaPanel } from "./ButterflyUI";
+import { cn } from "@/shared/infrastructure/cn";
+import { Button } from "@/shared/view/components/ui/button";
+import { Play, Pause, RotateCcw } from "lucide-react";
 
-const PULSE_STYLE = `
-@keyframes pulse-alert {
-  0%, 100% { opacity: 0.7; transform: scale(1); }
-  50% { opacity: 1.0; transform: scale(1.03); }
-}
-`;
-
-const BALL_COLOR_A = "#f0c040"; // 金色
-const BALL_COLOR_B = "#a855f7"; // 紫色
+const BALL_COLOR_A = "#f0c040"; // 金色摆
+const BALL_COLOR_B = "#a855f7"; // 紫色摆
 
 interface ButterflySplitProps {
   className?: string;
 }
 
+/**
+ * 蝴蝶效应分屏对比器。
+ *
+ * 桌面端：左右两个 3D 视口，中央暗色裂隙。
+ * 非桌面端：单视口 + A/B 切换。
+ */
 export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitProps) {
   const deviceType = useAppStore((s) => s.deviceType);
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
-
   const store = useButterflyStore();
-  const { handlePlay, handlePause, handleReset, handleDeltaChange } =
-    useButterflySimulation();
+  const { handlePlay, handlePause, handleReset, handleDeltaChange } = useButterflySimulation();
 
   const isDesktop = deviceType === "desktop";
+  const isFullyDecoupled = store.separation.isFullyDecoupled;
 
-  // ── 非桌面端：活跃视口切换 ──
   const [activeSide, setActiveSide] = useState<"A" | "B">("A");
-
   const switchToA = useCallback(() => setActiveSide("A"), []);
   const switchToB = useCallback(() => setActiveSide("B"), []);
 
   return (
-    <div className={`relative ${className} flex flex-col`}>
-      {/* 注入脉冲动画 */}
-      <style>{PULSE_STYLE}</style>
-
+    <div className={cn("relative flex flex-col", className)}>
       {/* 工具栏 */}
-      <div
-        className="flex items-center justify-between px-4 py-2 shrink-0"
-        style={{ background: "#0a0a14", borderBottom: "1px solid #1a1a2e" }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
+      <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-surface-container-lowest border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            size="sm"
             onClick={store.isRunning ? handlePause : handlePlay}
-            className="px-3 py-1 rounded text-sm font-medium transition-colors bg-primary text-[#0D1117] hover:opacity-90"
           >
+            {store.isRunning ? (
+              <Pause className="h-3.5 w-3.5 mr-1" />
+            ) : (
+              <Play className="h-3.5 w-3.5 mr-1" />
+            )}
             {store.isRunning ? "暂停" : "播放"}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="tertiary"
+            size="sm"
             onClick={handleReset}
-            className="px-3 py-1 rounded text-sm font-medium transition-colors bg-gray-700 text-gray-200 hover:bg-gray-600"
           >
+            <RotateCcw className="h-3.5 w-3.5 mr-1" />
             重置
-          </button>
+          </Button>
         </div>
 
         <DeltaPanel
@@ -72,18 +71,23 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
       </div>
 
       {/* 分屏区域 */}
-      <div className="flex-1 relative min-h-0">
+      <div
+        className={cn(
+          "flex-1 relative min-h-0",
+          isFullyDecoupled && "animate-alert-edge",
+        )}
+      >
         {isDesktop ? (
           <div className="flex w-full h-full">
             {/* 摆 A */}
-            <div className="relative flex-1 border-r" style={{ borderColor: "#2A2D34" }}>
-              <div className="absolute top-2 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50">
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50 backdrop-blur">
                 摆 A — δ=0
               </div>
               <Scene3D
                 pendulumMaterial="metal"
                 ballColor={BALL_COLOR_A}
-                environment="dark-lab"
+                environment="bright-stage"
                 showGrid
                 enableShadows
                 className="w-full h-full"
@@ -91,15 +95,23 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
               />
             </div>
 
+            {/* 暗色裂隙 */}
+            <div
+              className={cn(
+                "shrink-0 bg-surface transition-all duration-dramatic",
+                isFullyDecoupled ? "w-3" : "w-1",
+              )}
+            />
+
             {/* 摆 B */}
-            <div className="relative flex-1 border-l" style={{ borderColor: "#2A2D34" }}>
-              <div className="absolute top-2 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50">
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50 backdrop-blur">
                 摆 B — δ={butterflyDelta}°
               </div>
               <Scene3D
                 pendulumMaterial="metal"
                 ballColor={BALL_COLOR_B}
-                environment="dark-lab"
+                environment="bright-stage"
                 showGrid
                 enableShadows
                 className="w-full h-full"
@@ -108,28 +120,29 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             </div>
           </div>
         ) : (
-          /* 非桌面端：单视口 + A/B 切换 */
           <div className="relative w-full h-full">
-            <div className="absolute top-2 left-4 z-10 flex gap-2">
+            <div className="absolute top-3 left-4 z-10 flex gap-2">
               <button
                 type="button"
                 onClick={switchToA}
-                className={`px-2 py-0.5 rounded text-xs font-bold transition-opacity ${
+                className={cn(
+                  "px-2 py-0.5 rounded text-xs font-bold transition-opacity",
                   activeSide === "A"
                     ? "text-amber-300 bg-black/70 ring-1 ring-amber-500/50"
-                    : "text-amber-300/50 bg-black/30"
-                }`}
+                    : "text-amber-300/50 bg-black/30",
+                )}
               >
                 摆 A
               </button>
               <button
                 type="button"
                 onClick={switchToB}
-                className={`px-2 py-0.5 rounded text-xs font-bold transition-opacity ${
+                className={cn(
+                  "px-2 py-0.5 rounded text-xs font-bold transition-opacity",
                   activeSide === "B"
                     ? "text-purple-300 bg-black/70 ring-1 ring-purple-500/50"
-                    : "text-purple-300/50 bg-black/30"
-                }`}
+                    : "text-purple-300/50 bg-black/30",
+                )}
               >
                 摆 B
               </button>
@@ -137,7 +150,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             <Scene3D
               pendulumMaterial="metal"
               ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
-              environment="dark-lab"
+              environment="bright-stage"
               showGrid
               enableShadows
               className="w-full h-full"
