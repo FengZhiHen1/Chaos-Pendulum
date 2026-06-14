@@ -38,7 +38,10 @@ export function AppShell({ children }: AppShellProps) {
       <div className="h-screen w-screen flex flex-col bg-surface text-on-surface overflow-hidden">
         {/* 桌面端顶部导航 48px — surface-container-lowest, no border */}
         {isDesktop && (
-          <nav className="h-14 flex items-center px-6 bg-surface-container-lowest shrink-0 animate-appshell-panel select-none">
+          <nav
+            data-navigation-bar
+            className="h-14 flex items-center px-6 bg-surface-container-lowest shrink-0 animate-appshell-panel select-none"
+          >
             <span className="text-sm font-semibold tracking-wider text-on-surface mr-8 shrink-0">
               双摆混沌实验室
             </span>

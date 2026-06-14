@@ -185,7 +185,11 @@ export function ExplorePage() {
       <div className="flex-1 flex overflow-hidden gap-panel-gap p-panel-gap pb-0">
         {/* 左侧控制面板 (280px) — 桌面端 */}
         {isDesktop && (
-          <aside className="w-[280px] shrink-0 flex flex-col overflow-hidden rounded-lg bg-surface-container-low">
+          <aside
+            data-ui-controls
+            data-panel-left
+            className="w-[280px] shrink-0 flex flex-col overflow-hidden rounded-lg bg-surface-container-low"
+          >
             <div className="flex-1 overflow-y-auto min-h-0">
               <ParamPanel />
             </div>
@@ -201,7 +205,7 @@ export function ExplorePage() {
         )}
 
         {/* 中部 3D 舞台 — 唯一明亮区域 */}
-        <section className="flex-1 relative overflow-hidden rounded-lg bg-stage">
+        <section data-stage-container className="flex-1 relative overflow-hidden rounded-lg bg-stage">
           <Scene3D
             pendulumMaterial={pendulumMaterial}
             environment={environment}
@@ -241,6 +245,8 @@ export function ExplorePage() {
         onEnterButterfly={enterButterfly}
         timeReversalOpen={timeReversalOpen}
         onToggleTimeReversal={() => setTimeReversalOpen((v) => !v)}
+        data-ui-controls
+        data-panel-bottom
       />
 
       {/* 平板：可展开底部面板 */}

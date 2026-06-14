@@ -34,6 +34,8 @@ export function ExploreBottomToolbar({
 }: ExploreBottomToolbarProps) {
   return (
     <footer
+      data-ui-controls
+      data-panel-bottom
       className={`h-12 shrink-0 w-full bg-surface-container-lowest flex items-center justify-between px-4 select-none ${className}`}
     >
       {/* 左侧：播放控制 */}
@@ -64,7 +66,7 @@ export function ExploreBottomToolbar({
         </Button>
       </div>
 
-      {/* 右侧：实验入口 */}
+      {/* 右侧：实验入口（骨架顺序：受力分析 → 蝴蝶效应 → 时间反演） */}
       <div className="flex items-center gap-2">
         <Button
           variant={forceActive ? "secondary" : "tertiary"}
@@ -77,16 +79,6 @@ export function ExploreBottomToolbar({
         </Button>
 
         <Button
-          variant={timeReversalOpen ? "secondary" : "tertiary"}
-          size="sm"
-          onClick={onToggleTimeReversal}
-          title="时间反演实验"
-        >
-          <Hourglass className="h-3.5 w-3.5 mr-1" />
-          {timeReversalOpen ? "关闭反演" : "时间反演"}
-        </Button>
-
-        <Button
           variant="tertiary"
           size="sm"
           onClick={onEnterButterfly}
@@ -94,6 +86,16 @@ export function ExploreBottomToolbar({
         >
           <GitCompare className="h-3.5 w-3.5 mr-1" />
           蝴蝶效应
+        </Button>
+
+        <Button
+          variant={timeReversalOpen ? "secondary" : "tertiary"}
+          size="sm"
+          onClick={onToggleTimeReversal}
+          title="时间反演实验"
+        >
+          <Hourglass className="h-3.5 w-3.5 mr-1" />
+          {timeReversalOpen ? "关闭反演" : "时间反演"}
         </Button>
       </div>
     </footer>

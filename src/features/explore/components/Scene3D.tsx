@@ -13,6 +13,8 @@ import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
 import { TrailRenderer } from "./TrailRenderer";
 import { useButterflyStore } from "../butterfly-store";
 import { ForceArrows3D } from "@/features/lab/components/ForceArrows3D";
+import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
+import { globalWatermarkRenderer } from "@/features/data/infrastructure/adapters/watermarkRendererSingleton";
 
 // ─── 类型定义 ────────────────────────────────────
 
@@ -174,6 +176,8 @@ export function Scene3D({
   ballColor,
   canvasChildren,
 }: Scene3DProps) {
+  const stageRef = useRef<HTMLDivElement>(null);
+
   const {
     webglSupported,
     webglLost,
@@ -190,6 +194,13 @@ export function Scene3D({
   } = useSceneController(showGrid, enableShadows);
 
   const { trailPoints, appendPoint, clear: clearTrail } = useTrailBuffer();
+
+  // 注入 3D 舞台 DOM 容器到演示模式水印渲染器
+  useEffect(() => {
+    if (stageRef.current) {
+      globalWatermarkRenderer.injectContainer(stageRef.current);
+    }
+  }, []);
 
   // ── 蝴蝶模式：监听尾迹清空信号 ──
   useEffect(() => {
@@ -246,7 +257,7 @@ export function Scene3D({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={stageRef} className={`relative ${className}`}>
       <Canvas
         shadows={effectiveEnableShadows}
         camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
@@ -335,6 +346,31 @@ function SceneContent({
 }: SceneContentProps) {
   const { camera } = useThree();
   const orbitRef = useRef<any>(null);
+  const orbitInjectedRef = useRef(false);
+
+  // 将 Three.js OrbitControls 实例注入演示模式适配器
+  useEffect(() => {
+    let attempts = 0;
+    const maxAttempts = 50;
+    const id = setInterval(() => {
+      attempts++;
+      if (orbitInjectedRef.current) {
+        clearInterval(id);
+        return;
+      }
+      if (orbitRef.current) {
+        globalOrbitControlsAdapter.injectControls(orbitRef.current);
+        orbitInjectedRef.current = true;
+        clearInterval(id);
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(id);
+        console.warn("EXP-01: Failed to inject OrbitControls into demo mode adapter");
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, []);
 
   // Three.js 对象引用
   const ball1Ref = useRef<THREE.Mesh>(null);

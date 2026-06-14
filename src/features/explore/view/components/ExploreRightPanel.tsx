@@ -14,14 +14,22 @@ interface ExploreRightPanelProps {
 export function ExploreRightPanel({ forceActive }: ExploreRightPanelProps) {
   if (forceActive) {
     return (
-      <aside className="w-80 shrink-0 h-full overflow-hidden bg-surface-container-low">
+      <aside
+        data-ui-controls
+        data-chart-container
+        className="w-80 shrink-0 h-full overflow-hidden bg-surface-container-low"
+      >
         <DecompositionPanel />
       </aside>
     );
   }
 
   return (
-    <aside className="w-80 shrink-0 h-full overflow-y-auto overflow-x-hidden bg-surface-container-low flex flex-col">
+    <aside
+      data-ui-controls
+      data-chart-container
+      className="w-80 shrink-0 h-full overflow-y-auto overflow-x-hidden bg-surface-container-low flex flex-col"
+    >
       <EnergyMonitorPanel width={304} height={160} />
       <PhaseSpacePanel size={304} />
     </aside>

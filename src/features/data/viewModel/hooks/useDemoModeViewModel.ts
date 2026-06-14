@@ -11,8 +11,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { DemoModeManagerImpl } from "../../application/useCases/DemoModeManagerImpl";
-import { OrbitControlsAdapter } from "../../infrastructure/adapters/OrbitControlsAdapter";
-import { WatermarkRendererImpl } from "../../infrastructure/adapters/WatermarkRendererImpl";
+import { globalOrbitControlsAdapter } from "../../infrastructure/adapters/orbitControlsAdapterSingleton";
+import { globalWatermarkRenderer } from "../../infrastructure/adapters/watermarkRendererSingleton";
 import { UIVisibilityControllerImpl } from "../../infrastructure/adapters/UIVisibilityControllerImpl";
 import { DEFAULT_DEMO_CONFIG } from "../../contracts";
 import type { DemoModeConfig } from "../../contracts";
@@ -66,13 +66,12 @@ export function useDemoModeViewModel(
   const [error, setError] = useState<Error | null>(null);
 
   // 初始化 Manager（依赖注入）
+  // 使用全局单例适配器，以便 explore/Scene3D 在运行时注入 Three.js OrbitControls 与舞台容器。
   useEffect(() => {
-    const orbitControls = new OrbitControlsAdapter();
-    const watermark = new WatermarkRendererImpl();
     const uiController = new UIVisibilityControllerImpl();
     managerRef.current = new DemoModeManagerImpl(
-      orbitControls,
-      watermark,
+      globalOrbitControlsAdapter,
+      globalWatermarkRenderer,
       uiController,
       config,
     );

@@ -6,7 +6,7 @@
  *   - 依赖: contracts (SonificationParams, ISonificationEngine, SONIFICATION_DEFAULTS)
  *           simulation (useSimulationStore, normalizeAngle)
  *           shared/infrastructure/audio (AudioContext, 引擎工厂)
- *   - 被依赖: SonificationToggle, ExplorePage
+ *   - 被依赖: SonificationToggle, ExplorePage, GlobalNavBar
  * 禁止行为:
  *   - 禁止在移动端激活音频引擎——自动禁用
  *   - 禁止在无用户手势的情况下创建 AudioContext
@@ -40,9 +40,13 @@ export interface UseSonificationAPI {
  *
  * 管理音频引擎生命周期：
  * - 仅桌面端启用
- * - 惰性初始化（首次 toggle 时创建引擎）
+ * - 由 `sonificationEnabled` store flag 驱动初始化/销毁
  * - 每仿真帧更新音频参数
  * - 组件卸载时清理
+ *
+ * 设计要点：
+ *   任何 UI（舞台覆盖层、导航栏）都只读写 `sonificationEnabled` flag，
+ *   真正的 AudioContext / 引擎生命周期由本 Hook 统一接管，避免多处挂载 Hook 导致双发音频。
  */
 export function useSonification(): UseSonificationAPI {
   const deviceType = useAppStore((s) => s.deviceType);
@@ -66,49 +70,49 @@ export function useSonification(): UseSonificationAPI {
     }
   }, []);
 
-  // ── 开关切换 ──
+  // ── 开关切换（仅翻转 store flag，实际引擎启停由下方 effect 统一处理） ──
   const toggle = useCallback(() => {
     if (deviceType !== "desktop") return;
+    setSonificationEnabled(!sonificationEnabled);
+  }, [deviceType, sonificationEnabled, setSonificationEnabled]);
 
+  // ── 由 store flag 驱动的引擎初始化/禁用 ──
+  useEffect(() => {
     if (!sonificationEnabled) {
-      // 开启：恢复 AudioContext + 初始化/启用引擎
-      resumeAudioContext()
-        .then(() => {
-          const ctx = getAudioContext();
-          if (ctx.state === "suspended") {
-            console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
-            notify({
-              title: "浏览器阻止了音频播放",
-              description: "请再次点击按钮",
-              variant: "warning",
-              durationMs: 3000,
-            });
-            return;
-          }
-          initEngine();
-          const newEngine = engineRef.current;
-          if (newEngine) {
-            newEngine.setEnabled(true);
-          }
-          setSonificationEnabled(true);
-        })
-        .catch(() => {
+      engineRef.current?.setEnabled(false);
+      return;
+    }
+
+    if (deviceType !== "desktop") return;
+
+    resumeAudioContext()
+      .then(() => {
+        const ctx = getAudioContext();
+        if (ctx.state === "suspended") {
           console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
           notify({
             title: "浏览器阻止了音频播放",
-            description: "请点击页面后再试",
+            description: "请再次点击按钮",
             variant: "warning",
             durationMs: 3000,
           });
+          setSonificationEnabled(false);
+          return;
+        }
+        initEngine();
+        engineRef.current?.setEnabled(true);
+      })
+      .catch(() => {
+        console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
+        notify({
+          title: "浏览器阻止了音频播放",
+          description: "请点击页面后再试",
+          variant: "warning",
+          durationMs: 3000,
         });
-    } else {
-      // 关闭：静音但不销毁引擎
-      if (engineRef.current) {
-        engineRef.current.setEnabled(false);
-      }
-      setSonificationEnabled(false);
-    }
-  }, [deviceType, sonificationEnabled, setSonificationEnabled, initEngine]);
+        setSonificationEnabled(false);
+      });
+  }, [sonificationEnabled, deviceType, setSonificationEnabled, initEngine]);
 
   // ── 每帧音频参数更新（订阅仿真时间变化） ──
   const simTime = useSimulationStore((s) => s.t);

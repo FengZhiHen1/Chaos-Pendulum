@@ -1,19 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { scaleSequential } from "d3-scale";
-import { interpolateRdBu, interpolateViridis } from "d3-scale-chromatic";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnalyzeStore } from "../store";
 import { useSimulationStore } from "@/features/simulation";
 import { useAppStore } from "@/stores/useAppStore";
 import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
 import { usePrecomputeData } from "@/features/analyze/hooks/usePrecomputeData";
 import { measure } from "@/shared/infrastructure/observability/perf-mark";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import { Button } from "@/shared/view/components/ui/button";
 import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData, DampingSlice } from "../types";
 import { classifyLambda, resolveStoreParam } from "../types";
 import { ParameterFillDialog } from "./ParameterFillDialog";
+import { createHeatmapColorScale } from "./heatmapColorScale";
+import {
+  SURFACE,
+  SURFACE_CONTAINER,
+  ON_SURFACE_VARIANT,
+  WHITE,
+} from "./colorTokens";
 
 const CURSOR_DEBOUNCE_MS = 50;
+const GRID_COLOR = "rgba(155, 160, 170, 0.08)";
+const LABEL_FONT = "'JetBrains Mono', monospace";
 
 interface Props {
   dataPaths: {
@@ -21,10 +27,12 @@ interface Props {
     lyapunov_min: string;
     energy_curvature: string;
   };
+  activeLayer: LyapunovLayerType;
+  activeDamping: number;
   dampingSlices?: DampingSlice[];
 }
 
-export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
+export function LyapunovHeatmap({ dataPaths, activeLayer, activeDamping, dampingSlices = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
@@ -33,8 +41,6 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
   const { width: cw, height: ch, ready: sizeReady } = useContainerSize({ ref: containerRef, debounceMs: 100 });
   const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
 
-  const activeLayer = useAnalyzeStore((s) => s.activeLayer);
-  const setActiveLayer = useAnalyzeStore((s) => s.setActiveLayer);
   const setLoadStatus = useAnalyzeStore((s) => s.setLoadStatus);
   const setLoadError = useAnalyzeStore((s) => s.setLoadError);
   const setLayerCacheStatus = useAnalyzeStore((s) => s.setLayerCacheStatus);
@@ -44,9 +50,6 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
 
   const simInjectParams = useSimulationStore((s) => s.injectParams);
   const simSetRunning = useSimulationStore((s) => s.setRunning);
-
-  const activeDamping = useAnalyzeStore((s) => s.activeDamping);
-  const setActiveDamping = useAnalyzeStore((s) => s.setActiveDamping);
 
   const [gridData, setGridData] = useState<LyapunovGrid | null>(null);
   const [layerCache, setLayerCache] = useState<Map<LyapunovLayerType, LyapunovGrid>>(new Map());
@@ -148,10 +151,10 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
     }
 
     if (!hasValid || minVal === Infinity || maxVal === -Infinity) {
-      offCtx.fillStyle = "#1a1a2e";
+      offCtx.fillStyle = SURFACE;
       offCtx.fillRect(0, 0, width, height);
-      offCtx.fillStyle = "#ffffff";
-      offCtx.font = `${14 * dpr}px sans-serif`;
+      offCtx.fillStyle = ON_SURFACE_VARIANT;
+      offCtx.font = `${14 * dpr}px ${LABEL_FONT}`;
       offCtx.textAlign = "center";
       offCtx.fillText("该参数范围无有效数据，请更换扫描范围", width / 2, height / 2);
       ctx.clearRect(0, 0, width, height);
@@ -163,14 +166,12 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
     if (minVal > 0) minVal = 0;
     if (minVal === maxVal) { minVal -= 0.5; maxVal += 0.5; }
 
-    const colorScale = scaleSequential(
-      metadata.type === "energy_curvature"
-        ? interpolateViridis
-        : (t: number) => interpolateRdBu(1 - t),
-    ).domain([minVal, maxVal]);
+    const colorScale = createHeatmapColorScale(metadata.type, minVal, maxVal);
 
     const renderFn = () => {
       offCtx.clearRect(0, 0, width, height);
+      offCtx.fillStyle = SURFACE;
+      offCtx.fillRect(0, 0, width, height);
 
       for (let y = 0; y < stepsY; y++) {
         const row = grid[y];
@@ -183,7 +184,7 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
           const ph = Math.ceil((y + 1) * cellH) - py;
 
           if (v === null || v === undefined || isNaN(v)) {
-            offCtx.fillStyle = "#333333";
+            offCtx.fillStyle = SURFACE_CONTAINER;
           } else {
             offCtx.fillStyle = colorScale(v);
           }
@@ -191,15 +192,21 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
         }
       }
 
-      offCtx.fillStyle = "#a0a0b0";
-      offCtx.font = `${12 * dpr}px sans-serif`;
-      offCtx.textAlign = "center";
-      offCtx.fillText(metadata.paramX.name, width / 2, height - 4 * dpr);
-      offCtx.save();
-      offCtx.translate(14 * dpr, height / 2);
-      offCtx.rotate(-Math.PI / 2);
-      offCtx.fillText(metadata.paramY.name, 0, 0);
-      offCtx.restore();
+      // 网格线
+      offCtx.strokeStyle = GRID_COLOR;
+      offCtx.lineWidth = 1;
+      offCtx.beginPath();
+      for (let i = 0; i <= stepsX; i++) {
+        const x = Math.floor(i * cellW) + 0.5;
+        offCtx.moveTo(x, 0);
+        offCtx.lineTo(x, height);
+      }
+      for (let i = 0; i <= stepsY; i++) {
+        const y = Math.floor(i * cellH) + 0.5;
+        offCtx.moveTo(0, y);
+        offCtx.lineTo(width, y);
+      }
+      offCtx.stroke();
     };
 
     measure("lyapunov-render", renderFn);
@@ -461,7 +468,7 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
     const cy = cursor.y * dpr;
 
     ctx.save();
-    ctx.strokeStyle = "#FFFFFF";
+    ctx.strokeStyle = WHITE;
     ctx.lineWidth = 2 * dpr;
     ctx.shadowColor = "rgba(0,0,0,0.5)";
     ctx.shadowBlur = 2 * dpr;
@@ -481,11 +488,6 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
     ctx.restore();
   }, [cursor, gridData, dpr]);
 
-  // ── 图层切换 ──────────────────────────────────────
-  const handleLayerChange = useCallback((value: string) => {
-    setActiveLayer(value as LyapunovLayerType);
-  }, [setActiveLayer]);
-
   // ── 重试 ─────────────────────────────────────────
   const handleRetry = useCallback(() => {
     precomputeState.retry();
@@ -494,72 +496,32 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
   // ── Tooltip 消费 ─────────────────────────────────
   const hoverTooltip = useAnalyzeStore((s) => s.hoverTooltip);
 
-  const layerLabels: Record<LyapunovLayerType, string> = {
-    lyapunov_max: "最大 Lyapunov",
-    lyapunov_min: "最小 Lyapunov",
-    energy_curvature: "能量曲率",
+  const lambdaToneClass: Record<string, string> = {
+    混沌: "text-lyapunov-chaotic",
+    稳定: "text-lyapunov-stable",
+    准周期: "text-lyapunov-neutral",
+    数据缺失: "text-on-surface-variant",
   };
 
-  // 预计算数据不可用时禁用对应标签页（manifest 中无条目则回退到 -missing.json）
-  const availableLayers = useMemo(
-    () => new Set(
-      (Object.keys(dataPaths) as LyapunovLayerType[]).filter(
-        (k) => !dataPaths[k].endsWith("-missing.json"),
-      ),
-    ),
-    [dataPaths],
-  );
+  const axisXLabel = gridData
+    ? `${gridData.metadata.paramX.name} (${gridData.metadata.paramX.unit || "-"})`
+    : "";
+  const axisYLabel = gridData
+    ? `${gridData.metadata.paramY.name} (${gridData.metadata.paramY.unit || "-"})`
+    : "";
 
   return (
-    <div className="flex flex-col h-full w-full gap-2">
-      <Tabs value={activeLayer} onValueChange={handleLayerChange}>
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="lyapunov_max" disabled={!availableLayers.has("lyapunov_max")}>
-            {layerLabels.lyapunov_max}
-          </TabsTrigger>
-          <TabsTrigger value="lyapunov_min" disabled={!availableLayers.has("lyapunov_min")}>
-            {layerLabels.lyapunov_min}
-          </TabsTrigger>
-          <TabsTrigger value="energy_curvature" disabled={!availableLayers.has("energy_curvature")}>
-            {layerLabels.energy_curvature}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {dampingSlices.length > 1 && (
-        <div className="flex items-center gap-3 px-3 py-1.5 rounded-md bg-surface-container-low border border-white/5">
-          <span className="text-xs text-on-surface-variant shrink-0">阻尼</span>
-          <input
-            type="range"
-            min={0}
-            max={dampingSlices.length - 1}
-            step={1}
-            value={dampingSlices.findIndex((s) => s.value === activeDamping)}
-            onChange={(e) => {
-              const idx = parseInt(e.target.value, 10);
-              const slice = dampingSlices[idx];
-              if (slice) setActiveDamping(slice.value);
-            }}
-            className="flex-1 h-1.5 appearance-none bg-surface-container-high rounded-full
-              accent-primary
-              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-              [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-          />
-          <span className="text-xs font-mono text-on-surface w-12 text-right">
-            {activeDamping.toFixed(3)}
-          </span>
-        </div>
-      )}
-
-      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden bg-surface border border-white/5">
+    <div className="flex flex-col h-full w-full">
+      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden">
         {(loadStatus === "loading" || loadStatus === "idle") && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div className="w-full h-full animate-pulse bg-surface-container/20" />
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-on-surface-variant">正在加载预计算数据…</span>
           </div>
         )}
 
         {loadStatus === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-surface">
             <p className="text-sm text-on-surface">{loadError}</p>
             {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
               <p className="text-xs text-on-surface-variant">数据格式错误，请重新生成预计算数据</p>
@@ -581,6 +543,19 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
               onClick={handleClick}
             />
 
+            {/* X 轴标签 */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono text-on-surface-variant tracking-widest pointer-events-none">
+              {axisXLabel}
+            </div>
+
+            {/* Y 轴标签 */}
+            <div
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-mono text-on-surface-variant tracking-widest pointer-events-none"
+              style={{ writingMode: "vertical-rl", transform: "rotate(180deg) translateY(50%)" }}
+            >
+              {axisYLabel}
+            </div>
+
             {cursor.visible && (
               <div
                 className="absolute pointer-events-none"
@@ -598,51 +573,44 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
                     cy={6 * dpr}
                     r={5 * dpr}
                     fill="none"
-                    stroke="#FFFFFF"
+                    stroke={WHITE}
                     strokeWidth={2 * dpr}
                     style={{ filter: "drop-shadow(0 0 2px rgba(0,0,0,0.5))" }}
                   />
-                  <line x1={0} y1={6 * dpr} x2={2 * dpr} y2={6 * dpr} stroke="#FFFFFF" strokeWidth={2 * dpr} />
-                  <line x1={10 * dpr} y1={6 * dpr} x2={12 * dpr} y2={6 * dpr} stroke="#FFFFFF" strokeWidth={2 * dpr} />
-                  <line x1={6 * dpr} y1={0} x2={6 * dpr} y2={2 * dpr} stroke="#FFFFFF" strokeWidth={2 * dpr} />
-                  <line x1={6 * dpr} y1={10 * dpr} x2={6 * dpr} y2={12 * dpr} stroke="#FFFFFF" strokeWidth={2 * dpr} />
+                  <line x1={0} y1={6 * dpr} x2={2 * dpr} y2={6 * dpr} stroke={WHITE} strokeWidth={2 * dpr} />
+                  <line x1={10 * dpr} y1={6 * dpr} x2={12 * dpr} y2={6 * dpr} stroke={WHITE} strokeWidth={2 * dpr} />
+                  <line x1={6 * dpr} y1={0} x2={6 * dpr} y2={2 * dpr} stroke={WHITE} strokeWidth={2 * dpr} />
+                  <line x1={6 * dpr} y1={10 * dpr} x2={6 * dpr} y2={12 * dpr} stroke={WHITE} strokeWidth={2 * dpr} />
                 </svg>
               </div>
             )}
 
             {hoverTooltip.visible && (
               <div
-                className="absolute z-50 pointer-events-none rounded-md border border-white/5 bg-surface-container-low px-2 py-1 text-xs text-on-surface shadow-md"
+                className="absolute z-50 pointer-events-none rounded border border-white/[0.06] bg-surface-container px-3 py-2 text-xs text-on-surface shadow-md backdrop-blur-sm"
                 style={{
-                  left: Math.min(hoverTooltip.position.x + 12, (cw || 0) - 140),
+                  left: Math.min(hoverTooltip.position.x + 12, (cw || 0) - 160),
                   top: Math.max(hoverTooltip.position.y - 12, 0),
                 }}
               >
                 {hoverTooltip.lambdaValue === null ? (
-                  <div className="text-gray-400">数据缺失</div>
+                  <div className="text-on-surface-variant">数据缺失</div>
                 ) : (
-                  <div>
-                    <div className={
-                      hoverTooltip.lambdaLabel === "混沌" ? "text-red-400" :
-                      hoverTooltip.lambdaLabel === "稳定" ? "text-blue-400" :
-                      hoverTooltip.lambdaLabel === "准周期" ? "text-yellow-400" :
-                      "text-gray-400"
-                    }>
+                  <div className="flex flex-col gap-0.5">
+                    <span className={lambdaToneClass[hoverTooltip.lambdaLabel] ?? "text-on-surface-variant"}>
                       λ = {hoverTooltip.lambdaValue.toFixed(4)}（{hoverTooltip.lambdaLabel}）
-                    </div>
-                  </div>
-                )}
-                <div className="mt-0.5">
-                  {hoverTooltip.paramXName} = {hoverTooltip.paramXValue.toFixed(3)}
-                  {hoverTooltip.paramXName.includes("θ") ? " rad" : ""}
-                </div>
-                <div>
-                  {hoverTooltip.paramYName} = {hoverTooltip.paramYValue.toFixed(3)}
-                  {hoverTooltip.paramYName.includes("θ") ? " rad" : ""}
-                </div>
-                {hoverTooltip.dampingValue !== undefined && (
-                  <div className="mt-0.5 text-on-surface-variant">
-                    damping = {hoverTooltip.dampingValue.toFixed(3)}
+                    </span>
+                    <span className="text-on-surface/80">
+                      {hoverTooltip.paramXName} = {hoverTooltip.paramXValue.toFixed(3)}
+                    </span>
+                    <span className="text-on-surface/80">
+                      {hoverTooltip.paramYName} = {hoverTooltip.paramYValue.toFixed(3)}
+                    </span>
+                    {hoverTooltip.dampingValue !== undefined && (
+                      <span className="text-on-surface-variant">
+                        damping = {hoverTooltip.dampingValue.toFixed(3)}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -662,7 +630,6 @@ export function LyapunovHeatmap({ dataPaths, dampingSlices = [] }: Props) {
           }}
         />
       )}
-
     </div>
   );
 }
