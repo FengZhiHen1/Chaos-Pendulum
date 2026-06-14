@@ -10,6 +10,16 @@ import { Button } from "@/shared/view/components/ui/button";
 import type { BifurcationData, BifurcationHoverData, BifurcationCursor } from "../types";
 import { classifyRegime, resolveStoreParam } from "../types";
 import { BifurcationDialog } from "./BifurcationDialog";
+import {
+  SURFACE,
+  ON_SURFACE_VARIANT,
+  PRIMARY,
+  ON_PRIMARY,
+  LYAPUNOV_STABLE,
+  LYAPUNOV_CHAOTIC,
+  SEPARATION_ALERT,
+  WHITE,
+} from "./colorTokens";
 
 const CURSOR_HIT_RADIUS_PX = 8;
 const CLICK_PROXIMITY_PX = 12;
@@ -144,7 +154,7 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
       ctx.clearRect(0, 0, w, h);
 
       // 背景
-      ctx.fillStyle = "#fafafa";
+      ctx.fillStyle = SURFACE;
       ctx.fillRect(0, 0, w, h);
 
       // 绘制区域裁剪（margin 内）
@@ -155,9 +165,9 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
 
       // 网格线
       ctx.save();
-      ctx.strokeStyle = "#e0e0e0";
+      ctx.strokeStyle = "rgba(155, 160, 170, 0.12)";
       ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
+      ctx.setLineDash([4 * dpr, 4 * dpr]);
       for (let i = 0; i <= 10; i++) {
         const x = plotLeft + (plotRight - plotLeft) * (i / 10);
         ctx.beginPath();
@@ -203,16 +213,16 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
         ctx.globalAlpha = 1.0;
       };
 
-      drawGroup((len) => len <= 2, "#1a5fb4");
-      drawGroup((len) => len >= 3 && len <= 4, "#865ea8");
-      drawGroup((len) => len >= 5 && len <= 8, "#c06140");
-      drawGroup((len) => len > 8, "#e01b24");
+      drawGroup((len) => len <= 2, LYAPUNOV_STABLE);   // lyapunov-stable
+      drawGroup((len) => len >= 3 && len <= 4, PRIMARY); // primary
+      drawGroup((len) => len >= 5 && len <= 8, LYAPUNOV_CHAOTIC); // lyapunov-chaotic
+      drawGroup((len) => len > 8, SEPARATION_ALERT);    // separation-alert
 
       // 坐标轴
-      ctx.fillStyle = "#333333";
-      ctx.strokeStyle = "#333333";
+      ctx.fillStyle = ON_SURFACE_VARIANT;
+      ctx.strokeStyle = ON_SURFACE_VARIANT;
       ctx.lineWidth = 1 * dpr;
-      ctx.font = `${12 * dpr}px sans-serif`;
+      ctx.font = `${12 * dpr}px 'JetBrains Mono', monospace`;
 
       // X 轴
       const xAxisY = plotBottom * dpr;
@@ -255,20 +265,21 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
       }
 
       // 轴标题
-      ctx.font = `${14 * dpr}px sans-serif`;
+      ctx.font = `${12 * dpr}px 'JetBrains Mono', monospace`;
       ctx.textAlign = "center";
-      ctx.fillText(`${scannedParam.name} / ${scannedParam.unit || "-"}`, (plotLeft + plotRight) * 0.5 * dpr, (ch - 8) * dpr);
+      ctx.fillStyle = ON_SURFACE_VARIANT;
+      ctx.fillText(`${scannedParam.name} (${scannedParam.unit || "-"})`, (plotLeft + plotRight) * 0.5 * dpr, (ch - 12) * dpr);
       ctx.save();
-      ctx.translate(14 * dpr, (plotTop + plotBottom) * 0.5 * dpr);
+      ctx.translate(24 * dpr, (plotTop + plotBottom) * 0.5 * dpr);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`${sampledVariable.name} / ${sampledVariable.unit || "-"}`, 0, 0);
+      ctx.fillText(`${sampledVariable.name} (${sampledVariable.unit || "-"})`, 0, 0);
       ctx.restore();
 
       // 游标（竖直虚线）
       if (cursor.visible && cursor.x >= plotLeft && cursor.x <= plotRight) {
         const cx = cursor.x * dpr;
         ctx.save();
-        ctx.strokeStyle = "#ff6600";
+        ctx.strokeStyle = PRIMARY;
         ctx.lineWidth = 2 * dpr;
         ctx.setLineDash([6 * dpr, 4 * dpr]);
         ctx.beginPath();
@@ -279,17 +290,17 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
 
         // 顶部标签
         const label = cursor.label;
-        ctx.font = `${11 * dpr}px sans-serif`;
+        ctx.font = `${11 * dpr}px 'JetBrains Mono', monospace`;
         const textW = ctx.measureText(label).width;
         const labelH = 18 * dpr;
         const labelY = (plotTop + 2) * dpr;
         const labelX = Math.min(Math.max(cx - textW * 0.5, plotLeft * dpr), plotRight * dpr - textW);
 
-        ctx.fillStyle = "#ff6600";
+        ctx.fillStyle = PRIMARY;
         ctx.beginPath();
         ctx.roundRect(labelX - 4 * dpr, labelY - 2 * dpr, textW + 8 * dpr, labelH, 4 * dpr);
         ctx.fill();
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = ON_PRIMARY;
         ctx.textAlign = "left";
         ctx.fillText(label, labelX, labelY + 11 * dpr);
       }
@@ -300,9 +311,9 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
         for (const v of hover.sampledValues) {
           if (v < y0 || v > y1) continue;
           const hy = currentYScale(v) * dpr;
-          ctx.strokeStyle = "#ffffff";
+          ctx.strokeStyle = WHITE;
           ctx.lineWidth = 2 * dpr;
-          ctx.fillStyle = "#333333";
+          ctx.fillStyle = PRIMARY;
           ctx.beginPath();
           ctx.arc(hx, hy, 4 * dpr, 0, Math.PI * 2);
           ctx.fill();
@@ -625,16 +636,17 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
   }, [precomputeState.retry]);
 
   return (
-    <div className="flex flex-col h-full w-full gap-2">
-      <div ref={containerRef} className="relative flex-1 min-h-0 rounded-md overflow-hidden border border-white/5">
+    <div className="flex flex-col h-full w-full">
+      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden">
         {(loadStatus === "loading" || loadStatus === "idle") && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div className="w-full h-full animate-pulse bg-surface-container/20" />
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-on-surface-variant">正在加载预计算数据…</span>
           </div>
         )}
 
         {loadStatus === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-surface">
             <p className="text-sm text-on-surface">{loadError}</p>
             {precomputeState.errorCode === "PRECOMPUTE_FORMAT_ERROR" ? (
               <p className="text-xs text-on-surface-variant">数据格式错误，请重新生成预计算数据</p>
@@ -660,30 +672,32 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
             {/* HUD */}
             {hover.visible && (
               <div
-                className="absolute z-50 pointer-events-none rounded-md border border-white/5 bg-surface-container-low px-2 py-1 text-xs text-on-surface shadow-md"
+                className="absolute z-50 pointer-events-none rounded border border-white/[0.06] bg-surface-container px-3 py-2 text-xs text-on-surface shadow-md backdrop-blur-sm"
                 style={{
                   left: Math.min(hover.position.x + 12, (cw || 0) - 180),
                   top: Math.max(hover.position.y - 12, 0),
                 }}
               >
-                <div>
-                  {hover.scannedParamName} = {hover.scannedParamValue.toFixed(4)}
-                  {hover.scannedParamName.includes("θ") ? " rad" : ""}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-on-surface/90">
+                    {hover.scannedParamName} = {hover.scannedParamValue.toFixed(4)}
+                    {hover.scannedParamName.includes("θ") ? " rad" : ""}
+                  </span>
+                  <span className="text-on-surface-variant">
+                    采样点：{hover.pointCount}（{hover.regime}）
+                  </span>
+                  {hover.sampledValues && hover.sampledValues.length > 0 && (
+                    <span className="text-on-surface-variant max-w-[200px] truncate">
+                      {hover.sampledVariableName} = {"{"}
+                      {hover.sampledValues.slice(0, 6).map((v) => v.toFixed(2)).join(", ")}
+                      {hover.sampledValues.length > 6 ? ", ..." : ""}
+                      {"}"}
+                    </span>
+                  )}
+                  {hover.sampledValues && hover.sampledValues.length === 0 && (
+                    <span className="text-on-surface-variant">无有效数据</span>
+                  )}
                 </div>
-                <div className="mt-0.5">
-                  采样点：{hover.pointCount}（{hover.regime}）
-                </div>
-                {hover.sampledValues && hover.sampledValues.length > 0 && (
-                  <div className="mt-0.5 text-on-surface-variant max-w-[200px] truncate">
-                    {hover.sampledVariableName} = {"{"}
-                    {hover.sampledValues.slice(0, 6).map((v) => v.toFixed(2)).join(", ")}
-                    {hover.sampledValues.length > 6 ? ", ..." : ""}
-                    {"}"}
-                  </div>
-                )}
-                {hover.sampledValues && hover.sampledValues.length === 0 && (
-                  <div className="mt-0.5 text-gray-400">无有效数据</div>
-                )}
               </div>
             )}
           </>

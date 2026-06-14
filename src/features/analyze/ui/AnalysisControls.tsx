@@ -1,117 +1,220 @@
-import { BarChart3, Layers, Palette, SlidersHorizontal } from "lucide-react";
-
 /**
- * 分析模式左侧控制面板 — 占位组件。
- *
- * 设计文档要求:
- * - 参数轴选择 (X 轴 / Y 轴下拉)
- * - 图层切换 (RadioGroup: λ_max / λ_min / 能量曲率)
- * - 固定参数只读显示
- * - 色阶图例 (垂直色条)
- *
- * 风格：Dark Room，卡片用 tonal shift 区分，无实线边框
+ * 模块: analyze.view.components.AnalysisControls
+ * 职责: 分析模式左侧控制面板——严格对齐 Stitch 设计稿：
+ *       面板标题、当前视图卡、图层切换、阻尼切片、图例、固定参数、状态 Footer。
+ * 边界:
+ *   - 纯展示组件，通过 Props 接收数据与回调
+ *   - 不直接调用 API 或操作 store
  */
-export function AnalysisControls() {
+
+import { SlidersHorizontal, LayoutGrid, CheckCircle2 } from "lucide-react";
+import type { AnalysisView } from "../viewModel/stores/analyzeSlice";
+import type { LyapunovLayerType, LoadStatus } from "../types";
+import { SEMANTIC_GRADIENT } from "./colorTokens";
+
+interface AnalysisControlsProps {
+  activeView: AnalysisView;
+  activeLayer: LyapunovLayerType;
+  onLayerChange: (layer: LyapunovLayerType) => void;
+  availableLayers: Set<LyapunovLayerType>;
+  dampingSlices: Array<{ value: number; file: string; gridHash?: string }>;
+  activeDamping: number;
+  onDampingChange: (value: number) => void;
+  loadStatus: LoadStatus;
+  layerCacheStatus: Record<LyapunovLayerType, LoadStatus>;
+}
+
+const LAYER_OPTIONS: Array<{ value: LyapunovLayerType; label: string }> = [
+  { value: "lyapunov_max", label: "Max Lyapunov" },
+  { value: "lyapunov_min", label: "Min Lyapunov" },
+  { value: "energy_curvature", label: "Curvature" },
+];
+
+const VIEW_LABELS: Record<AnalysisView, string> = {
+  lyapunov: "Lyapunov 指数热力图",
+  bifurcation: "参数空间分岔图",
+  poincare: "庞加莱截面",
+  "energy-landscape": "能量景观地形图",
+};
+
+const FIXED_PARAMS = [
+  { key: "m₁ (Mass 1)", value: "1.0 kg" },
+  { key: "m₂ (Mass 2)", value: "1.0 kg" },
+  { key: "g (Gravity)", value: "9.81 m/s²" },
+  { key: "L (Length)", value: "0.5 m" },
+] as const;
+
+function statusDot(status: LoadStatus): string {
+  switch (status) {
+    case "ready":
+      return "bg-lyapunov-neutral";
+    case "loading":
+      return "bg-primary";
+    case "error":
+      return "bg-separation-alert";
+    default:
+      return "bg-on-surface-variant/30";
+  }
+}
+
+function statusText(status: LoadStatus): string {
+  switch (status) {
+    case "ready":
+      return "数据就绪 (ANL-01)";
+    case "loading":
+      return "数据加载中…";
+    case "error":
+      return "数据错误";
+    default:
+      return "待机 (ANL-01)";
+  }
+}
+
+export function AnalysisControls({
+  activeView,
+  activeLayer,
+  onLayerChange,
+  availableLayers,
+  dampingSlices,
+  activeDamping,
+  onDampingChange,
+  loadStatus,
+}: AnalysisControlsProps) {
+  const showLayerControls = activeView === "lyapunov";
+  const showDamping = showLayerControls && dampingSlices.length > 1;
+
+  const dampingMin = dampingSlices[0]?.value ?? 0;
+  const dampingMax = dampingSlices[dampingSlices.length - 1]?.value ?? 0;
+  const activeIndex = Math.max(
+    0,
+    dampingSlices.findIndex((s) => s.value === activeDamping),
+  );
+
   return (
-    <div className="flex flex-col h-full p-4 gap-4">
-      {/* 参数轴选择 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-on-surface-variant/60" />
-          <h4 className="text-xs font-semibold text-on-surface">参数轴选择</h4>
+    <div className="flex flex-col h-full p-5 gap-6">
+      {/* Panel Header */}
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+          <SlidersHorizontal className="w-4 h-4" />
         </div>
-        <div className="space-y-2">
-          <div className="space-y-1">
-            <span className="text-[10px] text-on-surface-variant/60">X 轴参数</span>
-            <div className="h-8 rounded-lg bg-surface-container border border-white/5 flex items-center px-3 text-xs text-on-surface/70">
-              L₂/L₁ 长度比
-            </div>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] text-on-surface-variant/60">Y 轴参数</span>
-            <div className="h-8 rounded-lg bg-surface-container border border-white/5 flex items-center px-3 text-xs text-on-surface/70">
-              θ₁ 初始角度
-            </div>
-          </div>
+        <div>
+          <h2 className="text-label-md font-bold text-on-surface">控制面板</h2>
+          <span className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+            Control Panel
+          </span>
         </div>
       </div>
 
-      {/* 图层切换 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5 text-on-surface-variant/60" />
-          <h4 className="text-xs font-semibold text-on-surface">图层切换</h4>
-        </div>
-        <div className="space-y-2">
-          {[
-            { label: "最大 Lyapunov 指数", active: true },
-            { label: "最小 Lyapunov 指数", active: false },
-            { label: "能量曲面曲率", active: false },
-          ].map((layer) => (
-            <label
-              key={layer.label}
-              className="flex items-center gap-2.5 text-xs text-on-surface-variant/70 cursor-pointer hover:text-on-surface/80 transition-colors duration-200 py-1"
-            >
-              <div className={`
-                h-3.5 w-3.5 rounded-full border flex items-center justify-center transition-all duration-200
-                ${layer.active ? "border-primary" : "border-white/10"}
-              `}>
-                {layer.active && (
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                )}
-              </div>
-              {layer.label}
-            </label>
-          ))}
+      {/* Current View Card */}
+      <div className="bg-surface-container rounded-lg p-3">
+        <span className="text-label-md text-on-surface-variant block mb-1">当前视图</span>
+        <div className="flex items-center justify-between">
+          <span className="text-body-md text-on-surface font-medium">{VIEW_LABELS[activeView]}</span>
+          <LayoutGrid className="w-4 h-4 text-primary" />
         </div>
       </div>
 
-      {/* 色阶图例 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Palette className="w-3.5 h-3.5 text-on-surface-variant/60" />
-          <h4 className="text-xs font-semibold text-on-surface">色阶图例</h4>
+      {/* Layer Selector */}
+      {showLayerControls && (
+        <div className="flex flex-col gap-2">
+          <span className="text-label-md text-on-surface-variant">分析图层</span>
+          <div className="flex flex-col gap-1">
+            {LAYER_OPTIONS.map((layer) => {
+              const isActive = activeLayer === layer.value;
+              const isDisabled = !availableLayers.has(layer.value);
+              return (
+                <button
+                  key={layer.value}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => onLayerChange(layer.value)}
+                  className={`
+                    flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium
+                    transition-all duration-quick
+                    ${isActive
+                      ? "bg-primary text-on-primary shadow-sm cursor-default"
+                      : "text-on-surface hover:bg-surface-container cursor-pointer"
+                    }
+                    ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}
+                  `}
+                >
+                  <span>{layer.label}</span>
+                  {isActive && <CheckCircle2 className="w-4 h-4" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="space-y-2">
+      )}
+
+      {/* Damping Slider */}
+      {showDamping && (
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-end">
+            <span className="text-label-md text-on-surface-variant">阻尼切片 (Damping)</span>
+            <span className="font-mono text-xs text-primary font-medium">
+              {activeDamping.toFixed(3)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={dampingSlices.length - 1}
+            step={1}
+            value={activeIndex}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value, 10);
+              const slice = dampingSlices[idx];
+              if (slice) onDampingChange(slice.value);
+            }}
+            className="w-full h-1 bg-surface-container-high rounded-full appearance-none outline-none accent-primary cursor-pointer
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5
+              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
+              [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full
+              [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] font-mono text-on-surface-variant/60">
+            <span>{dampingMin.toFixed(2)}</span>
+            <span>{dampingMax.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Color Legend */}
+      {showLayerControls && (
+        <div className="flex flex-col gap-2">
+          <span className="text-label-md text-on-surface-variant">图例 (Legend)</span>
           <div
-            className="w-full h-3 rounded-sm"
+            className="h-2 w-full rounded-full"
             style={{
-              background:
-                "linear-gradient(to right, #1E3A5F, #2DD4BF, #F97316)",
+              background: `linear-gradient(to right, ${SEMANTIC_GRADIENT.join(", ")})`,
             }}
           />
-          <div className="flex justify-between text-[10px] text-on-surface-variant/50">
-            <span>λ &lt; 0 (稳定)</span>
-            <span>λ ≈ 0</span>
-            <span>λ &gt; 0 (混沌)</span>
+          <div className="flex justify-between text-[10px] text-on-surface-variant mt-1">
+            <span>Stable</span>
+            <span>Chaotic</span>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 固定参数 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-3.5 h-3.5 text-on-surface-variant/60" />
-          <h4 className="text-xs font-semibold text-on-surface">固定参数</h4>
-        </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs p-3 rounded-lg bg-surface-container-low border border-white/5">
-          {[
-            ["m₁", "1.0 kg"],
-            ["m₂", "1.0 kg"],
-            ["g", "9.81 m/s²"],
-            ["阻尼", "扫描轴"],
-          ].map(([label, val]) => (
-            <div key={label} className="flex justify-between">
-              <span className="text-on-surface-variant/50">{label}</span>
-              <span className="font-mono text-on-surface/80">{val}</span>
+      {/* Fixed Params Grid */}
+      <div className="flex flex-col gap-2">
+        <span className="text-label-md text-on-surface-variant">边界条件 (Fixed Params)</span>
+        <div className="grid grid-cols-2 gap-2">
+          {FIXED_PARAMS.map(({ key, value }) => (
+            <div key={key} className="bg-surface-container rounded p-2 flex flex-col">
+              <span className="text-[10px] text-on-surface-variant/70 mb-1 font-mono">{key}</span>
+              <span className="font-mono text-xs text-on-surface">{value}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="text-[10px] text-on-surface-variant/40 text-center mt-auto pt-4">
-        分析控制面板 — 参数联动开发中
-      </p>
+      {/* Status Footer */}
+      <div className="mt-auto pt-5 flex items-center gap-3">
+        <span className={`w-2 h-2 rounded-full ${statusDot(loadStatus)} ${loadStatus === "loading" ? "animate-pulse" : ""}`} />
+        <span className="text-label-md text-on-surface-variant">{statusText(loadStatus)}</span>
+      </div>
     </div>
   );
 }

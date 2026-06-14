@@ -1,16 +1,24 @@
-import { useState, useEffect } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
+/**
+ * 模块: analyze.view.pages.AnalyzeModePage
+ * 职责: 分析模式主页面——Web 桌面端「DynamicsTerminal」视觉落地。
+ *       严格对齐 docs/pages/Stitch-Design/分析模式/ 设计稿：
+ *       280px 左侧控制面板 + 页头/文件夹式 Tabs + 发光图表舞台。
+ * 边界:
+ *   - 仅导入 analyze ViewModel Hook 与共享 UI 组件
+ *   - 子组件通过 Props 接收数据
+ */
+
+import { useEffect, useState } from "react";
 import { useAnalysisView } from "../hooks/useAnalysisView";
+import { useAnalyzeStore } from "../store";
 import type { DampingSlice } from "../types";
+import { AnalysisControls } from "./AnalysisControls";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
 import { EnergyLandscape } from "./EnergyLandscape";
-import { AnalysisControls } from "./AnalysisControls";
 import { BarChart3, Activity, ScatterChart, Mountain } from "lucide-react";
 
-// 预计算数据路径清单。由 scripts/precompute/ 各脚本维护，
-// 前端启动时 fetch 获取含 gridHash 的实际文件名。
 const MANIFEST_PATH = "./assets/layer_manifest.json";
 
 interface LayerManifest {
@@ -31,6 +39,13 @@ const FALLBACK_PATHS = {
 
 const FALLBACK_BIFURCATION = "./assets/bifurcation-missing.json";
 
+const VIEW_TABS = [
+  { id: "lyapunov", label: "Lyapunov 热力图", icon: BarChart3 },
+  { id: "bifurcation", label: "分岔图", icon: Activity },
+  { id: "poincare", label: "庞加莱截面", icon: ScatterChart },
+  { id: "energy-landscape", label: "能量景观", icon: Mountain },
+] as const;
+
 function useLayerManifest(): {
   lyapunovPaths: typeof FALLBACK_PATHS;
   dampingSlices: DampingSlice[];
@@ -48,7 +63,7 @@ function useLayerManifest(): {
         if (!cancelled) setManifest(m);
       })
       .catch(() => {
-        // manifest 不存在时使用 fallback（首次运行或预计算未完成）
+        // manifest 缺失时使用 fallback（首次运行或预计算未完成）
       })
       .finally(() => {
         if (!cancelled) setReady(true);
@@ -72,7 +87,6 @@ function useLayerManifest(): {
     ? `./assets/${manifest.bifurcation}`
     : FALLBACK_BIFURCATION;
 
-  // 提取当前活动图层的阻尼切片
   const dampingSlices = manifest?.lyapunov_max_dampingSlices
     ?? manifest?.lyapunov_min_dampingSlices
     ?? manifest?.energy_curvature_dampingSlices
@@ -81,93 +95,107 @@ function useLayerManifest(): {
   return { lyapunovPaths, dampingSlices, bifurcationPath, ready };
 }
 
-const VIEW_TABS = [
-  { id: "lyapunov", label: "热力图", icon: BarChart3 },
-  { id: "bifurcation", label: "分岔图", icon: Activity },
-  { id: "poincare", label: "庞加莱截面", icon: ScatterChart },
-  { id: "energy-landscape", label: "能量景观", icon: Mountain },
-] as const;
-
 export function AnalyzeModePage() {
-  const { activeView, setActiveView, isDesktop } = useAnalysisView();
+  const { activeView, setActiveView } = useAnalysisView();
   const { lyapunovPaths, dampingSlices, bifurcationPath, ready } = useLayerManifest();
 
+  const activeLayer = useAnalyzeStore((s) => s.activeLayer);
+  const setActiveLayer = useAnalyzeStore((s) => s.setActiveLayer);
+  const activeDamping = useAnalyzeStore((s) => s.activeDamping);
+  const setActiveDamping = useAnalyzeStore((s) => s.setActiveDamping);
+  const loadStatus = useAnalyzeStore((s) => s.loadStatus);
+  const layerCacheStatus = useAnalyzeStore((s) => s.layerCacheStatus);
+
+  const availableLayers = new Set(
+    (Object.keys(lyapunovPaths) as Array<keyof typeof lyapunovPaths>).filter(
+      (k) => !lyapunovPaths[k].endsWith("-missing.json"),
+    ),
+  );
+
   return (
-    <div className="h-full w-full flex">
-      {/* 左侧分析控制面板 (260px) — 桌面端 */}
-      {isDesktop && (
-        <aside className="w-[260px] shrink-0 overflow-y-auto bg-surface-container-low border-r border-white/5">
-          <AnalysisControls />
-        </aside>
-      )}
+    <div className="h-full w-full flex bg-surface overflow-hidden">
+      {/* 左侧控制面板 */}
+      <aside className="w-[280px] shrink-0 h-full overflow-y-auto bg-surface-container-lowest">
+        <AnalysisControls
+          activeView={activeView}
+          activeLayer={activeLayer}
+          onLayerChange={setActiveLayer}
+          availableLayers={availableLayers}
+          dampingSlices={dampingSlices}
+          activeDamping={activeDamping}
+          onDampingChange={setActiveDamping}
+          loadStatus={loadStatus}
+          layerCacheStatus={layerCacheStatus}
+        />
+      </aside>
 
-      {/* 图表区 */}
-      <div className="flex-1 flex flex-col min-w-0 p-4 gap-3">
-        {/* Tab 切换 — 无实线边框，仅用 tonal shift 区分 */}
-        <Tabs
-          value={activeView}
-          onValueChange={(v) =>
-            setActiveView(
-              v as "lyapunov" | "bifurcation" | "poincare" | "energy-landscape",
-            )
-          }
-        >
-          <TabsList className="w-full justify-start bg-transparent gap-1">
-            {VIEW_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeView === tab.id;
-              const isDisabled = false;
-              return (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  disabled={isDisabled}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                    transition-all duration-200
-                    ${isActive
-                      ? "bg-surface-container-low text-on-surface"
-                      : "text-on-surface-variant hover:text-on-surface"
-                    }
-                    ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}
-                  `}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+      {/* 主内容区 */}
+      <main className="flex-1 min-w-0 flex flex-col h-full p-6 gap-4">
+        {/* 页头 */}
+        <header className="shrink-0 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary shadow-sm">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-headline-lg font-semibold text-on-surface">分析模式</h1>
+            <p className="text-body-md text-on-surface-variant">非线性动力学诊断终端</p>
+          </div>
+        </header>
 
-        {/* 图表内容区 — surface-container-low 背景，无边框 */}
-        <div className="flex-1 min-h-0 rounded-lg bg-surface-container-low overflow-hidden relative">
+        {/* 视图 Tabs — 文件夹式 */}
+        <nav className="shrink-0 flex items-end gap-1" aria-label="分析视图">
+          {VIEW_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveView(tab.id)}
+                className={`
+                  flex items-center gap-2 px-4 py-2 text-xs font-medium transition-all duration-quick
+                  ${isActive
+                    ? "bg-surface-container-low text-primary rounded-t-lg shadow-sm"
+                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-t-lg"
+                  }
+                `}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* 图表舞台 */}
+        <div className="flex-1 min-h-0 bg-surface-container-low rounded-xl rounded-tl-none shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden flex flex-col">
+          {/* 顶部径向微光 */}
+          <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-full h-[400px] bg-[radial-gradient(circle_at_50%_0%,rgba(75,159,255,0.06),transparent_60%)] z-0" />
+
           {!ready && (
-            <div className="h-full flex flex-col items-center justify-center gap-3">
-              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-on-surface-variant">正在加载预计算数据…</span>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
+              <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-on-surface-variant">正在加载预计算数据索引…</span>
             </div>
           )}
-          {ready && activeView === "lyapunov" && (
-            <LyapunovHeatmap dataPaths={lyapunovPaths} dampingSlices={dampingSlices} />
-          )}
-          {ready && activeView === "bifurcation" && (
-            <BifurcationPlot dataPath={bifurcationPath} />
-          )}
-          {activeView === "poincare" && <PoincareSection />}
-          {activeView === "energy-landscape" && <EnergyLandscape />}
-        </div>
-      </div>
 
-      {/* 平板/手机: 分析控制以折叠形式 (占位) */}
-      {!isDesktop && (
-        <div className="h-10 shrink-0 flex items-center justify-center bg-surface-container-low border-t border-white/5 text-xs text-on-surface-variant/70">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-on-surface-variant/40" />
-            分析参数选择 — 点击展开
-          </span>
+          {ready && (
+            <div className="relative z-10 flex-1 min-h-0">
+              {activeView === "lyapunov" && (
+                <LyapunovHeatmap
+                  dataPaths={lyapunovPaths}
+                  dampingSlices={dampingSlices}
+                  activeLayer={activeLayer}
+                  activeDamping={activeDamping}
+                />
+              )}
+              {activeView === "bifurcation" && <BifurcationPlot dataPath={bifurcationPath} />}
+              {activeView === "poincare" && <PoincareSection />}
+              {activeView === "energy-landscape" && <EnergyLandscape />}
+            </div>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 }

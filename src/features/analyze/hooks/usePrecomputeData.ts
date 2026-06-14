@@ -140,9 +140,7 @@ export function usePrecomputeData<T extends PrecomputeDataType>(
     };
   }, [doLoad, input.enabled]);
 
-  const retry = useCallback(() => {
-    doLoad();
-  }, [doLoad]);
-
-  return { ...state, retry };
+  // 注意：retry 已作为 state 的一部分在 effect 中注入，直接返回 state 以保持引用稳定，
+  // 避免调用方 effect / memo 因对象引用变化而无限触发。
+  return state;
 }

@@ -19,10 +19,12 @@ const Y_MIN_INITIAL = -10;
 const Y_MAX_INITIAL = 10;
 const Y_CLAMP = 50;
 const Y_EXPAND_MARGIN = 0.2; // 20%
+import { TERTIARY } from "./colorTokens";
+
 const FULL_REDRAW_INTERVAL_MS = 2000;
 const POINT_RADIUS = 1.5;
-const BASELINE_COLOR = "#e76f51";
-const CURRENT_COLOR = "rgba(0, 180, 216, ";
+const BASELINE_COLOR = TERTIARY;
+const CURRENT_COLOR = "rgba(75, 159, 255, "; // primary #4B9FFF
 
 interface YDomain {
   min: number;
@@ -336,29 +338,29 @@ export function PoincareSection() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* 控制栏 */}
-      <div className="flex flex-wrap items-center gap-4 px-2 py-2 border-b border-white/5/30">
+      <div className="flex flex-wrap items-center gap-4 px-3 py-2.5 bg-surface-container-low border-b border-white/[0.06]">
         <div className="flex items-center gap-2">
           <button
             onClick={handleToggleActive}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              poincare.isActive ? "bg-primary" : "bg-input"
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow ${
+              poincare.isActive ? "bg-primary" : "bg-surface-container-high"
             }`}
             role="switch"
             aria-checked={poincare.isActive}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-background shadow-lg transition-transform ${
+              className={`inline-block h-4 w-4 transform rounded-full bg-on-surface shadow-lg transition-transform ${
                 poincare.isActive ? "translate-x-4" : "translate-x-0.5"
               }`}
             />
           </button>
-          <Label className="text-sm cursor-pointer" onClick={handleToggleActive}>
+          <Label className="text-sm cursor-pointer text-on-surface" onClick={handleToggleActive}>
             采集
           </Label>
         </div>
 
         <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">变量</Label>
+          <Label className="text-xs text-on-surface-variant">变量</Label>
           <Select
             value={poincare.condition.variable}
             onValueChange={(v) => handleConditionChange("variable", v)}
@@ -377,7 +379,7 @@ export function PoincareSection() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">目标值</Label>
+          <Label className="text-xs text-on-surface-variant">目标值</Label>
           <Input
             type="number"
             value={poincare.condition.targetValue}
@@ -389,7 +391,7 @@ export function PoincareSection() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">方向</Label>
+          <Label className="text-xs text-on-surface-variant">方向</Label>
           <Select
             value={poincare.condition.direction}
             onValueChange={(v) => handleConditionChange("direction", v)}
@@ -407,7 +409,7 @@ export function PoincareSection() {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-on-surface-variant">
             点数: {poincare.pointCount}
             {poincare.baseline ? ` + 基线: ${poincare.baseline.length}` : ""}
           </span>
@@ -443,7 +445,7 @@ export function PoincareSection() {
 
       {/* 警告提示 */}
       {clampWarning && (
-        <div className="px-2 py-1 bg-amber-100 text-amber-800 text-xs">
+        <div className="px-3 py-1.5 bg-surface-container-high text-tertiary text-xs font-medium">
           {clampWarning}
         </div>
       )}
@@ -467,11 +469,11 @@ export function PoincareSection() {
         {/* 坐标轴标签 */}
         {size.ready && (
           <>
-            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground pointer-events-none">
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono text-on-surface-variant tracking-widest pointer-events-none">
               θ₂ (rad)
             </div>
             <div
-              className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-mono text-on-surface-variant tracking-widest pointer-events-none"
               style={{ writingMode: "vertical-rl", transform: "rotate(180deg) translateY(50%)" }}
             >
               ω₂ (rad/s)
@@ -483,9 +485,9 @@ export function PoincareSection() {
       {/* 确认对话框 */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background rounded-lg border border-border shadow-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold mb-2">切换截面条件</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="bg-surface-container-low rounded-lg border border-white/[0.06] shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-on-surface mb-2">切换截面条件</h3>
+            <p className="text-sm text-on-surface-variant mb-4">
               当前已有 {poincare.points.length} 个采集点，切换条件将清空所有数据。是否继续？
             </p>
             <div className="flex justify-end gap-2">

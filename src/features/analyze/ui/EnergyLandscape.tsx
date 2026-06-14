@@ -5,6 +5,15 @@ import * as THREE from "three";
 import { useSimulationStore } from "@/features/simulation";
 import { normalizeAngle } from "@/features/simulation";
 import { DEFAULT_ENERGY_LANDSCAPE_CONFIG } from "../contracts";
+import {
+  SURFACE,
+  SURFACE_CONTAINER_HIGH,
+  ON_SURFACE_VARIANT,
+  PRIMARY,
+  LYAPUNOV_STABLE,
+  LYAPUNOV_NEUTRAL,
+  LYAPUNOV_CHAOTIC,
+} from "./colorTokens";
 
 /**
  * ANL-04 能量景观地形图 — 3D 半透明势能曲面。
@@ -20,6 +29,7 @@ export function EnergyLandscape() {
         camera={{ position: [0, 0, 5], fov: 50 }}
         gl={{ antialias: true, alpha: false }}
       >
+        <color attach="background" args={[SURFACE]} />
         <EnergyLandscapeScene />
       </Canvas>
     </div>
@@ -70,14 +80,20 @@ function EnergyLandscapeScene() {
       if (v > maxV) maxV = v;
     }
 
-    // 第二遍：设置 Z 和颜色
+    // 第二遍：设置 Z 和颜色（Stable → Neutral → Chaotic 语义渐变）
     const range = maxV - minV || 1;
+    const c0 = new THREE.Color(LYAPUNOV_STABLE);
+    const c1 = new THREE.Color(LYAPUNOV_NEUTRAL);
+    const c2 = new THREE.Color(LYAPUNOV_CHAOTIC);
     for (let i = 0; i < pos.count; i++) {
       pos.setZ(i, values[i]!);
       const t = (values[i]! - minV) / range;
-      // 蓝色(低势能) → 青 → 橙 → 红(高势能)
       const color = new THREE.Color();
-      color.setHSL(0.6 - t * 0.55, 0.8, 0.3 + t * 0.4);
+      if (t < 0.5) {
+        color.copy(c0).lerp(c1, t * 2);
+      } else {
+        color.copy(c1).lerp(c2, (t - 0.5) * 2);
+      }
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
@@ -118,20 +134,20 @@ function EnergyLandscapeScene() {
       {config.showContours && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -5]}>
           <planeGeometry args={[planeSize, planeSize, 20, 20]} />
-          <meshBasicMaterial color="#334155" transparent opacity={0.15} wireframe />
+          <meshBasicMaterial color={SURFACE_CONTAINER_HIGH} transparent opacity={0.2} wireframe />
         </mesh>
       )}
       {/* 实时光点 */}
       {config.showCurrentPoint && (
         <mesh ref={pointRef}>
           <sphereGeometry args={[0.08, 16, 16]} />
-          <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={0.5} />
+          <meshStandardMaterial color={PRIMARY} emissive={PRIMARY} emissiveIntensity={0.5} />
         </mesh>
       )}
       {/* θ₁-θ₂ 平面参考框 */}
       <lineSegments rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -4.9]}>
         <edgesGeometry args={[new THREE.PlaneGeometry(planeSize, planeSize)]} />
-        <lineBasicMaterial color="#64748b" transparent opacity={0.3} />
+        <lineBasicMaterial color={ON_SURFACE_VARIANT} transparent opacity={0.3} />
       </lineSegments>
       <OrbitControls enableDamping dampingFactor={0.08} />
     </>
