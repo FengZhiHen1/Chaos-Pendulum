@@ -20,7 +20,7 @@ function formatEta(seconds: number): string {
  *
  * 设计规范（DESIGN.md）：
  * - 背景：surface (#1A1D22) 全暗
- * - 中心元素："双摆混沌实验室" Inter SemiBold 24px，on-surface
+ * - 中心元素："双摆混沌实验室" Manrope SemiBold 24px，on-surface
  * - 进度条：Track surface-container，Fill primary
  * - 文本：JetBrains Mono 12px，on-surface-variant
  * - 过渡：进度淡出 (200ms) → 3D stage 先亮 (400ms) → 暗面板随后交错淡入
@@ -120,7 +120,7 @@ export function LoadingScreen({ progress, showQuotes, transitioning }: LoadingSc
           </svg>
         </div>
 
-        {/* 标题 — Inter SemiBold 24px */}
+        {/* 标题 — Manrope SemiBold 24px */}
         <div className="flex flex-col items-center gap-1 animate-fade-in-up">
           <h1 className="text-2xl font-semibold text-on-surface tracking-[0.1em]">
             双摆混沌实验室

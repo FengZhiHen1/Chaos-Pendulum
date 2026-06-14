@@ -40,9 +40,7 @@ import {
   TrailLength,
   TrailPoint,
   TrailConfig,
-  Scene3DConfig,
   ChaosIndicatorState,
-  ResponsiveConfig,
   DEFAULT_TRAIL_CONFIG,
   DEFAULT_SCENE3D_CONFIG,
   RESPONSIVE_PRESETS,
@@ -288,7 +286,7 @@ class MockSeparationCalculator implements ISeparationCalculator {
 
 /** Mock Delta 控制器 */
 class MockDeltaController implements IDeltaController {
-  private _deltaDeg = BUTTERFLY_DEFAULTS.defaultDeltaDeg;
+  private _deltaDeg: number = BUTTERFLY_DEFAULTS.defaultDeltaDeg;
   private _editMode: DeltaEditMode = "synced";
 
   get deltaDeg(): number { return this._deltaDeg; }
@@ -311,7 +309,6 @@ class MockTimeReversalController implements ITimeReversalController {
   private _mode: ReversalMode = "numerical";
   private _phase: ReversalPhase = "idle";
   private _driftHistory: DriftSample[] = [];
-  private _annotationDismissed = false;
   private _destroyed = false;
 
   public minHistoryFrames = REVERSAL_DEFAULTS.minHistoryFrames;
@@ -362,7 +359,7 @@ class MockTimeReversalController implements ITimeReversalController {
   }
 
   dismissAnnotation(): void {
-    this._annotationDismissed = true;
+    // no-op in mock: annotation dismissed state is not tracked
   }
 
   /** 测试辅助——注入漂移数据 */

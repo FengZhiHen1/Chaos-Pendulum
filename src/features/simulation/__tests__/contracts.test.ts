@@ -10,7 +10,7 @@
  *       仅依赖 contracts/ 和 shared/domain/valueObjects/ 暴露的契约定义。
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // ─── 契约入口 ────────────────────────────────────
 import {
@@ -41,7 +41,6 @@ import type {
   // 物理引擎
   IIntegrator,
   IIntegratorRegistry,
-  OdeRhsFunction,
   // 能量监控
   EnergyThresholds,
   IEnergyCalculator,
@@ -168,8 +167,8 @@ class MockOdeSolver extends IOdeSolver {
   protected validateInputs(
     state: Float64Array,
     params: PendulumParams,
-    method: IntegratorMethod,
-    dt: number,
+    _method: IntegratorMethod,
+    _dt: number,
   ): void {
     if (this._validateInputsResult) {
       this._validateInputsResult();
@@ -186,12 +185,12 @@ class MockOdeSolver extends IOdeSolver {
 
   protected _do_integrate(
     state: Float64Array,
-    params: PendulumParams,
-    method: IntegratorMethod,
-    dt: number,
+    _params: PendulumParams,
+    _method: IntegratorMethod,
+    _dt: number,
     frames: number,
     buffer: Float64Array,
-    direction: 1 | -1,
+    _direction: 1 | -1,
   ): number {
     if (this._doIntegrateFn) {
       this._doIntegrateFn(state, buffer, this._doIntegrateResult || frames);
@@ -200,7 +199,7 @@ class MockOdeSolver extends IOdeSolver {
   }
 
   protected validateOutputs(
-    state: Float64Array,
+    _state: Float64Array,
     buffer: Float64Array,
     frameCount: number,
   ): void {
@@ -209,7 +208,7 @@ class MockOdeSolver extends IOdeSolver {
     } else {
       const stride = FRAME_BUFFER_LAYOUT.stride;
       if (hasNaN(buffer, frameCount * stride) || hasInfinity(buffer, frameCount * stride)) {
-        throw new DivergenceError("output contains NaN/Infinity", -1, "mock", state);
+        throw new DivergenceError("output contains NaN/Infinity", -1, "mock", _state);
       }
     }
   }
@@ -418,7 +417,6 @@ class MockEnergyProjector implements IEnergyProjector {
 /** Mock IPhaseSpaceCollector */
 class MockPhaseSpaceCollector implements IPhaseSpaceCollector {
   private _trajectories = new Map<PhaseVariable, PhaseSpacePoint[]>();
-  private _trajectoryArrays = new Map<PhaseVariable, PhaseSpacePoint[]>();
 
   appendPoint(variable: PhaseVariable, theta: number, thetaDot: number, maxPoints: number): void {
     if (!Number.isFinite(theta) || !Number.isFinite(thetaDot)) return;
