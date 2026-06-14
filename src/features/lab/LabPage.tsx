@@ -2,7 +2,7 @@ import { FlaskConical, CheckCircle, XCircle, Circle, FileText, Code, Play, Alert
 import { useLabStore } from "./store";
 import { useLabValidation } from "./hooks/useLabValidation";
 import { SandboxPanel } from "./components/SandboxPanel";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 
 const TEMPLATES = [
   { id: "spring", name: "弹簧摆", file: "spring-pendulum.py" },

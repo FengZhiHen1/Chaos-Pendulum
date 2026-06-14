@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
 

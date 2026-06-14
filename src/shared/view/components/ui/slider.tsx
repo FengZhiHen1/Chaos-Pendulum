@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 

@@ -1,5 +1,5 @@
 import { Volume2, VolumeX } from "lucide-react";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 
 interface SonificationToggleProps {
   /** 声音化是否激活 */

@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { forwardRef, type InputHTMLAttributes } from "react";
 
 const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(

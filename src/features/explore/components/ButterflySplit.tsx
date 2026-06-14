@@ -5,7 +5,7 @@ import { useButterflyStore } from "../butterfly-store";
 import { useButterflySimulation } from "../hooks/useButterflySimulation";
 import { Scene3D } from "./Scene3D";
 import { SeparationAlert, DeltaPanel } from "./ButterflyUI";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/view/components/ui/button";
 import { Play, Pause, RotateCcw } from "lucide-react";
 

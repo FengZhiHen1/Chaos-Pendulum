@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { Slider } from "@/shared/view/components/ui/slider";
 import { Input } from "@/shared/view/components/ui/input";
 import { Label } from "@/shared/view/components/ui/label";

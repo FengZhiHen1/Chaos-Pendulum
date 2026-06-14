@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, Maximize2, Map, Target } from "lucide-react";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import {
   Select,
   SelectContent,

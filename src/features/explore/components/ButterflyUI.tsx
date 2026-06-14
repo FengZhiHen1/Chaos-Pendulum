@@ -3,7 +3,7 @@ import { useButterflyStore } from "../butterfly-store";
 import { useExploreStore } from "@/features/explore";
 import { createNoiseGenerator, type NoiseGenerator } from "@/shared/infrastructure/audio/noise-generator";
 import { getAudioContext } from "@/shared/infrastructure/audio/audio-context";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/view/components/ui/button";
 import type { DeltaEditMode } from "../butterfly-store";
 

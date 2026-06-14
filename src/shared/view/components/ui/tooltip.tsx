@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 

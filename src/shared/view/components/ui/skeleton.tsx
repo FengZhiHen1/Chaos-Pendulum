@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import type { HTMLAttributes } from "react";
 
 function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

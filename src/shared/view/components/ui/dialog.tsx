@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { useEffect, type ReactNode, type HTMLAttributes } from "react";
 import { X } from "lucide-react";
 

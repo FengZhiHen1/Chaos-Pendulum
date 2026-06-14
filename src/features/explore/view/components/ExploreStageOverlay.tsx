@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { SonificationToggle } from "../../components/SonificationToggle";
 import { ChaosIndicator } from "../../components/ChaosIndicator";
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useEnergyMonitor } from "../../hooks/useEnergyMonitor";
 import { EnergyCanvas } from "./EnergyCanvas";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 
 interface EnergyMonitorPanelProps {

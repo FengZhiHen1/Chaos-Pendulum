@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/shared/view/components/ui/tabs";
 import { Button } from "@/shared/view/components/ui/button";
 import { useAppStore } from "@/stores/useAppStore";

@@ -1,4 +1,4 @@
-import { cn } from "@/shared/infrastructure/cn";
+import { cn } from "@/shared/lib/cn";
 
 interface ChaosIndicatorProps {
   /** 实时 Lyapunov 指数 */
