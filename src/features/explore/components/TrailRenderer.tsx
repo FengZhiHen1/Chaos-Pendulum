@@ -24,12 +24,10 @@ export interface TrailRendererProps {
 
 const MAX_OBSERVED_VELOCITY = 15.0;
 
+// DESIGN: interpolated from trail-slow (#3B82F6) to trail-fast (#EF4444) via HSL path
 const DEFAULT_COLOR_STOPS: VelocityColorStop[] = [
-  { position: 0.0, color: "#3B82F6" },
-  { position: 0.25, color: "#06B6D4" },
-  { position: 0.5, color: "#10B981" },
-  { position: 0.75, color: "#F59E0B" },
-  { position: 1.0, color: "#EF4444" },
+  { position: 0.0, color: "#3B82F6" }, // trail-slow
+  { position: 1.0, color: "#EF4444" }, // trail-fast
 ];
 
 const DEFAULT_OPACITY = 0.9;

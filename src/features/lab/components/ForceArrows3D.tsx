@@ -8,11 +8,12 @@ import { FORCE_STRIDE, ForceField } from "@/shared/domain/valueObjects";
 
 // ─── 常量 ────────────────────────────────────
 
+// 力矢量颜色 —— 与 force-decomposition.contract FORCE_DISPLAY_COLORS 保持一致
 const COLORS = {
-  gravity: "#27ae60",
-  tension: "#e74c3c",
-  tensionNeg: "#e056a0",
-  inertial: "#3498db",
+  gravity: "#4ADE80",
+  tension: "#F87171",
+  tensionNeg: "#E056A0",
+  inertial: "#60A5FA",
 } as const;
 
 const SHAFT_R = 0.018;

@@ -24,7 +24,7 @@ interface ForceRowData {
 }
 
 const FORCE_NAMES = ["重力", "张力", "切向惯性力", "法向惯性力"];
-const FORCE_COLORS = ["#27ae60", "#e74c3c", "#3498db", "#3498db"];
+const FORCE_COLORS = ["#4ADE80", "#F87171", "#60A5FA", "#60A5FA"]; // force-gravity / force-tension / force-inertia
 
 /** 读取力数据中的指定字段 */
 function readForce(data: Float64Array, idx: 1 | 2, kind: "g" | "t" | "i_t" | "i_n"): number {

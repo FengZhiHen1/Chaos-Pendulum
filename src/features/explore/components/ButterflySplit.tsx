@@ -9,8 +9,9 @@ import { cn } from "@/shared/infrastructure/cn";
 import { Button } from "@/shared/view/components/ui/button";
 import { Play, Pause, RotateCcw } from "lucide-react";
 
-const BALL_COLOR_A = "#f0c040"; // 金色摆
-const BALL_COLOR_B = "#a855f7"; // 紫色摆
+// DESIGN: Pendulum A gold-tinted trail #FBBF24 / Pendulum B violet-tinted trail #A78BFA
+const BALL_COLOR_A = "#FBBF24"; // 金色摆
+const BALL_COLOR_B = "#A78BFA"; // 紫色摆
 
 interface ButterflySplitProps {
   className?: string;
