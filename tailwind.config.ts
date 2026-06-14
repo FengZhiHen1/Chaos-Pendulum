@@ -15,12 +15,15 @@ export default {
         // ── Dark Room Surface System ──
         surface: {
           DEFAULT: "#1A1D22",
+          dim: "#13161A",
+          bright: "#23262C",
           "container-lowest": "#1E2127",
           "container-low": "#23262C",
           container: "#2A2D34",
           "container-high": "#31353D",
+          "container-highest": "#3A3E47",
         },
-        // ── Bright Stage (3D viewport only) ──
+        // ── Bright Stage / inverse-surface (3D viewport only) ──
         stage: {
           DEFAULT: "#EAECEF",
         },
@@ -29,7 +32,7 @@ export default {
           DEFAULT: "#E8EAED",
           variant: "#9BA0AA",
         },
-        // ── On-stage text (inside 3D viewport) ──
+        // ── On-stage text (inside 3D viewport, = inverse-on-surface) ──
         "on-stage": {
           DEFAULT: "#1B1D21",
           variant: "#606670",
@@ -40,6 +43,36 @@ export default {
           container: "#1C3A5E",
           hover: "#6BB3FF",
           "focus-glow": "rgba(75, 159, 255, 0.25)",
+        },
+        "on-primary": {
+          DEFAULT: "#0D1117",
+        },
+        // ── Secondary ──
+        secondary: {
+          DEFAULT: "#9BA0AA",
+          container: "#2A2D34",
+        },
+        "on-secondary": {
+          DEFAULT: "#1A1D22",
+          container: "#E8EAED",
+        },
+        // ── Tertiary ──
+        tertiary: {
+          DEFAULT: "#2DD4BF",
+          container: "#1A3E3A",
+        },
+        "on-tertiary": {
+          DEFAULT: "#1A1D22",
+          container: "#E8EAED",
+        },
+        // ── Error ──
+        error: {
+          DEFAULT: "#FF3B3B",
+          container: "#5A1A1A",
+        },
+        "on-error": {
+          DEFAULT: "#FFFFFF",
+          container: "#FFFFFF",
         },
         // ── Outlines ──
         outline: {
