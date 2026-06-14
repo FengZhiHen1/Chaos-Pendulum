@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
+import { useSimulationControls } from "@/features/simulation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useLabStore } from "@/features/lab/store";
 import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";

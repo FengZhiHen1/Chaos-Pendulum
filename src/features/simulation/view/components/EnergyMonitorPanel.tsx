@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useEnergyMonitor } from "../../hooks/useEnergyMonitor";
+import { useEnergyMonitor } from "../../viewModel/hooks/useEnergyMonitor";
 import { EnergyCanvas } from "./EnergyCanvas";
 import { cn } from "@/shared/lib/cn";
 import { notificationPort } from "@/shared/infrastructure/adapters";

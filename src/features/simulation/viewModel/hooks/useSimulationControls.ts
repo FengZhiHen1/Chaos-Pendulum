@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useSimulationStore } from "../store";
+import { useSimulationStore } from "../../store";
 
 export interface UseSimulationControlsAPI {
   isRunning: boolean;

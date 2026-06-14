@@ -1,4 +1,4 @@
-import { usePhaseSpace } from "../../hooks/usePhaseSpace";
+import { usePhaseSpace } from "../../viewModel/hooks/usePhaseSpace";
 import { useAppStore } from "@/stores/useAppStore";
 import { PhaseSpaceCanvas } from "./PhaseSpaceCanvas";
 import type { PhaseVariable } from "../../contracts";

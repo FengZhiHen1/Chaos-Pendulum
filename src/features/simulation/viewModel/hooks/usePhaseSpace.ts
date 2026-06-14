@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
-import { useSimulationStore } from "../store";
-import type { PhaseVariable } from "../contracts";
+import { useSimulationStore } from "../../store";
+import type { PhaseVariable } from "../../contracts";
 
 export interface UsePhaseSpaceAPI {
   theta: number;

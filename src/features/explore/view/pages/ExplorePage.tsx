@@ -13,7 +13,7 @@ import { useButterflyMode } from "../../viewModel/hooks/useButterflyMode";
 import { useForceAnalysis } from "../../viewModel/hooks/useForceAnalysis";
 import { useSonification } from "../../viewModel/hooks/useSonification";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
-import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
+import { useSimulationControls } from "@/features/simulation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useAppStore } from "@/stores/useAppStore";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";

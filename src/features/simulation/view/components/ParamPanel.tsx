@@ -6,7 +6,7 @@ import { Dialog } from "@/shared/view/components/ui/dialog";
 import { RotateCcw, Play, Pause, AlertTriangle } from "lucide-react";
 import { PARAM_META } from "@/shared/domain/valueObjects";
 import type { ParamGroup } from "@/shared/domain/valueObjects";
-import { useSimulationControls } from "../../hooks/useSimulationControls";
+import { useSimulationControls } from "../../viewModel/hooks/useSimulationControls";
 import { useSimulationStore } from "../../store";
 import { ParamSlider } from "./ParamSlider";
 import { MethodSelector } from "./MethodSelector";

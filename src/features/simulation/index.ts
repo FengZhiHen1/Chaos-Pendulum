@@ -17,11 +17,15 @@ export type { SimulationFrame } from "./store";
 export { readFrameField, getFrameSlice } from "./viewModel/stores/simulationSlice";
 
 // ─── ViewModel — Hooks ────────────────────────────
-export { useEnergyMonitor } from "./hooks/useEnergyMonitor";
-export { useSimulationControls } from "./hooks/useSimulationControls";
-export { usePhaseSpace } from "./hooks/usePhaseSpace";
+export { useEnergyMonitor } from "./viewModel/hooks/useEnergyMonitor";
+export { useSimulationControls } from "./viewModel/hooks/useSimulationControls";
+export { usePhaseSpace } from "./viewModel/hooks/usePhaseSpace";
+export { useAutoPause } from "./viewModel/hooks/useAutoPause";
+export type { UseBootSequenceAPI } from "./viewModel/hooks/useBootSequence";
+export { useBootSequence } from "./viewModel/hooks/useBootSequence";
 
 // ─── Infrastructure — Worker ──────────────────────
+// TODO(Phase 5): 移除以下直接 Infrastructure 导出，改为通过 Application UseCase 访问
 export { Float64Pool } from "./infrastructure/worker/float64-pool";
 export { SimulationScheduler } from "./infrastructure/worker/scheduler";
 export type { InterpSnapshot } from "./infrastructure/worker/scheduler";

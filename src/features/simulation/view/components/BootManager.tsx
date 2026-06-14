@@ -1,4 +1,4 @@
-import { useBootSequence } from "../../hooks/useBootSequence";
+import { useBootSequence } from "../../viewModel/hooks/useBootSequence";
 import { LoadingScreen } from "./LoadingScreen";
 import { ErrorScreen } from "./ErrorScreen";
 import type { BootConfig } from "@/features/simulation/types.boot";
