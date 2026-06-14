@@ -24,13 +24,15 @@ interface PhaseSpaceCanvasProps {
 
 const MARGIN = { top: 20, right: 20, bottom: 35, left: 45 };
 const COLORS = {
-  bg: "#0a0a1a",
-  grid: "rgba(255,255,255,0.06)",
-  gridMajor: "rgba(255,255,255,0.12)",
-  axis: "#94a3b8",
-  cursorGlow: "rgba(0, 255, 255, 0.25)",
-  cursor: "#00ffff",
+  bg: "#1E2127",
+  grid: "rgba(255, 255, 255, 0.04)",
+  gridMajor: "rgba(255, 255, 255, 0.10)",
+  axis: "#9BA0AA",
+  cursorGlow: "rgba(75, 159, 255, 0.30)",
+  cursor: "#4B9FFF",
   cursorHighlight: "#ffffff",
+  trailStart: "#3B82F6",
+  trailEnd: "#EF4444",
 };
 const X_TICK_VALUES = [-Math.PI, -Math.PI / 2, 0, Math.PI / 2, Math.PI];
 const X_TICK_LABELS = ["-π", "-π/2", "0", "π/2", "π"];
@@ -38,6 +40,7 @@ const Y_AUTO_INTERVAL = 60; // 每 60 帧检查一次 Y 轴
 const EMA_SMOOTH = 0.2;
 const MIN_Y_RANGE = 2.0; // Y 轴最小范围（rad/s）
 const SHRINK_THRESHOLD = 0.7; // 收缩超过 30% 时直接跳变
+const FONT = '11px "JetBrains Mono", "Manrope", sans-serif';
 
 // ─── 角度归一化 ────────────────────────────────
 
@@ -56,7 +59,7 @@ function drawXAxis(
   ctx.strokeStyle = COLORS.axis;
   ctx.fillStyle = COLORS.axis;
   ctx.lineWidth = 1;
-  ctx.font = '10px "Courier New", monospace';
+  ctx.font = FONT;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
@@ -73,12 +76,10 @@ function drawXAxis(
     const val = X_TICK_VALUES[i]!;
     const label = X_TICK_LABELS[i]!;
     const x = xScale(val);
-    // 刻度线
     ctx.beginPath();
     ctx.moveTo(x, plotY);
     ctx.lineTo(x, plotY + 5);
     ctx.stroke();
-    // 标签（边界保护：首尾两端分别左/右对齐）
     if (i === 0) ctx.textAlign = "left";
     else if (i === X_TICK_VALUES.length - 1) ctx.textAlign = "right";
     else ctx.textAlign = "center";
@@ -86,6 +87,8 @@ function drawXAxis(
   }
 
   // 轴标题
+  ctx.fillStyle = "#E8EAED";
+  ctx.font = '10px "Manrope", sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.fillText("θ (rad)", (xMin + xMax) / 2, plotY + 28);
@@ -103,7 +106,7 @@ function drawYAxis(
   ctx.strokeStyle = COLORS.axis;
   ctx.fillStyle = COLORS.axis;
   ctx.lineWidth = 1;
-  ctx.font = '10px "Courier New", monospace';
+  ctx.font = FONT;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
 
@@ -132,41 +135,62 @@ function drawYAxis(
   ctx.translate(plotX - 32, (yMin + yMax) / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = "center";
+  ctx.fillStyle = "#E8EAED";
+  ctx.font = '10px "Manrope", sans-serif';
   ctx.fillText("θ̇ (rad/s)", 0, 0);
   ctx.restore();
 
   ctx.restore();
 }
 
-// ─── 分段绘制轨迹段 ────────────────────────────
+// ─── 颜色插值 ─────────────────────────────────
 
-function drawSegment(
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function lerpColor(a: string, b: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b2_ = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r},${g},${b2_})`;
+}
+
+// ─── 连续渐变轨迹绘制 ─────────────────────────
+
+function drawSmoothTrail(
   ctx: CanvasRenderingContext2D,
   points: TrailPoint[],
   startIdx: number,
   endIdx: number,
   xScale: d3Scale.ScaleLinear<number, number>,
   yScale: d3Scale.ScaleLinear<number, number>,
-  trailWidth: number,
   totalLen: number,
 ) {
   const segmentLen = endIdx - startIdx;
-  if (segmentLen < 1) return;
+  if (segmentLen < 2) return;
 
-  for (let i = startIdx; i < endIdx; i++) {
-    const { theta, thetaDot } = points[i]!;
-    const alpha = 0.05 + (i / totalLen) * 0.75;
-    const x = xScale(theta);
-    const y = yScale(thetaDot);
+  for (let i = startIdx + 1; i < endIdx; i++) {
+    const prev = points[i - 1]!;
+    const curr = points[i]!;
+    const t = i / totalLen;
+    const alpha = 0.12 + t * 0.78;
+    const color = lerpColor(COLORS.trailStart, COLORS.trailEnd, t);
 
-    const r = 30 + (i / totalLen) * 25;
-    const g = 80 + (i / totalLen) * 175;
-    const b = 150 + (i / totalLen) * 105;
-
-    ctx.fillStyle = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${alpha})`;
-    const halfW = trailWidth / 2;
-    ctx.fillRect(x - halfW, y - halfW, trailWidth, trailWidth);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 1.5 + t * 1.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(xScale(prev.theta), yScale(prev.thetaDot));
+    ctx.lineTo(xScale(curr.theta), yScale(curr.thetaDot));
+    ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 }
 
 // ─── 离线坐标轴渲染 ────────────────────────────
@@ -485,33 +509,30 @@ export function PhaseSpaceCanvas({
           const prevTheta = renderTrail[i - 1]!.theta;
           const currTheta = renderTrail[i]!.theta;
           if (Math.abs(currTheta - prevTheta) > Math.PI) {
-            drawSegment(ctx, renderTrail, segmentStart, i, xScale, yScale, trailWidth, rLen);
+            drawSmoothTrail(ctx, renderTrail, segmentStart, i, xScale, yScale, rLen);
             segmentStart = i;
           }
         }
-        drawSegment(ctx, renderTrail, segmentStart, rLen, xScale, yScale, trailWidth, rLen);
+        drawSmoothTrail(ctx, renderTrail, segmentStart, rLen, xScale, yScale, rLen);
 
         // 当前位置高亮（最上层）
         const last = renderTrail[rLen - 1]!;
         const cx = xScale(last.theta);
         const cy = yScale(last.thetaDot);
 
-        // 外发光
-        ctx.fillStyle = COLORS.cursorGlow;
-        ctx.beginPath();
-        ctx.arc(cx, cy, cursorRadius * 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 核心点
+        ctx.save();
+        ctx.shadowColor = COLORS.cursor;
+        ctx.shadowBlur = 10;
         ctx.fillStyle = COLORS.cursor;
         ctx.beginPath();
         ctx.arc(cx, cy, cursorRadius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
 
         // 白色高光
         ctx.fillStyle = COLORS.cursorHighlight;
         ctx.beginPath();
-        ctx.arc(cx, cy, cursorRadius * 0.4, 0, Math.PI * 2);
+        ctx.arc(cx - cursorRadius * 0.25, cy - cursorRadius * 0.25, cursorRadius * 0.35, 0, Math.PI * 2);
         ctx.fill();
       }
 

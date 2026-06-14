@@ -24,13 +24,18 @@ const MARGIN = { top: 20, right: 80, bottom: 30, left: 60 };
 const IDLE_FPS = 2;
 const IDLE_INTERVAL = 1000 / IDLE_FPS;
 const COLORS = {
-  E: "#22c55e",
-  K: "#3b82f6",
-  V: "#f97316",
-  grid: "#1e293b",
-  axisLabel: "#94a3b8",
-  legend: "#cbd5e1",
+  E: "#4ADE80",
+  K: "#4B9FFF",
+  V: "#F97316",
+  grid: "rgba(255, 255, 255, 0.04)",
+  gridMajor: "rgba(255, 255, 255, 0.10)",
+  axis: "#9BA0AA",
+  axisLabel: "#9BA0AA",
+  legend: "#E8EAED",
+  bg: "#1E2127",
+  zeroLine: "rgba(255, 255, 255, 0.12)",
 };
+const FONT = '11px "JetBrains Mono", "Manrope", sans-serif';
 
 // ─── 组件 ──────────────────────────────────────
 
@@ -67,7 +72,7 @@ export function EnergyCanvas({
       octx.scale(dpr, dpr);
 
       // 背景
-      octx.fillStyle = "#0a0a1a";
+      octx.fillStyle = COLORS.bg;
       octx.fillRect(0, 0, width, height);
 
       const plotW = width - MARGIN.left - MARGIN.right;
@@ -87,13 +92,15 @@ export function EnergyCanvas({
         .range([MARGIN.top + plotH, MARGIN.top])
         .nice();
 
+      const yTicks = yScale.ticks(5);
+      const xTicks = xScale.ticks(4);
+
       // 网格线
       octx.save();
-      octx.strokeStyle = COLORS.grid;
       octx.lineWidth = 0.5;
       octx.setLineDash([2, 4]);
+      octx.strokeStyle = COLORS.grid;
 
-      const yTicks = yScale.ticks(5);
       for (const yt of yTicks) {
         const yy = yScale(yt);
         octx.beginPath();
@@ -102,7 +109,6 @@ export function EnergyCanvas({
         octx.stroke();
       }
 
-      const xTicks = xScale.ticks(4);
       for (const xt of xTicks) {
         const xx = xScale(xt);
         octx.beginPath();
@@ -112,13 +118,27 @@ export function EnergyCanvas({
       }
       octx.restore();
 
+      // 零线
+      const yZero = yScale(0);
+      if (yZero >= MARGIN.top && yZero <= height - MARGIN.bottom) {
+        octx.save();
+        octx.strokeStyle = COLORS.zeroLine;
+        octx.lineWidth = 1;
+        octx.setLineDash([]);
+        octx.beginPath();
+        octx.moveTo(MARGIN.left, yZero);
+        octx.lineTo(width - MARGIN.right, yZero);
+        octx.stroke();
+        octx.restore();
+      }
+
       // 坐标轴
       octx.save();
-      octx.strokeStyle = COLORS.axisLabel;
+      octx.strokeStyle = COLORS.axis;
       octx.fillStyle = COLORS.axisLabel;
       octx.lineWidth = 1;
       octx.setLineDash([]);
-      octx.font = '10px "Courier New", monospace';
+      octx.font = FONT;
       octx.textAlign = "center";
       octx.textBaseline = "top";
 
@@ -129,21 +149,17 @@ export function EnergyCanvas({
       octx.stroke();
       for (const xt of xTicks) {
         const xx = xScale(xt);
-        octx.fillText(
-          xt.toFixed(0),
-          xx,
-          height - MARGIN.bottom + 6,
-        );
+        octx.fillText(xt.toFixed(0), xx, height - MARGIN.bottom + 6);
       }
       // X 轴标签
       octx.textBaseline = "bottom";
-      octx.fillText(
-        "时间 (s)",
-        MARGIN.left + plotW / 2,
-        height - 2,
-      );
+      octx.fillStyle = COLORS.legend;
+      octx.font = '10px "Manrope", sans-serif';
+      octx.fillText("时间 (s)", MARGIN.left + plotW / 2, height - 2);
 
       // Y 轴
+      octx.fillStyle = COLORS.axisLabel;
+      octx.font = FONT;
       octx.textAlign = "right";
       octx.textBaseline = "middle";
       octx.beginPath();
@@ -158,44 +174,31 @@ export function EnergyCanvas({
 
       // 图例
       octx.save();
-      octx.font = '10px "Courier New", monospace';
+      octx.font = '11px "JetBrains Mono", "Manrope", sans-serif';
       octx.textAlign = "left";
       octx.textBaseline = "middle";
       const lx = width - MARGIN.right + 10;
-      let ly = MARGIN.top + 5;
+      let ly = MARGIN.top + 8;
 
-      octx.strokeStyle = COLORS.E;
-      octx.lineWidth = 2;
-      octx.setLineDash([]);
-      octx.beginPath();
-      octx.moveTo(lx, ly);
-      octx.lineTo(lx + 20, ly);
-      octx.stroke();
-      octx.fillStyle = COLORS.E;
-      octx.fillText("E", lx + 25, ly);
+      const legendItems: Array<{ key: "E" | "K" | "V"; label: string; dash?: number[] }> = [
+        { key: "E", label: "E" },
+        ...(showComponents ? [
+          { key: "K" as const, label: "K", dash: [4, 3] as number[] },
+          { key: "V" as const, label: "V", dash: [2, 2] as number[] },
+        ] : []),
+      ];
 
-      if (showComponents) {
-        ly += 16;
-        octx.strokeStyle = COLORS.K;
-        octx.lineWidth = 1;
-        octx.setLineDash([4, 4]);
+      for (const item of legendItems) {
+        octx.strokeStyle = COLORS[item.key];
+        octx.fillStyle = COLORS[item.key];
+        octx.lineWidth = item.key === "E" ? 2 : 1.5;
+        octx.setLineDash(item.dash ?? []);
         octx.beginPath();
         octx.moveTo(lx, ly);
-        octx.lineTo(lx + 20, ly);
+        octx.lineTo(lx + 18, ly);
         octx.stroke();
-        octx.fillStyle = COLORS.K;
-        octx.fillText("K", lx + 25, ly);
-
+        octx.fillText(item.label, lx + 24, ly);
         ly += 16;
-        octx.strokeStyle = COLORS.V;
-        octx.lineWidth = 1;
-        octx.setLineDash([1, 3]);
-        octx.beginPath();
-        octx.moveTo(lx, ly);
-        octx.lineTo(lx + 20, ly);
-        octx.stroke();
-        octx.fillStyle = COLORS.V;
-        octx.fillText("V", lx + 25, ly);
       }
       octx.restore();
     },
@@ -435,49 +438,62 @@ export function EnergyCanvas({
           ? windowedData.filter((_, i) => i % 2 === 0)
           : windowedData;
 
-      // 绘制曲线
-      ctx.save();
+      // 辅助：绘制单条能量曲线
+      const drawEnergyLine = (
+        key: "E" | "K" | "V",
+        lineWidth: number,
+        dash: number[] = [],
+        glow = false,
+      ) => {
+        if (renderData.length < 2) return;
+        ctx.save();
+        ctx.strokeStyle = COLORS[key];
+        ctx.lineWidth = lineWidth;
+        ctx.setLineDash(dash);
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        if (glow) {
+          ctx.shadowColor = COLORS[key];
+          ctx.shadowBlur = 8;
+        }
+        ctx.beginPath();
+        const first = renderData[0]!;
+        ctx.moveTo(xScale(first.t), yScale(first[key]));
+        for (let i = 1; i < renderData.length; i++) {
+          const pt = renderData[i]!;
+          ctx.lineTo(xScale(pt.t), yScale(pt[key]));
+        }
+        ctx.stroke();
+        ctx.restore();
+      };
 
-      // E 线（总能量）：绿色实线
-      ctx.strokeStyle = COLORS.E;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      const firstE = renderData[0]!;
-      ctx.moveTo(xScale(firstE.t), yScale(firstE.E));
-      for (let i = 1; i < renderData.length; i++) {
-        const pt = renderData[i]!;
-        ctx.lineTo(xScale(pt.t), yScale(pt.E));
+      // E 线填充渐变（总能量下方）
+      if (renderData.length >= 2) {
+        ctx.save();
+        const gradient = ctx.createLinearGradient(0, MARGIN.top, 0, height - MARGIN.bottom);
+        gradient.addColorStop(0, `${COLORS.E}33`);
+        gradient.addColorStop(1, `${COLORS.E}05`);
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        const first = renderData[0]!;
+        ctx.moveTo(xScale(first.t), yScale(first.E));
+        for (let i = 1; i < renderData.length; i++) {
+          const pt = renderData[i]!;
+          ctx.lineTo(xScale(pt.t), yScale(pt.E));
+        }
+        ctx.lineTo(xScale(renderData[renderData.length - 1]!.t), height - MARGIN.bottom);
+        ctx.lineTo(xScale(first.t), height - MARGIN.bottom);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
       }
-      ctx.stroke();
 
+      // 绘制能量曲线
+      drawEnergyLine("E", 2, [], true);
       if (showComponents) {
-        // K 线（动能）：蓝色虚线
-        ctx.strokeStyle = COLORS.K;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(xScale(renderData[0]!.t), yScale(renderData[0]!.K));
-        for (let i = 1; i < renderData.length; i++) {
-          const pt = renderData[i]!;
-          ctx.lineTo(xScale(pt.t), yScale(pt.K));
-        }
-        ctx.stroke();
-
-        // V 线（势能）：橙色点线
-        ctx.strokeStyle = COLORS.V;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([1, 3]);
-        ctx.beginPath();
-        ctx.moveTo(xScale(renderData[0]!.t), yScale(renderData[0]!.V));
-        for (let i = 1; i < renderData.length; i++) {
-          const pt = renderData[i]!;
-          ctx.lineTo(xScale(pt.t), yScale(pt.V));
-        }
-        ctx.stroke();
+        drawEnergyLine("K", 1.5, [4, 3]);
+        drawEnergyLine("V", 1.5, [2, 2]);
       }
-
-      ctx.restore();
 
       rafRef.current = requestAnimationFrame(drawFrame);
     }
