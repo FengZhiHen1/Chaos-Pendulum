@@ -1,4 +1,4 @@
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import type { ToastFunction } from "@/shared/infrastructure/error-handling/types";
 
 /**
@@ -6,5 +6,5 @@ import type { ToastFunction } from "@/shared/infrastructure/error-handling/types
  * 与模块级 notify() 共享同一份去重与队列逻辑。
  */
 export function useToast(): { toast: ToastFunction } {
-  return { toast: notify };
+  return { toast: (input) => notificationPort.notify(input) };
 }

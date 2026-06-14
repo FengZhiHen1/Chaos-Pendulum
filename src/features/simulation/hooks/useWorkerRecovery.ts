@@ -4,7 +4,7 @@ import { useSimulationStore } from "@/features/simulation/store";
 import { getScheduler } from "@/features/simulation/infrastructure/worker/scheduler-factory";
 import { createOdeWorker } from "@/features/simulation/infrastructure/worker/createOdeWorker";
 import type { WorkerRecoverConfig } from "@/shared/infrastructure/error-handling/types";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 
 const DEFAULT_CONFIG: WorkerRecoverConfig = {
   maxAutoRecovery: 3,
@@ -36,7 +36,7 @@ export function useWorkerRecovery(
 
     const handleCrash = async () => {
       if (recoveryCountRef.current >= cfg.maxAutoRecovery) {
-        notify({
+        notificationPort.notify({
           title: "仿真引擎无法自动恢复",
           description: `已尝试 ${recoveryCountRef.current} 次自动恢复，均失败。请刷新页面`,
           variant: "error",
@@ -48,7 +48,7 @@ export function useWorkerRecovery(
       recoveryCountRef.current++;
       setRecoveryCount(recoveryCountRef.current);
 
-      notify({
+      notificationPort.notify({
         title: "仿真引擎崩溃",
         description: `正在自动恢复（第 ${recoveryCountRef.current} 次）...`,
         variant: "loading",
@@ -74,7 +74,7 @@ export function useWorkerRecovery(
         (workerRef as React.MutableRefObject<Worker | null>).current = newWorker;
       }
 
-      notify({
+      notificationPort.notify({
         title: "仿真引擎已恢复",
         description: cfg.autoResumeAfterRecovery
           ? "已自动继续仿真"
@@ -109,7 +109,7 @@ export function useWorkerRecovery(
         const key = `recovered-${state.engineEvent.message}`;
         if (lastEventRef.current !== key) {
           lastEventRef.current = key;
-          notify({
+          notificationPort.notify({
             title: "仿真引擎已恢复",
             description: state.engineEvent.message,
             variant: "success",
@@ -123,7 +123,7 @@ export function useWorkerRecovery(
         const key = `error-${state.engineError}`;
         if (lastEventRef.current !== key) {
           lastEventRef.current = key;
-          notify({
+          notificationPort.notify({
             title: "仿真引擎错误",
             description: state.engineError,
             variant: "error",
@@ -138,7 +138,7 @@ export function useWorkerRecovery(
 
   const recover = useCallback(async () => {
     if (recoveryCountRef.current >= cfg.maxAutoRecovery) {
-      notify({
+      notificationPort.notify({
         title: "仿真引擎无法自动恢复",
         description: `已尝试 ${recoveryCountRef.current} 次自动恢复，均失败。请刷新页面`,
         variant: "error",
@@ -156,7 +156,7 @@ export function useWorkerRecovery(
       recoveryCountRef.current++;
       setRecoveryCount(recoveryCountRef.current);
 
-      notify({
+      notificationPort.notify({
         title: "仿真引擎已恢复",
         description: cfg.autoResumeAfterRecovery
           ? "已自动继续仿真"
@@ -170,7 +170,7 @@ export function useWorkerRecovery(
         store.play();
       }
     } catch (e) {
-      notify({
+      notificationPort.notify({
         title: "恢复失败",
         description: String(e),
         variant: "error",

@@ -26,7 +26,7 @@ import {
   clearTrajectoryData,
   startTrajectoryFadeOut,
 } from "./TimeReversalTrajectory";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import { Dialog } from "@/shared/view/components/ui/dialog";
 import { Button } from "@/shared/view/components/ui/button";
 import { cn } from "@/shared/lib/cn";
@@ -314,7 +314,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     }
 
     if (store.engineError) {
-      notify({
+      notificationPort.notify({
         title: "数值反演发散",
         description: `于反演时间 t≈${(startSimTimeRef.current - currentSimTime).toFixed(2)}s — 误差已远超可追踪范围`,
         variant: "error",

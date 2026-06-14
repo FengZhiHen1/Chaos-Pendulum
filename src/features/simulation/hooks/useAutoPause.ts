@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useExploreStore } from "@/features/explore/store";
 import { useVisibilityChange } from "@/shared/viewModel/hooks/useVisibilityChange";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 
 /**
  * 组合 hook：后台时自动暂停仿真 + 声音化；切回时显示"点击继续"Toast。
@@ -36,7 +36,7 @@ export function useAutoPause(): { isAutoPaused: boolean; resume: () => void } {
     },
     onVisible: () => {
       if (isAutoPaused) {
-        notify({
+        notificationPort.notify({
           title: "已暂停",
           description: "浏览器切回前台，仿真已自动暂停",
           variant: "info",

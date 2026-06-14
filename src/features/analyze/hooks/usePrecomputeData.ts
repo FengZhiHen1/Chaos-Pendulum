@@ -14,7 +14,7 @@ import type {
   PrecomputeLoadResult,
 } from "@/shared/infrastructure/storage/precomputeLoader";
 import { loadPrecomputeData } from "@/shared/infrastructure/storage/precomputeLoader";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import { translateError } from "@/shared/infrastructure/error-handling/error-dictionary";
 import type { PrecomputeErrorCode } from "@/features/analyze/types";
 import type { PrecomputeDataType, UsePrecomputeDataInput, PrecomputeDataState } from "@/features/analyze/types";
@@ -25,7 +25,7 @@ function handleNotice(warning: { code: string; message: string }): void {
     code: warning.code as PrecomputeErrorCode,
     context: { reason: warning.message },
   });
-  notify({
+  notificationPort.notify({
     title: translated.message,
     variant: "warning",
     durationMs: translated.durationMs,
@@ -36,7 +36,7 @@ function handleNotice(warning: { code: string; message: string }): void {
 /** 加载错误 → Toast */
 function handleError(code: PrecomputeErrorCode, message: string): void {
   const translated = translateError({ code, context: { reason: message } });
-  notify({
+  notificationPort.notify({
     title: translated.message.split("：")[0] ?? translated.message,
     description: translated.message.includes("：")
       ? translated.message.slice(translated.message.indexOf("：") + 1)

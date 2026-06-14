@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useExploreStore } from "@/features/explore/store";
 import { LONG_RUNNING_CONFIG } from "@/shared/infrastructure/error-handling/constants";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 
 interface UseLongRunningDetectorOptions {
   enabled?: boolean;
@@ -54,7 +54,7 @@ export function useLongRunningDetector(
           LONG_RUNNING_CONFIG.WARNING_BEFORE_MS;
         if (elapsedRef.current >= warnThreshold && !warnedRef.current) {
           warnedRef.current = true;
-          notify({
+          notificationPort.notify({
             title: "长效运行提示",
             description: `仿真已运行 ${Math.floor(warnThreshold / 60000)} 分钟，1 分钟后将自动降低精度以节省资源`,
             variant: "warning",
@@ -69,7 +69,7 @@ export function useLongRunningDetector(
           useExploreStore.getState().setMaxTrailLength(
             LONG_RUNNING_CONFIG.DEGRADED_TRAIL_LENGTH,
           );
-          notify({
+          notificationPort.notify({
             title: "已进入长效运行模式",
             description: `积分精度已降低至 Δt=${LONG_RUNNING_CONFIG.DEGRADED_DT.toFixed(3)}s，尾迹长度已缩短至 ${LONG_RUNNING_CONFIG.DEGRADED_TRAIL_LENGTH} 步`,
             variant: "info",

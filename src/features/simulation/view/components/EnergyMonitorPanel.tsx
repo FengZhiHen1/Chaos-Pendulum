@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useEnergyMonitor } from "../../hooks/useEnergyMonitor";
 import { EnergyCanvas } from "./EnergyCanvas";
 import { cn } from "@/shared/lib/cn";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 
 interface EnergyMonitorPanelProps {
   width?: number;
@@ -38,7 +38,7 @@ export function EnergyMonitorPanel({
   useEffect(() => {
     if (isStopped && !stoppedNotifiedRef.current) {
       stoppedNotifiedRef.current = true;
-      notify({
+      notificationPort.notify({
         title: "双摆已静止",
         description: "阻尼已耗尽系统动能，仿真自动暂停",
         variant: "info",

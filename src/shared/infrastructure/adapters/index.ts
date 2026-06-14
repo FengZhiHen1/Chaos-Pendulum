@@ -1,0 +1,1 @@
+export { notificationPort } from "./NotificationAdapter";

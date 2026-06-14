@@ -17,7 +17,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore, normalizeAngle } from "@/features/simulation";
 import { useExploreStore } from "../../store";
 import { useAppStore } from "@/stores/useAppStore";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import {
   getAudioContext,
   createSonificationEngine,
@@ -90,7 +90,7 @@ export function useSonification(): UseSonificationAPI {
         const ctx = getAudioContext();
         if (ctx.state === "suspended") {
           console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
-          notify({
+          notificationPort.notify({
             title: "浏览器阻止了音频播放",
             description: "请再次点击按钮",
             variant: "warning",
@@ -104,7 +104,7 @@ export function useSonification(): UseSonificationAPI {
       })
       .catch(() => {
         console.warn("EXP-03: AudioContext blocked by browser autoplay policy");
-        notify({
+        notificationPort.notify({
           title: "浏览器阻止了音频播放",
           description: "请点击页面后再试",
           variant: "warning",
@@ -180,7 +180,7 @@ export function useSonification(): UseSonificationAPI {
         if (rebuildCountRef.current >= maxRebuilds) {
           engine?.setEnabled(false);
           setSonificationEnabled(false);
-          notify({
+          notificationPort.notify({
             title: "音频引擎故障",
             description: "请刷新页面后重试",
             variant: "error",

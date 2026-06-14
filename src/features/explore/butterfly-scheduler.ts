@@ -14,7 +14,7 @@ import type { PendulumParams, StateVector, InitialConditions } from "@/shared/do
 import type { WorkerResponse } from "@/shared/domain/valueObjects";
 import { FRAME_STRIDE } from "@/shared/domain/valueObjects";
 import { Float64Pool } from "@/features/simulation/infrastructure/worker/float64-pool";
-import { notify } from "@/shared/infrastructure/error-handling/notify";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import type {
   IButterflyScheduler,
@@ -227,7 +227,7 @@ export class ButterflyScheduler implements IButterflyScheduler {
     sw.initTimeoutId = setTimeout(() => {
       if (sw.initRetries >= 1) {
         commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
-        notify({
+        notificationPort.notify({
           title: `摆 ${side} 仿真引擎启动失败`,
           description: "请刷新页面后重试",
           variant: "error",
@@ -323,7 +323,7 @@ export class ButterflyScheduler implements IButterflyScheduler {
         commandBus.emit({ type: "butterfly:pause" });
         this.running = false;
         console.error(`EXP-04: Worker ${side} error`, resp);
-        notify({
+        notificationPort.notify({
           title: `摆 ${side} 仿真计算发散`,
           description: `于 t≈${sw.currentSimTime.toFixed(2)}s，请调整参数后重试`,
           variant: "error",
@@ -357,7 +357,7 @@ export class ButterflyScheduler implements IButterflyScheduler {
       commandBus.emit({ type: "butterfly:workerReady", side, ready: false });
       this.running = false;
       commandBus.emit({ type: "butterfly:pause" });
-      notify({
+      notificationPort.notify({
         title: `摆 ${side} 仿真引擎崩溃`,
         description: `于 t≈${sw.currentSimTime.toFixed(2)}s，请调整参数后重试`,
         variant: "error",
