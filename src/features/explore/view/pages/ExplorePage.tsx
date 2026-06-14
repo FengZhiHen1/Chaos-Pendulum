@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { X, ChevronUp } from "lucide-react";
-import { Scene3D } from "./components/Scene3D";
-import { TimeReversal } from "./components/TimeReversal";
-import { TimeReversalTrajectoryOverlay } from "./components/TimeReversalTrajectory";
-import { TrailControls } from "./components/TrailControls";
-import { ButterflySplit } from "./components/ButterflySplit";
-import { ExploreStageOverlay } from "./view/components/ExploreStageOverlay";
-import { ExploreRightPanel } from "./view/components/ExploreRightPanel";
-import { ExploreBottomToolbar } from "./view/components/ExploreBottomToolbar";
-import { useChaosUpdater } from "./hooks/useChaosUpdater";
-import { useButterflyMode } from "./hooks/useButterflyMode";
-import { useForceAnalysis } from "./hooks/useForceAnalysis";
-import { useSonification } from "./hooks/useSonification";
+import { Scene3D } from "../components/Scene3D";
+import { TimeReversal } from "../components/TimeReversal";
+import { TimeReversalTrajectoryOverlay } from "../components/TimeReversalTrajectory";
+import { TrailControls } from "../components/TrailControls";
+import { ButterflySplit } from "../components/ButterflySplit";
+import { ExploreStageOverlay } from "../components/ExploreStageOverlay";
+import { ExploreRightPanel } from "../components/ExploreRightPanel";
+import { ExploreBottomToolbar } from "../components/ExploreBottomToolbar";
+import { useChaosUpdater } from "../../viewModel/hooks/useChaosUpdater";
+import { useButterflyMode } from "../../viewModel/hooks/useButterflyMode";
+import { useForceAnalysis } from "../../viewModel/hooks/useForceAnalysis";
+import { useSonification } from "../../viewModel/hooks/useSonification";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
 import { useSimulationControls } from "@/features/simulation/hooks/useSimulationControls";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useAppStore } from "@/stores/useAppStore";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
-import type { PendulumMaterialType, EnvironmentPreset } from "./components/Scene3D";
+import type { PendulumMaterialType, EnvironmentPreset } from "../components/Scene3D";
 
 /** 平板/手机底部可展开面板 —— Tab 切换参数/能量/相空间 */
 function TabletBottomPanel() {

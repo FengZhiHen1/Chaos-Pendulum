@@ -8,8 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/view/components/ui/select";
-import { useExploreStore } from "../store";
-import type { ViewPreset } from "../contracts";
+import { useExploreStore } from "../../store";
+import type { ViewPreset } from "../../contracts";
 import type { PendulumMaterialType, EnvironmentPreset } from "./Scene3D";
 
 type TrailLength = 50 | 200 | 1000 | 0 | -1;

@@ -2,7 +2,7 @@ import { useRef, useMemo } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useAppStore } from "@/stores/useAppStore";
-import type { TrailPoint } from "../hooks/useTrailBuffer";
+import type { TrailPoint } from "../../viewModel/hooks/useTrailBuffer";
 
 // ─── 类型定义 ────────────────────────────────────
 

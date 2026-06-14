@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { DriftSample, ReversalMode } from "../contracts";
-import { REVERSAL_DEFAULTS } from "../contracts";
+import type { DriftSample, ReversalMode } from "../../contracts";
+import { REVERSAL_DEFAULTS } from "../../contracts";
 
 // DESIGN.md token 色值（Canvas 2D 无法使用 Tailwind class，直接使用 token hex）
 const COLOR_BG = "rgba(42, 45, 52, 0.92)";        // surface-container-high

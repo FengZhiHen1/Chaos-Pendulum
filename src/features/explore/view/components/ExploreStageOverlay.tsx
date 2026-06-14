@@ -1,6 +1,6 @@
 import { cn } from "@/shared/lib/cn";
-import { SonificationToggle } from "../../components/SonificationToggle";
-import { ChaosIndicator } from "../../components/ChaosIndicator";
+import { SonificationToggle } from "./SonificationToggle";
+import { ChaosIndicator } from "./ChaosIndicator";
 
 interface ExploreStageOverlayProps {
   isSonificationActive: boolean;

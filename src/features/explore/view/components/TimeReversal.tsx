@@ -19,7 +19,7 @@ import {
   pauseHistoryRecording,
   resumeHistoryRecording,
 } from "@/features/simulation";
-import { useExploreStore } from "../store";
+import { useExploreStore } from "../../store";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import {
   updateTrajectoryData,
@@ -30,8 +30,8 @@ import { notify } from "@/shared/infrastructure/error-handling/notify";
 import { Dialog } from "@/shared/view/components/ui/dialog";
 import { Button } from "@/shared/view/components/ui/button";
 import { cn } from "@/shared/lib/cn";
-import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../contracts";
-import { driftCalculator } from "../domain/drift-calculator";
+import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../../contracts";
+import { driftCalculator } from "../../domain/drift-calculator";
 import { DriftCurvePanel } from "./DriftCurvePanel";
 import { TeachingAnnotationPopup } from "./TeachingAnnotationPopup";
 

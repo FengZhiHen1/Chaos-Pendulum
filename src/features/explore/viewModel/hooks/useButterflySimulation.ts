@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useRootStore } from "@/stores/rootStore";
-import { ButterflyScheduler } from "../butterfly-scheduler";
+import { ButterflyScheduler } from "../../butterfly-scheduler";
 
 // ─── 全局单例管理 ──────────────────────────────
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useButterflyStore } from "../butterfly-store";
+import { useButterflyStore } from "../store";
 import type { StateVector, PendulumParams } from "@/shared/domain/valueObjects";
 
 const baseParams: PendulumParams = {

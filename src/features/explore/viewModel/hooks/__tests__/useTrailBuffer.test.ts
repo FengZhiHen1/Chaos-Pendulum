@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useTrailBuffer } from "../../hooks/useTrailBuffer";
-import type { TrailPoint } from "../../hooks/useTrailBuffer";
+import { useTrailBuffer } from "../useTrailBuffer";
+import type { TrailPoint } from "../useTrailBuffer";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { Vector3 } from "three";

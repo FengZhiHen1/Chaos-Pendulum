@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useExploreStore } from "@/features/explore";
-import { useButterflyStore } from "../butterfly-store";
-import { useButterflySimulation } from "../hooks/useButterflySimulation";
+import { useButterflyStore } from "../../store";
+import { useButterflySimulation } from "../../viewModel/hooks/useButterflySimulation";
 import { Scene3D } from "./Scene3D";
 import { SeparationAlert, DeltaPanel } from "./ButterflyUI";
 import { cn } from "@/shared/lib/cn";

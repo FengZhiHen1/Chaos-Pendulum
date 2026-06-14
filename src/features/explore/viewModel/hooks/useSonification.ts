@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore, normalizeAngle } from "@/features/simulation";
-import { useExploreStore } from "../store";
+import { useExploreStore } from "../../store";
 import { useAppStore } from "@/stores/useAppStore";
 import { notify } from "@/shared/infrastructure/error-handling/notify";
 import {
@@ -25,8 +25,8 @@ import {
   closeAudioContext,
 } from "@/shared/infrastructure/audio";
 import type { SonificationEngine } from "@/shared/infrastructure/audio";
-import { SONIFICATION_DEFAULTS } from "../contracts";
-import type { SonificationParams } from "../contracts";
+import { SONIFICATION_DEFAULTS } from "../../contracts";
+import type { SonificationParams } from "../../contracts";
 
 // ─── Hook 返回类型 ─────────────────────────────────
 
