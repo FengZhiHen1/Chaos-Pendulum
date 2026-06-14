@@ -125,6 +125,7 @@ export function ExplorePage() {
 
   const lyapunovExponent = useSimulationStore((s) => s.lyapunovExponent);
   const isSimulationActive = useSimulationStore((s) => s.isSimulationActive);
+  const simulationTime = useSimulationStore((s) => s.t);
 
   // GUI 视觉状态：摆体材质、环境、时间反演面板显隐
   const [pendulumMaterial, setPendulumMaterial] = useState<PendulumMaterialType>("metal");
@@ -191,7 +192,7 @@ export function ExplorePage() {
             className="w-[280px] shrink-0 flex flex-col overflow-hidden rounded-lg bg-surface-container-low"
           >
             <div className="flex-1 overflow-y-auto min-h-0">
-              <ParamPanel />
+              <ParamPanel hideGlobalControls />
             </div>
             <div className="shrink-0 p-3 border-t border-white/5">
               <TrailControls
@@ -221,7 +222,6 @@ export function ExplorePage() {
             lyapunovExponent={lyapunovExponent}
             isRunning={isRunning}
             isSimulationActive={isSimulationActive}
-            onEnterButterfly={enterButterfly}
           />
 
           {/* 时间反演控制面板 */}
@@ -245,6 +245,7 @@ export function ExplorePage() {
         onEnterButterfly={enterButterfly}
         timeReversalOpen={timeReversalOpen}
         onToggleTimeReversal={() => setTimeReversalOpen((v) => !v)}
+        elapsedSeconds={simulationTime}
         data-ui-controls
         data-panel-bottom
       />

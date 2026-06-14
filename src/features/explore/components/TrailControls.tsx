@@ -70,14 +70,14 @@ export function TrailControls({
       <button
         type="button"
         onClick={() => setIsExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-on-surface-variant hover:text-on-surface hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-on-surface hover:text-on-surface transition-colors"
       >
         <span className="flex items-center gap-1.5">
           <span>尾迹与视图</span>
         </span>
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 transition-transform duration-quick",
+            "h-3.5 w-3.5 text-on-surface-variant transition-transform duration-quick",
             isExpanded && "rotate-180",
           )}
         />

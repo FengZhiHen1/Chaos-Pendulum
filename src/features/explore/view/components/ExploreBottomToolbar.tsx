@@ -1,5 +1,5 @@
 import { Play, Pause, RotateCcw, Eye, GitCompare, Hourglass } from "lucide-react";
-import { Button } from "@/shared/view/components/ui/button";
+import { cn } from "@/shared/infrastructure/cn";
 
 interface ExploreBottomToolbarProps {
   isRunning: boolean;
@@ -11,8 +11,13 @@ interface ExploreBottomToolbarProps {
   onEnterButterfly: () => void;
   timeReversalOpen: boolean;
   onToggleTimeReversal: () => void;
+  /** 当前仿真时间（秒），用于左侧时间读数 */
+  elapsedSeconds?: number;
   className?: string;
 }
+
+const toolbarButtonBase =
+  "inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow";
 
 /**
  * 探索模式底部工具栏。
@@ -30,73 +35,97 @@ export function ExploreBottomToolbar({
   onEnterButterfly,
   timeReversalOpen,
   onToggleTimeReversal,
+  elapsedSeconds = 0,
   className = "",
 }: ExploreBottomToolbarProps) {
   return (
     <footer
       data-ui-controls
       data-panel-bottom
-      className={`h-12 shrink-0 w-full bg-surface-container-lowest flex items-center justify-between px-4 select-none ${className}`}
+      className={cn(
+        "h-12 shrink-0 w-full bg-surface-container-lowest flex items-center justify-between px-4 select-none",
+        className,
+      )}
     >
-      {/* 左侧：播放控制 */}
+      {/* 左侧：播放 / 重置 / 仿真时间 */}
       <div className="flex items-center gap-2">
-        <Button
-          variant={isRunning ? "secondary" : "primary"}
-          size="sm"
-          disabled={disabled}
+        <button
+          type="button"
           onClick={onToggleRunning}
+          disabled={disabled}
           title={isRunning ? "暂停仿真" : "启动仿真"}
+          className={cn(
+            "w-8 h-8 inline-flex items-center justify-center rounded-lg transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow disabled:opacity-40 disabled:cursor-not-allowed",
+            isRunning
+              ? "bg-surface-container text-on-surface hover:bg-surface-container-high"
+              : "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
+          )}
         >
           {isRunning ? (
-            <Pause className="h-3.5 w-3.5 mr-1" />
+            <Pause className="h-4 w-4" />
           ) : (
-            <Play className="h-3.5 w-3.5 mr-1" />
+            <Play className="h-4 w-4 ml-0.5" />
           )}
-          {isRunning ? "暂停" : "播放"}
-        </Button>
+        </button>
 
-        <Button
-          variant="tertiary"
-          size="sm"
+        <button
+          type="button"
           onClick={onReset}
           title="以当前面板参数重置仿真"
+          className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow"
         >
-          <RotateCcw className="h-3.5 w-3.5 mr-1" />
-          重置
-        </Button>
+          <RotateCcw className="h-4 w-4" />
+        </button>
+
+        <span className="ml-3 text-[11px] font-mono tabular-nums text-on-surface-variant/60">
+          t = {elapsedSeconds.toFixed(2)}s
+        </span>
       </div>
 
       {/* 右侧：实验入口（骨架顺序：受力分析 → 蝴蝶效应 → 时间反演） */}
       <div className="flex items-center gap-2">
-        <Button
-          variant={forceActive ? "secondary" : "tertiary"}
-          size="sm"
+        <button
+          type="button"
           onClick={onToggleForce}
           title="空格键切换受力分析"
+          className={cn(
+            toolbarButtonBase,
+            forceActive
+              ? "bg-surface-container text-primary border border-primary/30"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-transparent hover:border-white/5",
+          )}
         >
-          <Eye className="h-3.5 w-3.5 mr-1" />
-          {forceActive ? "关闭受力" : "受力分析"}
-        </Button>
+          <Eye className="h-3.5 w-3.5" />
+          受力分析
+        </button>
 
-        <Button
-          variant="tertiary"
-          size="sm"
+        <button
+          type="button"
           onClick={onEnterButterfly}
           title="进入蝴蝶效应分屏对比"
+          className={cn(
+            toolbarButtonBase,
+            "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-transparent hover:border-white/5",
+          )}
         >
-          <GitCompare className="h-3.5 w-3.5 mr-1" />
+          <GitCompare className="h-3.5 w-3.5" />
           蝴蝶效应
-        </Button>
+        </button>
 
-        <Button
-          variant={timeReversalOpen ? "secondary" : "tertiary"}
-          size="sm"
+        <button
+          type="button"
           onClick={onToggleTimeReversal}
           title="时间反演实验"
+          className={cn(
+            toolbarButtonBase,
+            timeReversalOpen
+              ? "bg-surface-container text-primary border border-primary/30"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-transparent hover:border-white/5",
+          )}
         >
-          <Hourglass className="h-3.5 w-3.5 mr-1" />
-          {timeReversalOpen ? "关闭反演" : "时间反演"}
-        </Button>
+          <Hourglass className="h-3.5 w-3.5" />
+          时间反演
+        </button>
       </div>
     </footer>
   );

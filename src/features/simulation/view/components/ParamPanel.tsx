@@ -28,13 +28,18 @@ for (const m of PARAM_META) {
   GROUPED_META[m.group].push(m.key);
 }
 
+interface ParamPanelProps {
+  /** 探索模式下播放/重置已移至底部工具栏，隐藏面板头部全局控制 */
+  hideGlobalControls?: boolean;
+}
+
 /**
  * 参数控制面板 — 探索模式左侧面板。
  *
  * 风格：Dark Room，surface-container-low 背景，无实线边框
  * 参数分组：系统参数 / 初始条件 / 环境
  */
-export function ParamPanel() {
+export function ParamPanel({ hideGlobalControls = false }: ParamPanelProps) {
   const {
     isRunning,
     isWorkerReady,
@@ -87,30 +92,32 @@ export function ParamPanel() {
           <span className="text-xs font-semibold text-on-surface tracking-wider">
             参数控制
           </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={handleResetClick}
-              disabled={!isWorkerReady}
-              title="以面板当前参数重置仿真"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant={isRunning ? "secondary" : "primary"}
-              size="sm"
-              disabled={disabled}
-              onClick={() => setRunning(!isRunning)}
-            >
-              {isRunning ? (
-                <Pause className="h-3.5 w-3.5 mr-1" />
-              ) : (
-                <Play className="h-3.5 w-3.5 mr-1" />
-              )}
-              {isRunning ? "暂停" : "启动"}
-            </Button>
-          </div>
+          {!hideGlobalControls && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="icon"
+                size="icon"
+                onClick={handleResetClick}
+                disabled={!isWorkerReady}
+                title="以面板当前参数重置仿真"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={isRunning ? "secondary" : "primary"}
+                size="sm"
+                disabled={disabled}
+                onClick={() => setRunning(!isRunning)}
+              >
+                {isRunning ? (
+                  <Pause className="h-3.5 w-3.5 mr-1" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 mr-1" />
+                )}
+                {isRunning ? "暂停" : "启动"}
+              </Button>
+            </div>
+          )}
         </div>
 
         {isSceneFrozen && (
@@ -132,7 +139,7 @@ export function ParamPanel() {
             <TabsTrigger
               key={g.id}
               value={g.id}
-              className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-surface-container data-[state=active]:text-on-surface text-on-surface-variant/60"
+              className="text-xs px-3 py-1.5 rounded-md"
             >
               {g.label}
             </TabsTrigger>
