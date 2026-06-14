@@ -83,7 +83,7 @@ export class ForkSimulationUseCaseImpl extends ForkSimulationUseCaseABC {
     const trailData = this.extractTrailData(forkConfig.forkTime);
 
     // 2. 创建幽灵尾迹配置
-    const ghostTrail = createDefaultGhostTrail(trailData, 0.3, "#4488ff");
+    const ghostTrail = createDefaultGhostTrail(trailData, 0.3, "#3B82F6"); // DESIGN: trail-slow
     this._ghostTrail = ghostTrail;
 
     // 3. 标记分叉活跃

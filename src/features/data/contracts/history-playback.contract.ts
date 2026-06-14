@@ -420,7 +420,7 @@ export function extractStateAtTime(
 export function createDefaultGhostTrail(
   trailData: StateVector[],
   opacity: number = 0.3,
-  color: string = "#4488ff",
+  color: string = "#3B82F6", // DESIGN: trail-slow
 ): GhostTrailConfig {
   return {
     opacity: Math.max(0, Math.min(1, opacity)),

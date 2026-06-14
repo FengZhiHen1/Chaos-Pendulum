@@ -69,16 +69,16 @@ export const FORCE_ARROW_REGISTRY: readonly IForceArrowMeta[] = [
 // @contract ForceDisplayColors — 力矢量颜色方案
 // ───────────────────────────────────────────────
 
-/** 力矢量颜色方案 */
+/** 力矢量颜色方案 — 色值来源于 DESIGN.md 语义数据色 */
 export const FORCE_DISPLAY_COLORS = {
-  /** 重力：绿色实线箭头，固定竖直向下 */
-  gravity: "#27ae60",
-  /** 张力：红色实线箭头，沿杆方向（负张力为粉色） */
-  tension: "#e74c3c",
-  /** 负张力（杆受压）: 品红色 */
-  tensionNegative: "#e056a0",
-  /** 惯性力：蓝色虚线箭头，分解为切向与法向 */
-  inertial: "#3498db",
+  /** 重力：绿色实线箭头，固定竖直向下 (DESIGN: force-gravity #4ADE80) */
+  gravity: "#4ADE80",
+  /** 张力：红色实线箭头，沿杆方向（负张力为粉色）(DESIGN: force-tension #F87171) */
+  tension: "#F87171",
+  /** 负张力（杆受压）: 品红色 (DESIGN: 无独立 token，基于 tension 色相偏移) */
+  tensionNegative: "#E056A0",
+  /** 惯性力：蓝色虚线箭头，分解为切向与法向 (DESIGN: force-inertia #60A5FA) */
+  inertial: "#60A5FA",
 } as const;
 
 // ───────────────────────────────────────────────

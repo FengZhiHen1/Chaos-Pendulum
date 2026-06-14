@@ -175,7 +175,7 @@ export function HistoryTimeline({ viewModel }: HistoryTimelineProps) {
               <div
                 className="w-3 h-3 rounded-full"
                 style={{
-                  background: ghostTrail?.color ?? "#4488ff",
+                  background: ghostTrail?.color ?? "#3B82F6", // DESIGN: trail-slow
                   opacity: ghostTrail?.opacity ?? 0.3,
                 }}
               />

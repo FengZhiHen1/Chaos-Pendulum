@@ -148,7 +148,7 @@ class TestForkSimulationUseCase extends ForkSimulationUseCase {
     this.active = true;
     return {
       opacity: 0.3,
-      color: "#4488ff",
+      color: "#3B82F6" // DESIGN: trail-slow,
       trailData: this.ringBuffer.toArray(),
     };
   }
@@ -512,7 +512,7 @@ describe("ForkSimulationUseCase — 分叉演化用例", () => {
     it("opacity < 0 应抛出 ForkError", () => {
       const badGhost: GhostTrailConfig = {
         opacity: -0.1,
-        color: "#4488ff",
+        color: "#3B82F6" // DESIGN: trail-slow,
         trailData: [],
       };
       expect(() =>
@@ -523,7 +523,7 @@ describe("ForkSimulationUseCase — 分叉演化用例", () => {
     it("opacity > 1 应抛出 ForkError", () => {
       const badGhost: GhostTrailConfig = {
         opacity: 1.5,
-        color: "#4488ff",
+        color: "#3B82F6" // DESIGN: trail-slow,
         trailData: [],
       };
       expect(() =>
@@ -669,9 +669,9 @@ describe("createDefaultGhostTrail — 默认幽灵尾迹配置", () => {
     expect(result.opacity).toBe(0.3);
   });
 
-  it("默认 color = '#4488ff'", () => {
+  it("默认 color = '#3B82F6' (DESIGN: trail-slow)", () => {
     const result = createDefaultGhostTrail([]);
-    expect(result.color).toBe("#4488ff");
+    expect(result.color).toBe("#3B82F6");
   });
 
   it("传入自定义 opacity = 0.5 → 精确匹配", () => {
