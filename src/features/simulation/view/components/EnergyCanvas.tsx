@@ -43,11 +43,13 @@ export function EnergyCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const bufferRef = useRef<EnergyDataPoint[]>([]);
-  const yRangeRef = useRef<[number, number]>([Infinity, -Infinity]);
+  // 初始用有限值，确保首次 resize 时坐标轴正确绘制
+  const yRangeRef = useRef<[number, number]>([-1, 1]);
   const lastXDomainRef = useRef<[number, number]>([0, timeWindow]);
   const rafRef = useRef(0);
   const isVisibleRef = useRef(true);
   const lastIdleDrawRef = useRef(0);
+  const wasRunningRef = useRef(false);
   const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
   // ── 离屏坐标轴渲染 ─────────────────────────
@@ -228,20 +230,21 @@ export function EnergyCanvas({
   }, []);
 
   useEffect(() => {
-    redrawOffscreen(
-      yRangeRef.current[0],
-      yRangeRef.current[1],
-      lastXDomainRef.current[0],
-      lastXDomainRef.current[1],
-    );
+    const y0 = yRangeRef.current[0];
+    const y1 = yRangeRef.current[1];
+    // 用有限值防御首次渲染时 yRange 尚未被真实数据初始化的窗口期
+    const yMin = isFinite(y0) ? y0 : -1;
+    const yMax = isFinite(y1) ? y1 : 1;
+    redrawOffscreen(yMin, yMax, lastXDomainRef.current[0], lastXDomainRef.current[1]);
   }, [width, height, redrawOffscreen]);
 
   // ── 重置时清空缓冲区（useLayoutEffect 确保在浏览器绘制前执行）──
 
   useLayoutEffect(() => {
     bufferRef.current.length = 0;
-    yRangeRef.current = [Infinity, -Infinity];
+    yRangeRef.current = [-1, 1];
     lastXDomainRef.current = [0, timeWindow];
+    wasRunningRef.current = false;
     const offscreen = offscreenRef.current;
     if (offscreen) {
       redrawOffscreen(-1, 1, 0, timeWindow);
@@ -287,6 +290,17 @@ export function EnergyCanvas({
       const store = useSimulationStore.getState();
       const currentTime = store.t;
       const buffer = bufferRef.current;
+
+      // 仿真启动瞬间：注入 t=0 的初始能量参照点，确保曲线始终从 0 开始
+      if (!wasRunningRef.current && store.isRunning && !isNaN(store.totalEnergy)) {
+        buffer.push({
+          t: 0,
+          K: store.kineticEnergy,
+          V: store.potentialEnergy,
+          E: store.totalEnergy,
+        });
+      }
+      wasRunningRef.current = store.isRunning;
 
       // 追加新数据点（仅在正向积分且有效帧时追加）
       if (
@@ -382,8 +396,11 @@ export function EnergyCanvas({
 
         const range = dataMax - dataMin;
         const padding = range > 0 ? range * 0.12 : 1.0;
-        const newYMin = dataMin - padding;
-        const newYMax = dataMax + padding;
+        // Y 轴始终包含 0 作为参照线——确保能量曲线始终有零位参照
+        let newYMin = dataMin - padding;
+        let newYMax = dataMax + padding;
+        newYMin = Math.min(0, newYMin);
+        newYMax = Math.max(0, newYMax);
 
         const isUninit = !isFinite(yMin) || !isFinite(yMax);
         const needsExpand = newYMin < yMin || newYMax > yMax;

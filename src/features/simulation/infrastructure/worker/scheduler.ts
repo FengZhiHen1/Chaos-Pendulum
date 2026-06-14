@@ -147,7 +147,8 @@ export class SimulationScheduler extends ISimulationScheduler {
 
   override tickDelta(delta: number): number {
     if (!this._running) return 0;
-    this.tickAcc += delta;
+    // 上限防止长时间挂起后加速追赶（螺旋-of-death）
+    this.tickAcc = Math.min(this.tickAcc + delta, TICK_DT * MAX_TICKS_PER_FRAME);
     let consumed = 0;
     while (this.tickAcc >= TICK_DT && consumed < MAX_TICKS_PER_FRAME) {
       if (this.consumeOneFrame()) { this.tickAcc -= TICK_DT; consumed++; }

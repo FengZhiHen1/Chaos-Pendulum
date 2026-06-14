@@ -1,6 +1,7 @@
 import { FlaskConical, CheckCircle, XCircle, Circle, FileText, Code, Play, AlertTriangle } from "lucide-react";
 import { useLabStore } from "./store";
 import { useLabValidation } from "./hooks/useLabValidation";
+import { SandboxPanel } from "./components/SandboxPanel";
 import { cn } from "@/shared/infrastructure/cn";
 
 const TEMPLATES = [
