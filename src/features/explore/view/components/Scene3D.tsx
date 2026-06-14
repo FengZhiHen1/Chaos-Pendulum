@@ -16,7 +16,7 @@ import { useSceneAnimation } from "../../viewModel/hooks/useSceneAnimation";
 import { PendulumGeometry } from "./scene/PendulumGeometry";
 import { TrailRenderer } from "./TrailRenderer";
 import { useButterflyStore } from "../../store";
-import { ForceArrows3D } from "@/features/lab/components/ForceArrows3D";
+import { ForceArrows3D } from "@/features/lab/view/components/ForceArrows3D";
 import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
 import { globalWatermarkRenderer } from "@/features/data/infrastructure/adapters/watermarkRendererSingleton";
 

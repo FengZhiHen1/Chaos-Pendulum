@@ -1,5 +1,5 @@
 import { EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
-import { DecompositionPanel } from "@/features/lab/components/DecompositionPanel";
+import { DecompositionPanel } from "@/features/lab/view/components/DecompositionPanel";
 
 interface ExploreRightPanelProps {
   forceActive: boolean;

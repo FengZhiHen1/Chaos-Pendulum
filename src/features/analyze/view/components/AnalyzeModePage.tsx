@@ -9,9 +9,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { useAnalysisView } from "../viewModel/hooks/useAnalysisView";
-import { useAnalyzeStore } from "../store";
-import type { DampingSlice } from "../types";
+import { useAnalysisView } from "../../viewModel/hooks/useAnalysisView";
+import { useAnalyzeStore } from "../../store";
+import type { DampingSlice } from "../../types";
 import { AnalysisControls } from "./AnalysisControls";
 import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";

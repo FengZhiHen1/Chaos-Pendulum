@@ -1,8 +1,8 @@
 export { useLabStore } from "./store";
-export { LabPage } from "./LabPage";
-export { ForceArrows3D } from "./components/ForceArrows3D";
-export { DecompositionPanel } from "./components/DecompositionPanel";
-export { SandboxPanel } from "./components/SandboxPanel";
+export { LabPage } from "./view/pages/LabPage";
+export { ForceArrows3D } from "./view/components/ForceArrows3D";
+export { DecompositionPanel } from "./view/components/DecompositionPanel";
+export { SandboxPanel } from "./view/components/SandboxPanel";
 
 // Pyodide 缓存（从 infrastructure 重导出）
 export {

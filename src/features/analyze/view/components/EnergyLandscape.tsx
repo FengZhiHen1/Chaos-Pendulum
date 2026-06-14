@@ -4,7 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useSimulationStore } from "@/features/simulation";
 import { normalizeAngle } from "@/features/simulation";
-import { DEFAULT_ENERGY_LANDSCAPE_CONFIG } from "../contracts";
+import { DEFAULT_ENERGY_LANDSCAPE_CONFIG } from "../../contracts";
 import {
   SURFACE,
   SURFACE_CONTAINER_HIGH,

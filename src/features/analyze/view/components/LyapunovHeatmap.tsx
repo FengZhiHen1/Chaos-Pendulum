@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAnalyzeStore } from "../store";
+import { useAnalyzeStore } from "../../store";
 import { useSimulationStore } from "@/features/simulation";
 import { useAppStore } from "@/stores/useAppStore";
 import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
 import { usePrecomputeData } from "@/features/analyze/viewModel/hooks/usePrecomputeData";
 import { measure } from "@/shared/infrastructure/observability/perf-mark";
 import { Button } from "@/shared/view/components/ui/button";
-import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData, DampingSlice } from "../types";
-import { classifyLambda, resolveStoreParam } from "../types";
+import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData, DampingSlice } from "../../types";
+import { classifyLambda, resolveStoreParam } from "../../types";
 import { ParameterFillDialog } from "./ParameterFillDialog";
 import { createHeatmapColorScale } from "./heatmapColorScale";
 import {

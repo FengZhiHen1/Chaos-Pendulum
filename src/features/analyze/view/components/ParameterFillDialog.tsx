@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Button } from "@/shared/view/components/ui/button";
 import { useSimulationStore } from "@/features/simulation";
-import type { LyapunovGrid } from "../types";
-import { classifyLambda, resolveStoreParam } from "../types";
+import type { LyapunovGrid } from "../../types";
+import { classifyLambda, resolveStoreParam } from "../../types";
 
 interface Props {
   gridData: LyapunovGrid;

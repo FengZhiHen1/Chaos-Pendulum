@@ -5,7 +5,7 @@
  *   - 仅返回 CSS 颜色字符串，不依赖 React
  */
 
-import type { LyapunovLayerType } from "../types";
+import type { LyapunovLayerType } from "../../types";
 
 const STABLE_RGB = { r: 30, g: 58, b: 95 };      // lyapunov-stable #1E3A5F
 const NEUTRAL_RGB = { r: 45, g: 212, b: 191 };   // lyapunov-neutral #2DD4BF

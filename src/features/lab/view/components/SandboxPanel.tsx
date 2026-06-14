@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { CodeEditor } from "./CodeEditor";
-import { SANDBOX_TEMPLATES, ERROR_TRANSLATIONS, SANDBOX_DEFAULTS } from "../contracts";
-import type { SandboxTemplateId, ISandboxExecutionResult } from "../contracts";
+import { SANDBOX_TEMPLATES, ERROR_TRANSLATIONS, SANDBOX_DEFAULTS } from "../../contracts";
+import type { SandboxTemplateId, ISandboxExecutionResult } from "../../contracts";
 import { Button } from "@/shared/view/components/ui/button";
 import { Badge } from "@/shared/view/components/ui/badge";
 import { Play, RotateCcw, Loader2, AlertCircle, CheckCircle } from "lucide-react";

@@ -8,8 +8,8 @@
  */
 
 import { SlidersHorizontal, LayoutGrid, CheckCircle2 } from "lucide-react";
-import type { AnalysisView } from "../viewModel/stores/analyzeSlice";
-import type { LyapunovLayerType, LoadStatus } from "../types";
+import type { AnalysisView } from "../../viewModel/stores/analyzeSlice";
+import type { LyapunovLayerType, LoadStatus } from "../../types";
 import { SEMANTIC_GRADIENT } from "./colorTokens";
 
 interface AnalysisControlsProps {
