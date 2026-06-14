@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useAnalyzeStore } from "../store";
+import { useAnalyzeStore } from "../../store";
 import { useAppStore } from "@/stores/useAppStore";
 
 export type AnalysisViewType =

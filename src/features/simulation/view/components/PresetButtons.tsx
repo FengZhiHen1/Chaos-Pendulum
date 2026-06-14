@@ -1,4 +1,4 @@
-import { PRESETS } from "@/shared/domain/valueObjects";
+import { PRESETS } from "../../viewModel/selectors/presets";
 import { Button } from "@/shared/view/components/ui/button";
 import { useSimulationStore } from "../../store";
 

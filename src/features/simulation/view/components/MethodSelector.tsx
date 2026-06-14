@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/view/components/ui/select";
-import type { IntegratorMethod } from "@/shared/domain/valueObjects";
+import type { IntegratorMethod } from "../../viewModel/selectors/methods";
 import { useSimulationStore } from "../../store";
 
 const METHOD_OPTIONS: {

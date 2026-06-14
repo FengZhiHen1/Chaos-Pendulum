@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useAnalysisView } from "../hooks/useAnalysisView";
+import { useAnalysisView } from "../viewModel/hooks/useAnalysisView";
 import { useAnalyzeStore } from "../store";
 import type { DampingSlice } from "../types";
 import { AnalysisControls } from "./AnalysisControls";

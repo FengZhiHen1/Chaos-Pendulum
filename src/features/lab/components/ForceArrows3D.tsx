@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useLabStore } from "@/features/lab/store";
-import { FORCE_STRIDE, ForceField } from "@/shared/domain/valueObjects";
+import { FORCE_STRIDE, ForceField } from "../viewModel/selectors/physics";
 
 // ─── 常量 ────────────────────────────────────
 

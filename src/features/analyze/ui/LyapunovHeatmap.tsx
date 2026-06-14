@@ -3,7 +3,7 @@ import { useAnalyzeStore } from "../store";
 import { useSimulationStore } from "@/features/simulation";
 import { useAppStore } from "@/stores/useAppStore";
 import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
-import { usePrecomputeData } from "@/features/analyze/hooks/usePrecomputeData";
+import { usePrecomputeData } from "@/features/analyze/viewModel/hooks/usePrecomputeData";
 import { measure } from "@/shared/infrastructure/observability/perf-mark";
 import { Button } from "@/shared/view/components/ui/button";
 import type { LyapunovGrid, LyapunovLayerType, HeatmapCursor, HoverTooltipData, DampingSlice } from "../types";

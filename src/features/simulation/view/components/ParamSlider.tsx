@@ -5,7 +5,8 @@ import { Input } from "@/shared/view/components/ui/input";
 import { Label } from "@/shared/view/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/view/components/ui/tooltip";
 import { AlertCircle } from "lucide-react";
-import type { ParamFieldMeta, PendulumParams, InitialConditions } from "@/shared/domain/valueObjects";
+import type { ParamFieldMeta } from "../../viewModel/selectors/paramMeta";
+import type { PendulumParams, InitialConditions } from "../../viewModel/selectors/physics";
 import { useSimulationStore } from "../../store";
 
 interface ParamSliderProps {

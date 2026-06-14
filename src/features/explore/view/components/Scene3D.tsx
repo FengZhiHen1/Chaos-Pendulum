@@ -9,7 +9,7 @@ import { useExploreStore } from "@/features/explore";
 import { useTrailBuffer } from "../../viewModel/hooks/useTrailBuffer";
 import { useSceneController } from "../../viewModel/hooks/useSceneController";
 import type { TrailPoint } from "../../viewModel/hooks/useTrailBuffer";
-import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
+import type { PendulumParams, StateVector } from "../../viewModel/selectors/domainTypes";
 import { TrailRenderer } from "./TrailRenderer";
 import { useButterflyStore } from "../../store";
 import { ForceArrows3D } from "@/features/lab/components/ForceArrows3D";

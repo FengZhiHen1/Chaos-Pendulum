@@ -31,7 +31,7 @@ import { Dialog } from "@/shared/view/components/ui/dialog";
 import { Button } from "@/shared/view/components/ui/button";
 import { cn } from "@/shared/lib/cn";
 import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../../contracts";
-import { driftCalculator } from "../../domain/drift-calculator";
+import { useDriftCalculation } from "../../viewModel/hooks/useDriftCalculation";
 import { DriftCurvePanel } from "./DriftCurvePanel";
 import { TeachingAnnotationPopup } from "./TeachingAnnotationPopup";
 
@@ -54,6 +54,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
   const annotationDismissed = useExploreStore((s) => s.annotationDismissed);
   const dismissAnnotation = useExploreStore((s) => s.dismissAnnotation);
   const resetAnnotation = useExploreStore((s) => s.resetAnnotation);
+  const { computeDrift } = useDriftCalculation();
 
   const history = useSimulationHistory();
   const simTime = useSimulationStore((s) => s.t);
@@ -332,7 +333,7 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
 
     let drift = 0;
     if (fwdIdx >= 0 && fwdIdx < fwdArray.length) {
-      drift = driftCalculator.compute(store.state, fwdArray[fwdIdx]!);
+      drift = computeDrift(store.state, fwdArray[fwdIdx]!);
     }
 
     useExploreStore.getState().appendDriftSample({
