@@ -148,7 +148,7 @@ class TestForkSimulationUseCase extends ForkSimulationUseCase {
     this.active = true;
     return {
       opacity: 0.3,
-      color: "#3B82F6" // DESIGN: trail-slow,
+      color: "#3B82F6" /* DESIGN: trail-slow */,
       trailData: this.ringBuffer.toArray(),
     };
   }
@@ -512,7 +512,7 @@ describe("ForkSimulationUseCase — 分叉演化用例", () => {
     it("opacity < 0 应抛出 ForkError", () => {
       const badGhost: GhostTrailConfig = {
         opacity: -0.1,
-        color: "#3B82F6" // DESIGN: trail-slow,
+        color: "#3B82F6" /* DESIGN: trail-slow */,
         trailData: [],
       };
       expect(() =>
@@ -523,7 +523,7 @@ describe("ForkSimulationUseCase — 分叉演化用例", () => {
     it("opacity > 1 应抛出 ForkError", () => {
       const badGhost: GhostTrailConfig = {
         opacity: 1.5,
-        color: "#3B82F6" // DESIGN: trail-slow,
+        color: "#3B82F6" /* DESIGN: trail-slow */,
         trailData: [],
       };
       expect(() =>

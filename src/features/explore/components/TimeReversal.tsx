@@ -181,7 +181,8 @@ export function TimeReversal({ className = "" }: TimeReversalProps) {
     updateTrajectoryData({
       forwardPoints: fwdPts,
       reversalPoints: [],
-      reversalColor: mode === "exact" ? "#ffd700" : "#00ffff",
+      // 时间反演颜色：金色（精确反向）、青色（统计反向）—— 与 TimeReversalTrajectory 默认值一致
+      reversalColor: mode === "exact" ? "#FFD700" : "#00FFFF",
       visible: true,
       fadeOutAt: null,
     });

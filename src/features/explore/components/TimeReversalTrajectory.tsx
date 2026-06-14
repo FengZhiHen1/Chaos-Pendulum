@@ -23,10 +23,11 @@ interface TrajectoryData {
   fadeOutAt: number | null;
 }
 
+// 时间反演轨迹默认色：青色（统计反向）→ 由 TimeReversal 组件根据模式覆盖
 let sharedData: TrajectoryData = {
   forwardPoints: [],
   reversalPoints: [],
-  reversalColor: "#00ffff",
+  reversalColor: "#00FFFF",
   visible: false,
   fadeOutAt: null,
 };
@@ -46,7 +47,7 @@ export function clearTrajectoryData(): void {
   sharedData = {
     forwardPoints: [],
     reversalPoints: [],
-    reversalColor: "#00ffff",
+    reversalColor: "#00FFFF",
     visible: false,
     fadeOutAt: null,
   };
@@ -153,7 +154,7 @@ export function TimeReversalTrajectoryOverlay() {
       <lineSegments ref={forwardLineRef as any}>
         <bufferGeometry />
         <lineBasicMaterial
-          color="#ffffff"
+          color="#FFFFFF" /* 前向轨迹线：白色高对比度 */
           transparent
           opacity={0.4}
           depthTest

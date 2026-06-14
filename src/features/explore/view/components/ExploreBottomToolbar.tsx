@@ -58,7 +58,7 @@ export function ExploreBottomToolbar({
             "w-8 h-8 inline-flex items-center justify-center rounded-lg transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow disabled:opacity-40 disabled:cursor-not-allowed",
             isRunning
               ? "bg-surface-container text-on-surface hover:bg-surface-container-high"
-              : "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
+              : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98]",
           )}
         >
           {isRunning ? (

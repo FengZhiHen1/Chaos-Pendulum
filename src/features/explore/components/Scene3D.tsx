@@ -289,7 +289,7 @@ export function Scene3D({
       {/* 参数异常遮罩 */}
       {paramInvalid && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none z-10">
-          <p className="text-sm font-medium" style={{ color: "#ff6644" }}>
+          <p className="text-sm font-medium text-error">
             参数异常，请在控制面板中调整
           </p>
         </div>
@@ -308,7 +308,7 @@ export function Scene3D({
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-primary text-[#0D1117] rounded text-sm font-medium hover:opacity-90"
+                className="px-4 py-2 bg-primary text-on-primary rounded text-sm font-medium hover:opacity-90"
               >
                 刷新页面
               </button>

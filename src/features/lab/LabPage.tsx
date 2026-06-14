@@ -148,7 +148,7 @@ export function LabPage() {
                   "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                   validationRunning
                     ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-wait"
-                    : "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
+                    : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98]",
                 )}
               >
                 {validationRunning ? (

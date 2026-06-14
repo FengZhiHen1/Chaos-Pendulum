@@ -19,7 +19,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-primary text-[#0D1117] hover:bg-primary-hover active:scale-[0.98]",
+          "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98]",
         secondary:
           "bg-surface-container text-primary hover:bg-primary-container active:scale-[0.98]",
         tertiary:

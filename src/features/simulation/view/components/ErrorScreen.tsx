@@ -51,7 +51,7 @@ export function ErrorScreen({ error, onRetry, onOffline }: ErrorScreenProps) {
             type="button"
             onClick={onRetry}
             disabled={!error.retryable}
-            className="px-5 py-2.5 rounded-lg bg-primary text-[#0D1117] font-medium text-sm
+            className="px-5 py-2.5 rounded-lg bg-primary text-on-primary font-medium text-sm
                        hover:bg-primary-hover active:scale-95 transition-all duration-200
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow
                        disabled:opacity-40 disabled:cursor-not-allowed"

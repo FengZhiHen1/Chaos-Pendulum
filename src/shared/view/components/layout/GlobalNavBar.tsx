@@ -154,7 +154,7 @@ export function GlobalNavBar() {
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow
               disabled:opacity-50 disabled:cursor-not-allowed
               ${demoActive
-                ? "bg-primary text-[#0D1117] hover:bg-primary-hover"
+                ? "bg-primary text-on-primary hover:bg-primary-hover"
                 : "bg-surface/90 backdrop-blur border border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary/30 hover:bg-surface"}
             `}
           >
