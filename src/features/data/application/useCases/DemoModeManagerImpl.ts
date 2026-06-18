@@ -38,6 +38,15 @@ export class DemoModeManagerImpl extends DemoModeManagerABC {
   /** 用户交互处理器（绑定 this） */
   private readonly interactionHandler: () => void;
 
+  /** 全局事件处理器（click/keydown 兜底退出） */
+  private readonly globalInteractionHandler: () => void;
+
+  /** 全局事件是否已注册 */
+  private globalListenersRegistered: boolean = false;
+
+  /** 全局事件 options（同引用确保 removeEventListener 正确匹配） */
+  private readonly captureOptions: AddEventListenerOptions = { capture: true };
+
   constructor(
     orbitControls: IOrbitControlsAdapter,
     watermark: IWatermarkRenderer,
@@ -46,6 +55,7 @@ export class DemoModeManagerImpl extends DemoModeManagerABC {
   ) {
     super(orbitControls, watermark, uiController, config);
     this.interactionHandler = this.handleUserInteraction.bind(this);
+    this.globalInteractionHandler = this.handleUserInteraction.bind(this);
   }
 
   // ── 公共入口 ──
@@ -65,6 +75,12 @@ export class DemoModeManagerImpl extends DemoModeManagerABC {
     if (self.cleanupIdleHandlers) {
       self.cleanupIdleHandlers();
       self.cleanupIdleHandlers = undefined;
+    }
+    // 清理全局交互监听（不依赖 deactivate，直接兜底）
+    if (this.globalListenersRegistered) {
+      document.removeEventListener("click", this.globalInteractionHandler, this.captureOptions);
+      document.removeEventListener("keydown", this.globalInteractionHandler, this.captureOptions);
+      this.globalListenersRegistered = false;
     }
   }
 
@@ -112,6 +128,13 @@ export class DemoModeManagerImpl extends DemoModeManagerABC {
     // 4. 注册用户交互监听（触碰任意控件 = 退出演示模式）
     this.orbitControls.onUserInteraction(this.interactionHandler);
 
+    // 4b. 全局 click/keydown 兜底——确保在任何模式下单击或按键都能退出
+    if (!this.globalListenersRegistered) {
+      document.addEventListener("click", this.globalInteractionHandler, this.captureOptions);
+      document.addEventListener("keydown", this.globalInteractionHandler, this.captureOptions);
+      this.globalListenersRegistered = true;
+    }
+
     // 5. 派发事件
     this.emit("demoActivated");
 
@@ -134,6 +157,13 @@ export class DemoModeManagerImpl extends DemoModeManagerABC {
 
     // 4. 移除用户交互监听
     this.orbitControls.offUserInteraction(this.interactionHandler);
+
+    // 4b. 移除全局监听
+    if (this.globalListenersRegistered) {
+      document.removeEventListener("click", this.globalInteractionHandler, this.captureOptions);
+      document.removeEventListener("keydown", this.globalInteractionHandler, this.captureOptions);
+      this.globalListenersRegistered = false;
+    }
 
     this._active = false;
 
