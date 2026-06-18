@@ -65,6 +65,11 @@ export function StoryOverlay() {
       case "storyStart":
         sync(); // 强制同步引擎状态（play() 在 StoryPage 实例中调用，本实例状态陈旧）
         setVisible(true);
+        // 故事启动时确保仿真在运行（isRunning 默认为 false，不自动启动）
+        {
+          const sim = useSimulationStore.getState();
+          if (!sim.isRunning) sim.setRunning(true);
+        }
         break;
 
       case "stageEnter": {
@@ -102,6 +107,11 @@ export function StoryOverlay() {
             const simStore = useSimulationStore.getState();
             simStore.injectParams(newParams, newIC);
           }
+        }
+        // 确保仿真在运行（参数注入可能触发 reset 导致 isRunning 变 false）
+        {
+          const sim = useSimulationStore.getState();
+          if (!sim.isRunning) sim.setRunning(true);
         }
         sync(); // 阶段切换后同步引擎状态，确保本地 playback 与引擎一致
         break;
