@@ -1,6 +1,12 @@
 import { useEffect, useCallback } from "react";
 import { useAppStore } from "@/stores/useAppStore";
 import type { AppMode } from "@/shared/domain/valueObjects";
+import { MODE_REGISTRY } from "@/shared/domain/valueObjects";
+
+// 禁用模式对应的快捷键——构建时过滤，运行时不触发
+const DISABLED_KEYS = new Set(
+  MODE_REGISTRY.filter((m) => m.disabled).map((m) => m.shortcut),
+);
 
 const SHORTCUT_MAP: Record<string, AppMode> = {
   "1": "explore",
@@ -16,6 +22,7 @@ export function useKeyboardShortcuts() {
     (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      if (DISABLED_KEYS.has(e.key)) return;
       const mode = SHORTCUT_MAP[e.key];
       if (mode) setMode(mode);
     },

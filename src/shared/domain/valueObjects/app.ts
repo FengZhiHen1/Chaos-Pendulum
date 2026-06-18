@@ -19,6 +19,10 @@ export interface ModeDefinition {
   iconName: "Compass" | "BarChart3" | "FlaskConical" | "Play";
   shortcut: "1" | "2" | "3" | "4";
   tooltip: string;
+  /** 是否暂时禁用（置灰 + 不可切换） */
+  disabled?: boolean;
+  /** 禁用原因提示 */
+  disabledReason?: string;
 }
 
 /** 所有模式的元数据注册表（不可变常量） */
@@ -53,7 +57,9 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     shortLabel: "故事",
     iconName: "Play",
     shortcut: "4",
-    tooltip: "评审专用一键演示 · 快捷键 4",
+    tooltip: "评审专用一键演示",
+    disabled: true,
+    disabledReason: "因存在已知 bug，故事模式暂时关闭，修复后重新开放",
   },
 ];
 

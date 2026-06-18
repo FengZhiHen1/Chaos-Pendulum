@@ -85,19 +85,22 @@ export function GlobalNavBar() {
             const Icon = ICON_MAP[mode.iconName];
             const isActive = mode.id === activeMode;
             const isStory = mode.id === "story";
+            const isDisabled = mode.disabled === true;
 
             return (
               <TabsTrigger
                 key={mode.id}
                 value={mode.id}
+                disabled={isDisabled}
                 className={`
                   relative gap-1.5 transition-all duration-quick
-                  data-[state=active]:text-primary
-                  data-[state=inactive]:text-on-surface-variant
-                  data-[state=inactive]:hover:text-on-surface
-                  ${isStory && !isActive ? "animate-pulse-glow rounded-lg" : ""}
+                  ${isDisabled
+                    ? "opacity-35 cursor-not-allowed"
+                    : "data-[state=active]:text-primary data-[state=inactive]:text-on-surface-variant data-[state=inactive]:hover:text-on-surface"
+                  }
+                  ${isStory && !isActive && !isDisabled ? "animate-pulse-glow rounded-lg" : ""}
                 `}
-                title={`${MODE_LABELS[mode.id]}模式 (快捷键 ${mode.shortcut})`}
+                title={isDisabled ? mode.disabledReason : `${MODE_LABELS[mode.id]}模式 (快捷键 ${mode.shortcut})`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline text-[13px] font-medium">
