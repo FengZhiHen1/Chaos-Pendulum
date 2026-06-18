@@ -15,6 +15,10 @@ export interface UseLabValidationAPI {
 /** 三项验证的标识 */
 const ALL_TESTS = ["smallAngle", "singlePendulum", "energy"] as const;
 
+/** Worker 未就绪时显示的友好提示 */
+const WORKER_NOT_READY_MSG =
+  "仿真引擎未就绪。请先切换到「探索模式」点击播放按钮启动仿真，再返回此页面运行验证。";
+
 export function useLabValidation(): UseLabValidationAPI {
   const validationResults = useLabStore((s) => s.validationResults);
   const validationDetails = useLabStore((s) => s.validationDetails);
@@ -26,8 +30,16 @@ export function useLabValidation(): UseLabValidationAPI {
   const setAllPassed = useLabStore((s) => s.setAllPassed);
 
   const handleRunValidation = useCallback(() => {
-    // 缓存当前仿真状态，验证完成后恢复
+    // ── 预检：Worker 是否就绪 ──
     const simStore = useSimulationStore.getState();
+    if (!simStore.isWorkerReady) {
+      for (const test of ALL_TESTS) {
+        setValidationDetail(test, WORKER_NOT_READY_MSG);
+      }
+      return;
+    }
+
+    // 缓存当前仿真状态，验证完成后恢复
     const cachedParams = { ...simStore.params };
     const cachedIC = {
       theta1: simStore.state.theta1,

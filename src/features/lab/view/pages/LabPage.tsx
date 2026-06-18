@@ -1,6 +1,7 @@
-import { FlaskConical, CheckCircle, XCircle, Circle, Code, Play, AlertTriangle } from "lucide-react";
+import { FlaskConical, CheckCircle, XCircle, Circle, Code, Play, AlertTriangle, Info } from "lucide-react";
 import { useLabStore } from "../../store";
 import { useLabValidation } from "../../hooks/useLabValidation";
+import { useSimulationStore } from "@/features/simulation/store";
 import { SandboxPanel } from "../components/SandboxPanel";
 import { cn } from "@/shared/lib/cn";
 
@@ -46,6 +47,7 @@ export function LabPage() {
   } = useLabValidation();
 
   const activeTemplate = useLabStore((s) => s.activeTemplate);
+  const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -58,7 +60,7 @@ export function LabPage() {
           <div className="flex flex-col">
             <h2 className="text-sm font-semibold text-on-surface tracking-wide">实验模式</h2>
             <span className="text-[10px] text-on-surface-variant">
-              物理验证 · 代码实验 · 报告生成
+              物理验证 · 代码实验
             </span>
           </div>
         </div>
@@ -83,9 +85,25 @@ export function LabPage() {
             <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
               物理模型验证
             </h3>
+
+            {/* Worker 未就绪横幅 */}
+            {!isWorkerReady && (
+              <div className="mb-5 px-4 py-3 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 flex items-start gap-3">
+                <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-amber-300/90 font-medium mb-1">
+                    仿真引擎未就绪
+                  </p>
+                  <p className="text-[11px] text-amber-300/60 leading-relaxed">
+                    请先切换到「探索模式」点击播放按钮启动仿真，再返回此页面运行验证。
+                  </p>
+                </div>
+              </div>
+            )}
+
             <p className="text-xs text-on-surface-variant/70 mb-5 leading-relaxed">
               三项自动化验证确保仿真引擎的物理正确性。
-              验证使用 RK4 积分器直接调用物理引擎核心函数，无需 Worker 通信开销。
+              验证通过 Worker 执行实际仿真路径，而非隔离测试纯函数。
             </p>
 
             <div className="space-y-3">
