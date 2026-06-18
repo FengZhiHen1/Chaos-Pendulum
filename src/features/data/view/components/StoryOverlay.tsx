@@ -72,9 +72,54 @@ export function StoryOverlay() {
         const stage = d?.stage;
         if (!stage) break;
 
+        // ── 步骤 1: 先注入参数 + 同步 store 的 state 字段 ──
+        // 必须在 setMode 之前完成——确保 ExplorePage 挂载时 3D 场景读到正确的初始姿态
+        if (stage.params) {
+          const newParams: Partial<PendulumParams> = {};
+          const newIC: Partial<InitialConditions> = {};
+          const IC_KEYS = new Set(["theta1", "theta2", "theta1Dot", "theta2Dot"]);
+          for (const [k, v] of Object.entries(stage.params)) {
+            if (v === undefined) continue;
+            if (IC_KEYS.has(k)) {
+              (newIC as Record<string, number>)[k] = v as number;
+            } else {
+              (newParams as Record<string, number>)[k] = v as number;
+            }
+          }
+          if (Object.keys(newParams).length > 0 || Object.keys(newIC).length > 0) {
+            const prev = useSimulationStore.getState();
+            prev.injectParams(newParams, newIC);
+            // 同步 store 的 3D 姿态字段——injectParams 仅更新 initialConditions，
+            // 不更新 theta1/theta2/x1/y1/x2/y2/state，Scene3D 渲染的是这些字段
+            if (Object.keys(newIC).length > 0) {
+              const t1 = newIC.theta1 ?? prev.theta1;
+              const t2 = newIC.theta2 ?? prev.theta2;
+              const L1 = prev.params.L1;
+              const L2 = prev.params.L2;
+              const x1 = L1 * Math.sin(t1);
+              const y1 = -L1 * Math.cos(t1);
+              const x2 = x1 + L2 * Math.sin(t1 + t2);
+              const y2 = y1 - L2 * Math.cos(t1 + t2);
+              useSimulationStore.setState({
+                theta1: t1, theta1Dot: 0,
+                theta2: t2, theta2Dot: 0,
+                x1, y1, x2, y2,
+                kineticEnergy: 0, potentialEnergy: 0, totalEnergy: 0,
+                state: { theta1: t1, omega1: 0, theta2: t2, omega2: 0 },
+              });
+            }
+          }
+        }
+
+        // ── 步骤 2: 启动仿真 ──
+        {
+          const sim = useSimulationStore.getState();
+          if (!sim.isRunning) sim.setRunning(true);
+        }
+
+        // ── 步骤 3: 模式切换（3D 场景此时挂载，读到步骤 1 的姿态） ──
         if (stage.targetMode) {
           const app = useAppStore.getState();
-          // 若已锁定（前一个 stageEnter 所设），临时解锁以允许故事内部模式切换
           if (app.isNavigationLocked) app.unlockNavigation();
           app.setMode(stage.targetMode);
           app.lockNavigation("故事播放中");
@@ -85,30 +130,7 @@ export function StoryOverlay() {
           globalOrbitControlsAdapter.setCameraTarget(azimuth, elevation, distance);
         }
 
-        if (stage.params) {
-          const params = stage.params;
-          const newParams: Partial<PendulumParams> = {};
-          const newIC: Partial<InitialConditions> = {};
-          const IC_KEYS = new Set(["theta1", "theta2", "theta1Dot", "theta2Dot"]);
-          for (const [k, v] of Object.entries(params)) {
-            if (v === undefined) continue;
-            if (IC_KEYS.has(k)) {
-              (newIC as Record<string, number>)[k] = v as number;
-            } else {
-              (newParams as Record<string, number>)[k] = v as number;
-            }
-          }
-          if (Object.keys(newParams).length > 0 || Object.keys(newIC).length > 0) {
-            const simStore = useSimulationStore.getState();
-            simStore.injectParams(newParams, newIC);
-          }
-        }
-        // 确保仿真在运行（参数注入可能触发 reset 导致 isRunning 变 false）
-        {
-          const sim = useSimulationStore.getState();
-          if (!sim.isRunning) sim.setRunning(true);
-        }
-        sync(); // 阶段切换后同步引擎状态，确保本地 playback 与引擎一致
+        sync();
         break;
       }
 
