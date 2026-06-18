@@ -23,36 +23,15 @@ export function StoryPage() {
     };
   })();
 
-  // 组件卸载时清理导航锁
+  // 组件卸载时清理导航锁——仅在非故事播放期间（防止故事自动模式切换时误解锁）
   useEffect(() => {
     return () => {
       const app = useAppStore.getState();
-      if (app.isNavigationLocked) {
+      if (app.isNavigationLocked && app.navigationLockReason !== "故事播放中") {
         app.unlockNavigation();
       }
     };
   }, []);
-
-  // 控件脉冲高亮（与 StoryOverlay 协作）
-  useEffect(() => {
-    const ids = playback.highlightedControls;
-    if (ids.length === 0) return;
-
-    const elements: Element[] = [];
-    for (const id of ids) {
-      const els = document.querySelectorAll(`[data-story-highlight="${id}"]`);
-      els.forEach((el) => {
-        el.classList.add("animate-pulse-glow");
-        elements.push(el);
-      });
-    }
-
-    return () => {
-      for (const el of elements) {
-        el.classList.remove("animate-pulse-glow");
-      }
-    };
-  }, [playback.highlightedControls]);
 
   const handleStart = useCallback(() => {
     play();

@@ -12,7 +12,7 @@ import { useSimulationStore } from "@/features/simulation";
 import { globalOrbitControlsAdapter } from "../../infrastructure/adapters/orbitControlsAdapterSingleton";
 import { StoryPlayer } from "./StoryPlayer";
 import type { CameraConfig } from "../../contracts";
-import type { AppMode, PendulumParams } from "@/shared/domain/valueObjects";
+import type { AppMode, PendulumParams, InitialConditions } from "@/shared/domain/valueObjects";
 import { RefreshCw } from "lucide-react";
 
 interface StageEventData {
@@ -30,18 +30,39 @@ export function StoryOverlay() {
   const { playback, play, pause, onEvent, offEvent } = viewModel;
   const [visible, setVisible] = useState(false);
 
-  // 监听 playback 状态，控制覆盖层可见性
+  // 监听 playback 状态，控制覆盖层可见性（不包含 storyEnd 的 setVisible，消除闪烁）
   useEffect(() => {
     setVisible(playback.isPlaying || playback.isInterrupted || playback.progress >= 1);
   }, [playback.isPlaying, playback.isInterrupted, playback.progress]);
 
-  // 故事事件 → 模式切换 + 相机 + 参数 + 导航锁定
-  const handleStoryEvent = useCallback((event: string, data?: unknown) => {
-    const app = useAppStore.getState();
+  // 控件脉冲高亮——跨模式持久（StoryPage 会随模式切换卸载，此处才是正确的宿主）
+  useEffect(() => {
+    const ids = playback.highlightedControls;
+    if (ids.length === 0) return;
 
+    const elements: Element[] = [];
+    for (const id of ids) {
+      const els = document.querySelectorAll(`[data-story-highlight="${id}"]`);
+      els.forEach((el) => {
+        el.classList.add("animate-pulse-glow");
+        elements.push(el);
+      });
+    }
+
+    return () => {
+      for (const el of elements) {
+        el.classList.remove("animate-pulse-glow");
+      }
+    };
+  }, [playback.highlightedControls]);
+
+  // 故事事件 → 模式切换 + 相机 + 参数 + 导航锁定
+  // 修复：storyStart 不再锁定导航（避免阻塞首个 stageEnter 的模式切换）。
+  //       锁定移至 stageEnter——在 setMode 成功后锁定，确保故事内部切换不被自锁。
+  //       stageEnter 采用"临时解锁→切换→重新锁定"模式，兼容正常推进/首次播放/暂停恢复三种场景。
+  const handleStoryEvent = useCallback((event: string, data?: unknown) => {
     switch (event) {
       case "storyStart":
-        app.lockNavigation("故事播放中");
         setVisible(true);
         break;
 
@@ -51,7 +72,11 @@ export function StoryOverlay() {
         if (!stage) break;
 
         if (stage.targetMode) {
+          const app = useAppStore.getState();
+          // 若已锁定（前一个 stageEnter 所设），临时解锁以允许故事内部模式切换
+          if (app.isNavigationLocked) app.unlockNavigation();
           app.setMode(stage.targetMode);
+          app.lockNavigation("故事播放中");
         }
 
         if (stage.cameraConfig) {
@@ -62,19 +87,19 @@ export function StoryOverlay() {
         if (stage.params) {
           const params = stage.params;
           const newParams: Partial<PendulumParams> = {};
-          const newIC: Record<string, number> = {};
+          const newIC: Partial<InitialConditions> = {};
           const IC_KEYS = new Set(["theta1", "theta2", "theta1Dot", "theta2Dot"]);
           for (const [k, v] of Object.entries(params)) {
             if (v === undefined) continue;
             if (IC_KEYS.has(k)) {
-              newIC[k] = v as number;
+              (newIC as Record<string, number>)[k] = v as number;
             } else {
               (newParams as Record<string, number>)[k] = v as number;
             }
           }
           if (Object.keys(newParams).length > 0 || Object.keys(newIC).length > 0) {
             const simStore = useSimulationStore.getState();
-            simStore.injectParams(newParams, newIC as Record<string, number>);
+            simStore.injectParams(newParams, newIC);
           }
         }
         break;
@@ -82,8 +107,7 @@ export function StoryOverlay() {
 
       case "storyEnd":
       case "storyInterrupted":
-        app.unlockNavigation();
-        if (event === "storyEnd") setVisible(false);
+        useAppStore.getState().unlockNavigation();
         break;
     }
   }, []);

@@ -298,7 +298,7 @@ export abstract class StoryScriptEngine {
         state.currentStage,
       );
     }
-    if (state.progress < 0 || state.progress > 1) {
+    if (Number.isNaN(state.progress) || state.progress < 0 || state.progress > 1) {
       throw new StoryScriptError(
         "STORY_STAGE_TRANSITION",
         `播放进度无效：progress=${state.progress}`,

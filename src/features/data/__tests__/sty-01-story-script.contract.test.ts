@@ -336,13 +336,11 @@ describe("StoryScriptEngine — 故事脚本引擎", () => {
       ).not.toThrow();
     });
 
-    it("progress = NaN → 应抛出 (NaN < 0 为 false, NaN > 1 为 false → 不会触发校验)", () => {
-      // 实际上 NaN < 0 === false AND NaN > 1 === false，所以两个 check 都不会触发
-      // 这是已知的漏洞：NaN progress 可以通过校验
+    it("progress = NaN → 应抛出（已知漏洞已修复，Number.isNaN 守卫生效）", () => {
       const state = createValidPlaybackState({ progress: NaN });
       expect(() =>
         engine["validatePlaybackState"](state),
-      ).not.toThrow();
+      ).toThrow(StoryScriptError);
     });
   });
 
