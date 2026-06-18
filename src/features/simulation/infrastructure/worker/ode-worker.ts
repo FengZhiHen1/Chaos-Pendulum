@@ -445,6 +445,15 @@ function handleRunValidation(cmd: {
 
   const integrateStart = performance.now();
   for (let i = 0; i < totalFrames; i++) {
+    // 先采集当前帧数据（含 t=0 初始条件），再积分推进
+    theta1Samples[i] = ctx.state[0]!;
+
+    if (i % ENERGY_SAMPLE_INTERVAL === 0) {
+      const derived = computeDerived(ctx.state, ctx.params);
+      if (i === 0) energyInitial = derived.totalEnergy;
+      energySamples.push(derived.totalEnergy);
+    }
+
     integratorStep(ctx.state, ctx.params, VALIDATION_DT, savedMethod);
 
     if (hasInvalidValue(ctx.state)) {
@@ -456,14 +465,6 @@ function handleRunValidation(cmd: {
     ctx.simTime += VALIDATION_DT;
     ctx.state[0] = normalizeAngle(ctx.state[0]!);
     ctx.state[2] = normalizeAngle(ctx.state[2]!);
-
-    theta1Samples[i] = ctx.state[0]!;
-
-    if (i % ENERGY_SAMPLE_INTERVAL === 0) {
-      const derived = computeDerived(ctx.state, ctx.params);
-      if (i === 0) energyInitial = derived.totalEnergy;
-      energySamples.push(derived.totalEnergy);
-    }
   }
   console.log(`[ode-worker] 验证积分完成: elapsed=${(performance.now() - integrateStart).toFixed(1)}ms, diverged=${divergedAt !== undefined}`);
 
