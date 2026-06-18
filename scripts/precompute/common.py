@@ -167,6 +167,163 @@ def rkf45_adaptive(y: np.ndarray, dt: float, params: dict,
 # v2: 自实现 RKF45 Fehlberg 替代 SciPy solve_ivp；
 #     扰动策略与 JS ode-worker.ts 影子轨迹完全一致
 
+def _modified_gram_schmidt(A: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """修正 Gram-Schmidt 正交化（数值稳定性优于经典 GS）。
+
+    对矩阵 A 的列向量做 MGS 正交化，返回 (Q, R) 满足 A = Q @ R。
+
+    参数:
+        A: np.ndarray (m, n) — 列向量矩阵，m ≥ n
+
+    返回:
+        (Q, R): tuple — Q 为正交矩阵 (m, n)，R 为上三角矩阵 (n, n)
+    """
+    m, n = A.shape
+    Q = A.copy().astype(np.float64)
+    R = np.zeros((n, n), dtype=np.float64)
+    for j in range(n):
+        v = Q[:, j]
+        # 对前面所有已正交化的向量做投影减法
+        for i in range(j):
+            R[i, j] = float(np.dot(Q[:, i], v))
+            v = v - R[i, j] * Q[:, i]
+        R[j, j] = float(np.sqrt(np.dot(v, v)))
+        if R[j, j] > 1e-15:
+            Q[:, j] = v / R[j, j]
+        else:
+            Q[:, j] = v  # 退化情况，保留原向量
+    return Q, R
+
+
+def estimate_lyapunov_spectrum(
+    params: dict,
+    y0: np.ndarray,           # 初始状态 [θ₁, ω₁, θ₂, ω₂]
+    total_time: float,        # 总仿真时长 (s)
+    transient_time: float,    # 瞬态抛弃时间 (s)
+    dt: float,                # 积分步长 (s)
+    delta0: float = 1e-8,     # 初始扰动大小
+    renorm_interval: int = 60,  # 重正交化间隔（帧）
+) -> np.ndarray:
+    """使用 Benettin 算法 + Gram-Schmidt 重正交化估计全部 Lyapunov 谱。
+
+    追踪 4 个正交扰动向量，得到 [λ₁, λ₂, λ₃, λ₄]（从大到小排列）。
+
+    参考:
+        Benettin et al. (1980), "Lyapunov Characteristic Exponents
+        for Smooth Dynamical Systems"
+
+    参数:
+        params: dict             — 物理参数
+        y0: np.ndarray[4]       — 初始状态 [θ₁, ω₁, θ₂, ω₂]
+        total_time: float       — 总仿真时长 (s)
+        transient_time: float   — 瞬态抛弃时长 (s)
+        dt: float               — 积分步长 (s)
+        delta0: float           — 初始扰动大小，默认 1e-8
+        renorm_interval: int    — 重正交化间隔帧数，默认 60
+
+    返回:
+        np.ndarray[4] — [λ₁, λ₂, λ₃, λ₄]，从大到小排列。
+                        全 NaN 表示积分失败。
+    """
+    # 1. 积分瞬态阶段
+    y_ref = y0.copy().astype(np.float64)
+    if transient_time > 0:
+        transient_steps = int(transient_time / dt)
+        for _ in range(transient_steps):
+            rkf45_adaptive(y_ref, dt, params)
+            if np.isnan(y_ref).any():
+                return np.full(4, float("nan"))
+
+    # 2. 初始化 4 个正交扰动向量
+    #    生成随机矩阵 → QR 分解取 Q 的列作为正交基 → 缩放至 delta0
+    rng = np.random.default_rng(42)
+    random_mat = rng.standard_normal((4, 4))
+    Q0, _ = np.linalg.qr(random_mat)
+    pert_vectors = [y_ref.copy() for _ in range(4)]
+    for k in range(4):
+        pert_vectors[k] = pert_vectors[k] + delta0 * Q0[:, k]
+
+    # 3. Benettin 迭代
+    lyap_sum = np.zeros(4, dtype=np.float64)
+    total_steps = int(total_time / dt) if transient_time == 0 else \
+                  int((total_time - transient_time) / dt)
+    renorm_count = 0
+
+    for step in range(total_steps):
+        # 积分参考轨线
+        rkf45_adaptive(y_ref, dt, params)
+        if np.isnan(y_ref).any():
+            return np.full(4, float("nan"))
+
+        # 积分 4 条扰动轨线
+        for k in range(4):
+            rkf45_adaptive(pert_vectors[k], dt, params)
+            if np.isnan(pert_vectors[k]).any():
+                return np.full(4, float("nan"))
+
+        # 每 renorm_interval 帧做 Gram-Schmidt 重正交化
+        if (step + 1) % renorm_interval == 0:
+            # 构建扰动矩阵 D (4×4): 每列是一个扰动向量与参考轨线的差
+            D = np.zeros((4, 4), dtype=np.float64)
+            for k in range(4):
+                D[:, k] = pert_vectors[k] - y_ref
+
+            # 修正 Gram-Schmidt 正交化
+            Q, R = _modified_gram_schmidt(D)
+
+            # 累加对数增长率: ln(|R_diag| / delta0)
+            for k in range(4):
+                r_kk = abs(R[k, k])
+                if r_kk > 1e-15:
+                    lyap_sum[k] += np.log(r_kk / delta0)
+
+            # 重标定扰动向量
+            for k in range(4):
+                pert_vectors[k] = y_ref + Q[:, k] * delta0
+
+            renorm_count += 1
+
+    if renorm_count == 0:
+        return np.full(4, float("nan"))
+
+    # λ_k = Σ ln(|R_kk|/D0) / (N × RENORM_INTERVAL × dt)
+    spectrum = lyap_sum / (renorm_count * renorm_interval * dt)
+    # 从大到小排列
+    spectrum = -np.sort(-spectrum)
+    return spectrum
+
+
+def compute_energy_curvature(params: dict, theta1: float, theta2: float) -> float:
+    """计算双摆势能曲面 V(θ₁,θ₂) 在 (θ₁,θ₂) 处的最大曲率。
+
+    曲率 = Hessian 矩阵的最大特征值（绝对值）。
+    Hessian 为对角矩阵（∂²V/∂θ₁∂θ₂ = 0），因此特征值即对角元素。
+
+    势能:
+        V(θ₁,θ₂) = (m₁+m₂)gL₁(1-cos(θ₁)) + m₂gL₂(1-cos(θ₂))
+
+    Hessian 对角元素:
+        ∂²V/∂θ₁² = (m₁+m₂)gL₁cos(θ₁)
+        ∂²V/∂θ₂² = m₂gL₂cos(θ₂)
+
+    参数:
+        params: dict — 物理参数，须包含 m1, m2, L1, L2, g
+        theta1: float — θ₁ 角 (rad)
+        theta2: float — θ₂ 角 (rad)
+
+    返回:
+        float — 最大曲率（非负值）
+    """
+    m1, m2 = params["m1"], params["m2"]
+    L1, L2 = params["L1"], params["L2"]
+    g = params["g"]
+
+    h11 = (m1 + m2) * g * L1 * np.cos(theta1)
+    h22 = m2 * g * L2 * np.cos(theta2)
+
+    return float(max(abs(h11), abs(h22)))
+
+
 def estimate_lyapunov(
     params: dict,
     y0: np.ndarray,          # 初始状态 [θ₁, ω₁, θ₂, ω₂]

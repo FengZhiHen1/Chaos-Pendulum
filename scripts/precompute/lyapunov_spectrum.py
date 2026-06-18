@@ -21,7 +21,13 @@ from pathlib import Path
 import numpy as np
 
 from config import LYAPUNOV_GRID, LYAPUNOV_DAMPING_RANGE, FIXED_PARAMS, INTEGRATION, OUTPUT_DIR, SOLVER_VERSION
-from common import estimate_lyapunov, compute_grid_hash, safe_json_dump
+from common import (
+    estimate_lyapunov,
+    estimate_lyapunov_spectrum,
+    compute_energy_curvature,
+    compute_grid_hash,
+    safe_json_dump,
+)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -211,7 +217,15 @@ def main():
                 theta2_0 = FIXED_PARAMS.get("theta2_0", np.pi / 2)
                 y0 = np.array([theta1_init, 0.0, theta2_0, 0.0])
 
-                lam = estimate_lyapunov(params, y0, total_time, lyapunov_transient, dt)
+                if layer_type == "lyapunov_max":
+                    lam = estimate_lyapunov(params, y0, total_time, lyapunov_transient, dt)
+                elif layer_type == "lyapunov_min":
+                    spectrum = estimate_lyapunov_spectrum(params, y0, total_time, lyapunov_transient, dt)
+                    lam = float(spectrum[-1])  # 最小 Lyapunov 指数
+                elif layer_type == "energy_curvature":
+                    lam = compute_energy_curvature(params, theta1_init, theta2_0)
+                else:
+                    lam = float("nan")
 
                 if np.isnan(lam):
                     lyap_matrix[y, x] = 0.0

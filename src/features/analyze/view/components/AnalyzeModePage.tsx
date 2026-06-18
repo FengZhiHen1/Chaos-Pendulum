@@ -48,7 +48,7 @@ const VIEW_TABS = [
 
 function useLayerManifest(): {
   lyapunovPaths: typeof FALLBACK_PATHS;
-  dampingSlices: DampingSlice[];
+  dampingSlicesByLayer: Record<string, DampingSlice[]>;
   bifurcationPath: string;
   ready: boolean;
 } {
@@ -87,17 +87,20 @@ function useLayerManifest(): {
     ? `./assets/${manifest.bifurcation}`
     : FALLBACK_BIFURCATION;
 
-  const dampingSlices = manifest?.lyapunov_max_dampingSlices
-    ?? manifest?.lyapunov_min_dampingSlices
-    ?? manifest?.energy_curvature_dampingSlices
-    ?? [];
+  // 按层隔离 damping slices，禁止跨层 fallback
+  //（lyapunov_max_dampingSlices 不存在时不应 fallback 到 lyapunov_min 的切片）
+  const dampingSlicesByLayer: Record<string, DampingSlice[]> = {
+    lyapunov_max: manifest?.lyapunov_max_dampingSlices ?? [],
+    lyapunov_min: manifest?.lyapunov_min_dampingSlices ?? [],
+    energy_curvature: manifest?.energy_curvature_dampingSlices ?? [],
+  };
 
-  return { lyapunovPaths, dampingSlices, bifurcationPath, ready };
+  return { lyapunovPaths, dampingSlicesByLayer, bifurcationPath, ready };
 }
 
 export function AnalyzeModePage() {
   const { activeView, setActiveView } = useAnalysisView();
-  const { lyapunovPaths, dampingSlices, bifurcationPath, ready } = useLayerManifest();
+  const { lyapunovPaths, dampingSlicesByLayer, bifurcationPath, ready } = useLayerManifest();
 
   const activeLayer = useAnalyzeStore((s) => s.activeLayer);
   const setActiveLayer = useAnalyzeStore((s) => s.setActiveLayer);
@@ -105,6 +108,8 @@ export function AnalyzeModePage() {
   const setActiveDamping = useAnalyzeStore((s) => s.setActiveDamping);
   const loadStatus = useAnalyzeStore((s) => s.loadStatus);
   const layerCacheStatus = useAnalyzeStore((s) => s.layerCacheStatus);
+
+  const activeDampingSlices = dampingSlicesByLayer[activeLayer] ?? [];
 
   const availableLayers = new Set(
     (Object.keys(lyapunovPaths) as Array<keyof typeof lyapunovPaths>).filter(
@@ -121,7 +126,7 @@ export function AnalyzeModePage() {
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
           availableLayers={availableLayers}
-          dampingSlices={dampingSlices}
+          dampingSlices={activeDampingSlices}
           activeDamping={activeDamping}
           onDampingChange={setActiveDamping}
           loadStatus={loadStatus}
@@ -184,7 +189,7 @@ export function AnalyzeModePage() {
               {activeView === "lyapunov" && (
                 <LyapunovHeatmap
                   dataPaths={lyapunovPaths}
-                  dampingSlices={dampingSlices}
+                  dampingSlices={activeDampingSlices}
                   activeLayer={activeLayer}
                   activeDamping={activeDamping}
                 />

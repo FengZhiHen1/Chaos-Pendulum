@@ -23,7 +23,7 @@ export function ParameterFillDialog({ gridData, cell, onConfirm, onCancel }: Pro
   const paramXValue = px.min + (col + 0.5) / px.steps * (px.max - px.min);
   const paramYValue = py.min + (row + 0.5) / py.steps * (py.max - py.min);
   const lambdaValue = gridData.grid[row]?.[col];
-  const { label: lambdaLabel } = classifyLambda(isNaN(lambdaValue ?? NaN) ? null : lambdaValue!);
+  const { label: lambdaLabel } = classifyLambda(isNaN(lambdaValue ?? NaN) ? null : lambdaValue!, metadata.type);
 
   const xResolved = resolveStoreParam(px.name, paramXValue, metadata.fixedParams);
   const yResolved = resolveStoreParam(py.name, paramYValue, metadata.fixedParams);

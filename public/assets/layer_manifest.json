@@ -1,5 +1,27 @@
 {
   "bifurcation": "bifurcation-f5770d24521b59de.json",
+  "energy_curvature": "lyapunov_curvature-ac0c55b87191d90f.json",
+  "energy_curvature_dampingSlices": [
+    {
+      "file": "lyapunov_curvature-ac0c55b87191d90f.json",
+      "gridHash": "ac0c55b87191d90f",
+      "value": 0.0
+    }
+  ],
   "lyapunov_max": "lyapunov_max-18a7e25c8db5e979.json",
-  "energy_curvature": "energy_curvature-a1b3f2e8.json"
+  "lyapunov_max_dampingSlices": [
+    {
+      "file": "lyapunov_max-18a7e25c8db5e979.json",
+      "gridHash": "18a7e25c8db5e979",
+      "value": 0.0
+    }
+  ],
+  "lyapunov_min": "lyapunov_min-ca44082746e39e57.json",
+  "lyapunov_min_dampingSlices": [
+    {
+      "file": "lyapunov_min-ca44082746e39e57.json",
+      "gridHash": "ca44082746e39e57",
+      "value": 0.0
+    }
+  ]
 }

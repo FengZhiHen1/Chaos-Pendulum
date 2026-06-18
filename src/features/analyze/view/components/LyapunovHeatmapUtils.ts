@@ -52,15 +52,19 @@ export function calcGridStats(grid: (number | null)[][]): {
   return { minVal, maxVal, hasValid };
 }
 
-/** 将网格值域归一化到含零区间，确保 colorScale 零色调对齐 */
+/**
+ * 将网格值域归一化，供 colorScale 使用。
+ *
+ * - 值域跨越零时（min < 0 < max）：保留原始范围，零自然在中间
+ * - 单侧值域时（全负或全正）：不强制扩展至零，让色阶充分利用实际数据范围
+ * - 退化为单点时：±0.5 防止除零
+ */
 export function normalizeRange(minVal: number, maxVal: number): {
   normMin: number;
   normMax: number;
 } {
   let normMin = minVal;
   let normMax = maxVal;
-  if (normMax < 0) normMax = 0;
-  if (normMin > 0) normMin = 0;
   if (normMin === normMax) { normMin -= 0.5; normMax += 0.5; }
   return { normMin, normMax };
 }
@@ -98,7 +102,7 @@ export function buildTooltipData(
   mouseY: number,
   activeDamping: number,
 ): HoverTooltipData {
-  const { label } = classifyLambda(value);
+  const { label } = classifyLambda(value, gridData.metadata.type);
   const px = gridData.metadata.paramX;
   const py = gridData.metadata.paramY;
   const { paramXValue, paramYValue } = cellToParamValue(col, row, px, py);

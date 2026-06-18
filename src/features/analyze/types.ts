@@ -263,11 +263,25 @@ export const PARAM_NAME_TO_STORE_KEY: Record<
   "g": { key: "g" },
 };
 
-/** 混沌判定标签（ANL-01） */
-export function classifyLambda(value: number | null): { label: string; tone: "chaos" | "quasi" | "stable" | "missing" } {
+/** 混沌判定标签（ANL-01）。
+ *
+ * - lyapunov_max / lyapunov_min: 基于 ±0.01 阈值判定混沌/稳定/准周期
+ * - energy_curvature: 基于曲率幅值判定高/中/低弯曲程度
+ */
+export function classifyLambda(
+  value: number | null,
+  layerType: LyapunovLayerType = "lyapunov_max",
+): { label: string; tone: "chaos" | "quasi" | "stable" | "missing" | "high" | "mid" | "low" } {
   if (value === null || value === undefined || isNaN(value)) {
     return { label: "数据缺失", tone: "missing" };
   }
+
+  if (layerType === "energy_curvature") {
+    if (value > 15) return { label: "高弯曲", tone: "high" };
+    if (value > 5) return { label: "中等弯曲", tone: "mid" };
+    return { label: "低弯曲", tone: "low" };
+  }
+
   if (value > 0.01) return { label: "混沌", tone: "chaos" };
   if (value < -0.01) return { label: "稳定", tone: "stable" };
   return { label: "准周期", tone: "quasi" };

@@ -155,7 +155,10 @@ def main():
             maxima = detect_local_maxima(theta2_series, order=5)
             samples.append(maxima.tolist())
 
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"[警告] 参数值 {param_val:.4f} 处积分异常: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             samples.append([])
 
         # 每 50 个参数值打印进度

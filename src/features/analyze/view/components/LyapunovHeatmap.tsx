@@ -39,7 +39,7 @@ export function LyapunovHeatmap({ dataPaths, activeLayer, activeDamping, damping
 
   // ── 数据加载（SYS-03 usePrecomputeData）
   const resolvedPath = (() => {
-    if (dampingSlices.length > 0 && activeLayer === "lyapunov_max") {
+    if (dampingSlices.length > 0) {
       const slice = dampingSlices.find((s) => s.value === activeDamping) ?? dampingSlices[0];
       if (slice) return `./assets/${slice.file}`;
     }
