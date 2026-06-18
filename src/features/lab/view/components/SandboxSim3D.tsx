@@ -109,7 +109,7 @@ export function SandboxSim3D() {
   return (
     <div className="w-full h-full rounded-lg overflow-hidden bg-surface-container-low">
       <Canvas
-        camera={{ position: [0, -0.3, 2.5], fov: 40 }}
+        camera={{ position: [0, -0.4, 3.2], fov: 45 }}
         gl={{ antialias: true, alpha: false }}
       >
         <color attach="background" args={["#1A1D22"]} />

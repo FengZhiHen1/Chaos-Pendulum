@@ -148,7 +148,7 @@ export function SandboxPanel() {
       {/* 左右分栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 左：编辑器 */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-white/5">
+        <div className="w-[360px] shrink-0 flex flex-col overflow-hidden border-r border-white/5">
           <div className="flex-1 overflow-hidden">
             <CodeEditor value={userCode} onChange={setUserCode}
               errorLine={errorLine} height={SANDBOX_DEFAULTS.editorHeight} />
@@ -188,7 +188,7 @@ export function SandboxPanel() {
         </div>
 
         {/* 右：3D 预览 */}
-        <div className="w-[380px] shrink-0 flex flex-col bg-surface-container-lowest">
+        <div className="flex-1 min-w-[400px] flex flex-col bg-surface-container-lowest">
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5 shrink-0">
             <span className="text-[10px] text-on-surface-variant font-medium">3D 预览</span>
             {traj && <Badge variant="outline" className="text-[9px]">{traj.time.length} 帧</Badge>}
