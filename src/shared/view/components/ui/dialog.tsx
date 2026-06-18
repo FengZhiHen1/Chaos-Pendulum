@@ -15,7 +15,7 @@ function DialogOverlay({ className, onClick }: { className?: string; onClick?: (
   return (
     <div
       className={cn(
-        "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm",
+        "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm pointer-events-auto",
         "animate-in fade-in-0",
         className,
       )}
@@ -32,7 +32,7 @@ function DialogContent({
   return (
     <div
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
+        "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 pointer-events-auto",
         "w-full max-w-lg rounded-xl bg-surface-container-high p-6",
         "shadow-[0_12px_32px_rgba(0,0,0,0.4)]",
         "animate-in fade-in-0 zoom-in-95",
