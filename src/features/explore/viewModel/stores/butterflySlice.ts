@@ -34,6 +34,8 @@ export interface ButterflySlice {
   isRunning: boolean;
   /** 递增信号：通知 Scene3D 清空尾迹 */
   trailClearSignal: number;
+  /** true=已通过 init() 写入真实仿真数据（区别于 defaultSideState 零值） */
+  bfInitialized: boolean;
 
   init: (baseParams: PendulumParams, baseState: StateVector, deltaDeg: number) => void;
   play: () => void;
@@ -90,6 +92,8 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
   separation: defaultSeparation(),
   isRunning: false,
   trailClearSignal: 0,
+  /** true=butterfly store 已通过 init() 写入真实仿真数据（区别于 defaultSideState 的零值） */
+  bfInitialized: false,
 
   init: (baseParams, baseState, deltaDeg) => {
     const deltaRad = deltaDeg * (Math.PI / 180);
@@ -116,6 +120,7 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
       },
       separation: defaultSeparation(),
       isRunning: false,
+      bfInitialized: true,
     });
   },
 

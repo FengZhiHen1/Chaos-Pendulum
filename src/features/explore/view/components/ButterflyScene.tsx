@@ -70,14 +70,24 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
   const initializedRef = useRef(false);
   useFrame(() => {
     const bf = useButterflyStore.getState();
-    // 等待 butterflySlice 初始化（sideA.params.L1 有合法值）
+
+    // ── 哨兵：等待 butterfly store 通过 init() 写入真实数据 ──
+    if (!bf.bfInitialized) return;
+
+    // ── 首次初始化：几何体等一次性设置 ──
     if (!initializedRef.current) {
-      if (!bf.sideA.params || bf.sideA.params.L1 <= 0) return;
       initializedRef.current = true;
+      // 球半径首次设置（走 useFrame 确保 mesh ref 已挂载）
+      const p = bf.sideA.params;
+      lastM1.current = p.m1; lastM2.current = p.m2;
+      const r1 = ballR(p.m1); const r2 = ballR(p.m2);
+      [bA1, bB1].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r1, 48, 48); } });
+      [bA2, bB2].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r2, 48, 48); } });
     }
+
     const p = bf.sideA.params;
 
-    // 动态球半径
+    // 质量变化时重建球几何体（罕见，走 useEffect 更好但此处保持兼容）
     if (p.m1 !== lastM1.current || p.m2 !== lastM2.current) {
       lastM1.current = p.m1; lastM2.current = p.m2;
       const r1 = ballR(p.m1); const r2 = ballR(p.m2);
@@ -93,7 +103,6 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
       ptsB.current.push(new Vector3(bf.sideB.x2 + X_OFF, bf.sideB.y2, 0));
       if (ptsA.current.length > TRAIL_LEN) ptsA.current = ptsA.current.slice(-TRAIL_LEN);
       if (ptsB.current.length > TRAIL_LEN) ptsB.current = ptsB.current.slice(-TRAIL_LEN);
-      // 写入预分配 Float32Array → needsUpdate，避免每帧 dispose/create BufferGeometry
       updTrailBuf(tA.current, trailBufA.current, ptsA.current, !trailGeomInit.current);
       updTrailBuf(tB.current, trailBufB.current, ptsB.current, !trailGeomInit.current);
       trailGeomInit.current = true;
