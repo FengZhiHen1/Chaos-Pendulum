@@ -33,6 +33,8 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     subtitle: "一个摆，我们知道它会在哪里",
     highlightedControls: ["sim-controls"],
     cameraConfig: { azimuth: 0.2, elevation: 0.35, distance: 3.0 },
+    // 低能初始条件：小角度 θ₁≈17°，下摆对齐 → 接近单摆的规律摆动
+    params: { theta1: 0.3, theta2: 0, theta1Dot: 0, theta2Dot: 0 },
   },
   {
     startTime: 25,

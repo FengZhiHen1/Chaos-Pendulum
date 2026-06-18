@@ -18,7 +18,7 @@
  *   - 禁止与 shared/domain/valueObjects 中的类型重复定义——本文件聚合和扩展共享类型
  */
 
-import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
+import type { PendulumParams, InitialConditions, StateVector } from "@/shared/domain/valueObjects";
 import type { AppMode } from "@/shared/domain/valueObjects";
 
 // ─── 品牌类型（编译期类型安全） ──────────────────
@@ -64,8 +64,8 @@ export interface StoryStage {
   highlightedControls: string[];
   /** 可选相机配置 */
   cameraConfig?: CameraConfig;
-  /** 可选参数注入 */
-  params?: Partial<PendulumParams>;
+  /** 可选参数注入（包含物理参数与初始条件——运行时按 key 分流） */
+  params?: Partial<PendulumParams & InitialConditions>;
 }
 
 /**

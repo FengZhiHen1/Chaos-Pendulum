@@ -20,7 +20,7 @@ interface StageEventData {
     targetMode: AppMode;
     subtitle: string;
     cameraConfig?: CameraConfig;
-    params?: Partial<PendulumParams>;
+    params?: Partial<PendulumParams & InitialConditions>;
   };
   index: number;
 }
@@ -65,11 +65,6 @@ export function StoryOverlay() {
       case "storyStart":
         sync(); // 强制同步引擎状态（play() 在 StoryPage 实例中调用，本实例状态陈旧）
         setVisible(true);
-        // 故事启动时确保仿真在运行（isRunning 默认为 false，不自动启动）
-        {
-          const sim = useSimulationStore.getState();
-          if (!sim.isRunning) sim.setRunning(true);
-        }
         break;
 
       case "stageEnter": {
