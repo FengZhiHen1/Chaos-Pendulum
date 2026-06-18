@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { useAppStore } from "@/stores/useAppStore";
 import { useExploreStore } from "@/features/explore";
 import { useButterflyStore } from "../../store";
 import { useButterflySimulation } from "../../viewModel/hooks/useButterflySimulation";
@@ -24,7 +23,6 @@ interface ButterflySplitProps {
  * 非桌面端：单视口 + A/B 切换。
  */
 export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitProps) {
-  const deviceType = useAppStore((s) => s.deviceType);
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
   // 使用精确选择器，避免每帧 store 更新触发整个组件树重渲染
   const isBfRunning = useButterflyStore((s) => s.isRunning);
@@ -36,7 +34,6 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
   const bfSetEditMode = useButterflyStore((s) => s.setEditMode);
   const { handlePlay, handlePause, handleReset, handleDeltaChange, initError } = useButterflySimulation();
 
-  const isDesktop = deviceType === "desktop";
   const workersReady = sideAWorkerReady && sideBWorkerReady;
 
   const [activeSide, setActiveSide] = useState<"A" | "B">("A");
@@ -55,7 +52,9 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             onClick={isBfRunning ? handlePause : handlePlay}
             title={initError ? "仿真引擎启动失败" : !workersReady ? "仿真引擎初始化中…" : undefined}
           >
-            {!workersReady ? (
+            {initError ? (
+              "启动失败"
+            ) : !workersReady ? (
               <span className="h-3.5 w-3.5 mr-1 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : isBfRunning ? (
               <Pause className="h-3.5 w-3.5 mr-1" />
@@ -82,94 +81,58 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
         />
       </div>
 
-      {/* 分屏区域 */}
+      {/* 单视口 + A/B 切换（所有平台统一，避免双 WebGL context 导致 GPU 资源耗尽） */}
       <div
         className={cn(
           "flex-1 relative min-h-0",
           isFullyDecoupled && "animate-alert-edge",
         )}
       >
-        {isDesktop ? (
-          <div className="flex w-full h-full">
-            {/* 摆 A */}
-            <div className="relative flex-1 min-w-0">
-              <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50 backdrop-blur">
-                摆 A — δ=0
-              </div>
-              <Scene3D
-                pendulumMaterial="metal"
-                ballColor={BALL_COLOR_A}
-                environment="dark-lab"
-                showGrid
-                enableShadows
-                className="w-full h-full"
-                butterflySide="A"
-              />
-            </div>
-
-            {/* 暗色裂隙 */}
-            <div
+        <div className="relative w-full h-full">
+          {/* 侧边标签 + A/B 切换 */}
+          <div className="absolute top-3 left-4 z-10 flex gap-2">
+            <button
+              type="button"
+              onClick={switchToA}
               className={cn(
-                "shrink-0 bg-surface transition-all duration-dramatic",
-                isFullyDecoupled ? "w-3" : "w-1",
+                "px-2 py-0.5 rounded text-xs font-bold transition-all",
+                activeSide === "A"
+                  ? "text-amber-300 bg-black/70 ring-1 ring-amber-500/50"
+                  : "text-amber-300/50 bg-black/30",
               )}
-            />
+            >
+              摆 A — δ=0
+            </button>
+            <button
+              type="button"
+              onClick={switchToB}
+              className={cn(
+                "px-2 py-0.5 rounded text-xs font-bold transition-all",
+                activeSide === "B"
+                  ? "text-purple-300 bg-black/70 ring-1 ring-purple-500/50"
+                  : "text-purple-300/50 bg-black/30",
+              )}
+            >
+              摆 B — δ={butterflyDelta}°
+            </button>
+          </div>
 
-            {/* 摆 B */}
-            <div className="relative flex-1 min-w-0">
-              <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50 backdrop-blur">
-                摆 B — δ={butterflyDelta}°
-              </div>
-              <Scene3D
-                pendulumMaterial="metal"
-                ballColor={BALL_COLOR_B}
-                environment="dark-lab"
-                showGrid
-                enableShadows
-                className="w-full h-full"
-                butterflySide="B"
-              />
+          {/* 分离度指示器（替代暗色裂隙） */}
+          {isFullyDecoupled && (
+            <div className="absolute top-3 right-4 z-10 px-2 py-0.5 rounded text-[10px] font-bold text-separation-alert bg-black/70 ring-1 ring-separation-alert/50">
+              |Δθ| = {(separationRad * 180 / Math.PI).toFixed(1)}°
             </div>
-          </div>
-        ) : (
-          <div className="relative w-full h-full">
-            <div className="absolute top-3 left-4 z-10 flex gap-2">
-              <button
-                type="button"
-                onClick={switchToA}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-bold transition-opacity",
-                  activeSide === "A"
-                    ? "text-amber-300 bg-black/70 ring-1 ring-amber-500/50"
-                    : "text-amber-300/50 bg-black/30",
-                )}
-              >
-                摆 A
-              </button>
-              <button
-                type="button"
-                onClick={switchToB}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-bold transition-opacity",
-                  activeSide === "B"
-                    ? "text-purple-300 bg-black/70 ring-1 ring-purple-500/50"
-                    : "text-purple-300/50 bg-black/30",
-                )}
-              >
-                摆 B
-              </button>
-            </div>
-            <Scene3D
-              pendulumMaterial="metal"
-              ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
-              environment="dark-lab"
-              showGrid
-              enableShadows
-              className="w-full h-full"
-              butterflySide={activeSide}
-            />
-          </div>
-        )}
+          )}
+
+          <Scene3D
+            ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
+            environment="dark-lab"
+            showGrid
+            enableShadows
+            className="w-full h-full"
+            butterflySide={activeSide}
+          />
+        </div>
 
         {/* 分离警报 */}
         <SeparationAlert
