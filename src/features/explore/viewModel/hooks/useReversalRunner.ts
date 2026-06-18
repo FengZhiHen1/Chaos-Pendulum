@@ -143,7 +143,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     && !annotationDismissed && driftHistory.some((d) => d.driftDistance > REVERSAL_DEFAULTS.teachingThreshold);
 
   function exactPlaybackLoop() {
-    const fwdArray = history.toArray();
+    const fwdArray = fwdSnapshotRef.current;
     const idx = exactFrameIdxRef.current;
     if (idx >= fwdArray.length) {
       cancelAnimationFrame(exactRafRef.current);
