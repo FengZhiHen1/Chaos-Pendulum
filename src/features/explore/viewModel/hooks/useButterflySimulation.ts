@@ -46,8 +46,9 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
       const simStore = useSimulationStore.getState();
       console.log("[DEBUG] 调用 init()...");
       useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
-      console.log("[DEBUG] init() 完成, 不调用 start()");
-      // simRef.current.start(simStore.params, simStore.state, butterflyDelta);
+      console.log("[DEBUG] init() 完成, 调用 start()...");
+      simRef.current.start(simStore.params, simStore.state, butterflyDelta);
+      console.log("[DEBUG] start() 完成");
     } catch (err) {
       console.error("ButterflyEffect: 初始化失败", err);
     }
