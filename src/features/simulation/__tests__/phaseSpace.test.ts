@@ -180,22 +180,23 @@ describe("相空间 — NaN 处理", () => {
 describe("相空间 — reset 状态", () => {
   beforeEach(resetStore);
 
-  it("resetToDefaults 重置初始条件为默认值，保留用户参数", () => {
+  it("resetToDefaults 重置初始条件为默认值，保留用户参数和积分方法", () => {
     const store = useSimulationStore.getState();
 
-    // 修改参数
+    // 修改参数和积分方法
     store.setParam("m1", 3.0);
     store.setInitialCondition("theta1", 2.5);
+    store.setMethod("VelocityVerlet");
 
     expect(useSimulationStore.getState().params.m1).toBe(3.0);
     expect(useSimulationStore.getState().initialConditions.theta1).toBe(2.5);
 
-    // reset：params 保留用户设置，不覆盖
+    // reset：params 和 method 保留用户设置，不覆盖
     store.resetToDefaults();
     const s = useSimulationStore.getState();
     expect(s.params.m1).toBe(3.0);
     expect(s.initialConditions.theta1).toBe(DEFAULT_INITIAL_CONDITIONS.theta1);
-    expect(s.method).toBe(DEFAULT_METHOD);
+    expect(s.method).toBe("VelocityVerlet");
   });
 });
 

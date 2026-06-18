@@ -591,9 +591,9 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
     const ny2 = ny1 - L2 * Math.cos(t2);
 
     set({
-      // params 保留用户设置，不覆盖
+      // params 和 method 保留用户设置，不覆盖
       initialConditions: { ...DEFAULT_INITIAL_CONDITIONS },
-      method: DEFAULT_METHOD,
+      method: s.method,
       fieldErrors: {},
       isSceneFrozen: false,
       paramsDirty: false,

@@ -155,7 +155,7 @@ describe("injectParams", () => {
 describe("resetToDefaults", () => {
   beforeEach(resetStore);
 
-  it("重置恢复初始条件和积分方法为默认值，保留用户参数", () => {
+  it("重置恢复初始条件为默认值，保留用户设置的参数和积分方法", () => {
     // 先制造一些脏数据
     const store = useSimulationStore.getState();
     store.setParam("m1", 5.0);
