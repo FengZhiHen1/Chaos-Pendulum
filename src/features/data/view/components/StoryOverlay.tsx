@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useStoryViewModel } from "../../viewModel/hooks/useStoryViewModel";
 import { useAppStore } from "@/stores/useAppStore";
-import { useSimulationStore } from "@/features/simulation";
+import { useSimulationStore, getScheduler } from "@/features/simulation";
+import { useExploreStore, useButterflyStore } from "@/features/explore";
 import { globalOrbitControlsAdapter } from "../../infrastructure/adapters/orbitControlsAdapterSingleton";
 import { StoryPlayer } from "./StoryPlayer";
 import type { CameraConfig } from "../../contracts";
@@ -111,10 +112,33 @@ export function StoryOverlay() {
           }
         }
 
-        // ── 步骤 2: 启动仿真 ──
+        // ── 步骤 1.5: 蝴蝶模式控制（阶段索引驱动） ──
+        const stageIndex = d?.index ?? -1;
+        if (stageIndex === 2) {
+          // 进入蝴蝶效应阶段——暂停主仿真，激活蝴蝶分屏
+          const sim = useSimulationStore.getState();
+          if (sim.isRunning) {
+            sim.pause();
+            getScheduler().pause();
+          }
+          const bf = useButterflyStore.getState();
+          if (!bf.bfInitialized) {
+            bf.init(sim.params, sim.state, 0.001);
+          }
+          bf.play();
+          useExploreStore.getState().setButterflyForcedActive(true);
+        } else if (stageIndex === 4) {
+          // 退出蝴蝶效应阶段——重置蝴蝶，恢复主仿真
+          useButterflyStore.getState().reset();
+          useExploreStore.getState().setButterflyForcedActive(false);
+          useSimulationStore.getState().play();
+        }
+
+        // ── 步骤 2: 启动仿真（蝴蝶模式下跳过——由蝴蝶 store 管理） ──
         {
           const sim = useSimulationStore.getState();
-          if (!sim.isRunning) sim.setRunning(true);
+          const bfActive = useExploreStore.getState().butterflyForcedActive;
+          if (!sim.isRunning && !bfActive) sim.setRunning(true);
         }
 
         // ── 步骤 3: 模式切换（3D 场景此时挂载，读到步骤 1 的姿态） ──

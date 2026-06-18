@@ -119,6 +119,8 @@ export function ExplorePage() {
   useChaosUpdater();
 
   const { butterflyActive, enterButterfly, exitButterfly } = useButterflyMode();
+  const butterflyForcedActive = useExploreStore((s) => s.butterflyForcedActive);
+  const butterflyEffective = butterflyActive || butterflyForcedActive;
   const { isRunning, disabled, setRunning, resetToDefaults } = useSimulationControls();
   const { forceActive, toggle: toggleForce, exit: exitForce } = useForceAnalysis();
   const { isActive: sonificationActive, toggle: toggleSonification } = useSonification();
@@ -218,7 +220,7 @@ export function ExplorePage() {
             environment={environment}
             showGrid
             enableShadows
-            butterflyActive={butterflyActive}
+            butterflyActive={butterflyEffective}
             canvasChildren={trajectoryOverlay}
           />
 
@@ -235,9 +237,14 @@ export function ExplorePage() {
           <TimeReversal />
 
           {/* 蝴蝶效应 overlay — 工具栏+警报 */}
-          {butterflyActive && (
+          {butterflyEffective && (
             <div className="absolute inset-0 z-20 pointer-events-none">
-              <ButterflySplit onExit={exitButterfly} />
+              <ButterflySplit
+                onExit={() => {
+                  exitButterfly();
+                  useExploreStore.getState().setButterflyForcedActive(false);
+                }}
+              />
             </div>
           )}
         </section>

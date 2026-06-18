@@ -32,6 +32,10 @@ export interface ExploreSlice {
   // ── 混沌检测 ──
   chaosVariance: number;
 
+  // ── 故事模式跨组件控制 ──
+  /** 故事引擎强制激活蝴蝶模式（ExplorePage 与 StoryOverlay 共享） */
+  butterflyForcedActive: boolean;
+
   setViewPreset: (preset: ViewPreset) => void;
   setTrailLength: (length: TrailLength) => void;
   setMaxTrailLength: (length: number) => void;
@@ -50,6 +54,8 @@ export interface ExploreSlice {
   resetReversalState: () => void;
 
   setChaosState: (variance: number) => void;
+
+  setButterflyForcedActive: (active: boolean) => void;
 }
 
 export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice> = (set) => ({
@@ -68,6 +74,8 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
   annotationDismissed: false,
 
   chaosVariance: 0,
+
+  butterflyForcedActive: false,
 
   setViewPreset: (viewPreset) => set({ viewPreset }),
   setTrailLength: (trailLength) => set({ trailLength }),
@@ -88,6 +96,8 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
   resetAnnotation: () => set({ annotationDismissed: false }),
 
   setChaosState: (chaosVariance) => set({ chaosVariance }),
+
+  setButterflyForcedActive: (butterflyForcedActive) => set({ butterflyForcedActive }),
 
   resetReversalState: () =>
     set({
