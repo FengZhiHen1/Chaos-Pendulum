@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, ChevronUp } from "lucide-react";
 import { Scene3D } from "../components/Scene3D";
 import { TimeReversal } from "../components/TimeReversal";
@@ -18,6 +18,7 @@ import { useSimulationStore } from "@/features/simulation/store";
 import { useExploreStore } from "@/features/explore/store";
 import { useAppStore } from "@/stores/useAppStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import type { EnvironmentPreset } from "../components/Scene3D";
 
@@ -128,6 +129,15 @@ export function ExplorePage() {
   const lyapunovExponent = useSimulationStore((s) => s.lyapunovExponent);
   const isSimulationActive = useSimulationStore((s) => s.isSimulationActive);
   const simulationTime = useSimulationStore((s) => s.t);
+
+  // 首次启动 Worker 时弹出提示（自动消失）
+  const hasShownFirstStartRef = useRef(false);
+  useEffect(() => {
+    if (isRunning && !hasShownFirstStartRef.current) {
+      hasShownFirstStartRef.current = true;
+      notificationPort.info("首次加载中", "仿真引擎正在初始化，可能需要数秒…");
+    }
+  }, [isRunning]);
 
   /** 估算历史帧数（≈60fps），用于底部工具栏的禁用状态 */
   const estimatedHistoryFrames = Math.floor(simulationTime * 60);
