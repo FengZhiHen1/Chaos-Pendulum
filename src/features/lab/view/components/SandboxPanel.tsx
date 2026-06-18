@@ -64,7 +64,16 @@ export function SandboxPanel() {
   const setCodeError = useLabStore((s) => s.setCodeError);
   const traj = useLabStore((s) => s.sandboxTrajectory);
 
-  useEffect(() => { if (!userCode) setUserCode(SANDBOX_TEMPLATES[0]?.code ?? ""); }, [userCode, setUserCode]);
+  // 首次加载默认模板（弹簧摆），同步设置 activeTemplate 以便参数拼接
+  useEffect(() => {
+    if (!userCode) {
+      const defaultTpl = SANDBOX_TEMPLATES[0];
+      if (defaultTpl) {
+        setUserCode(defaultTpl.code);
+        useLabStore.setState({ activeTemplate: defaultTpl.id, codeStatus: "idle", codeError: null });
+      }
+    }
+  }, [userCode, setUserCode]);
 
   const isExecuting = codeStatus === "running";
 
