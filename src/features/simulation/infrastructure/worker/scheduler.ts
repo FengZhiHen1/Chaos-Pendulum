@@ -5,6 +5,7 @@ import type {
   IntegratorMethod,
   PoincareSectionCondition,
   PoincarePoint,
+  ForceExtrema,
 } from "@/shared/domain/valueObjects";
 import { FRAMES_PER_BATCH, BATCH_PREFETCH_THRESHOLD, FRAME_STRIDE, FrameField } from "@/shared/domain/valueObjects";
 import { commandBus } from "@/shared/infrastructure/commandBus";
@@ -39,6 +40,7 @@ export class SimulationScheduler extends ISimulationScheduler {
   private nextFrameCount = 0;
   private nextPoolIndex = -1;
   private nextForceData: Float64Array | null = null;
+  private nextForceExtrema: ForceExtrema | null = null;
   private nextPoincarePoints: PoincarePoint[] | null = null;
   private pendingBatch = false;
   private pendingPoolIndex = -1;
@@ -102,6 +104,7 @@ export class SimulationScheduler extends ISimulationScheduler {
     this.releaseBuffers();
     this.activeIndex = 0;
     this.nextForceData = null;
+    this.nextForceExtrema = null;
     this.nextPoincarePoints = null;
     this.pendingBatch = false;
     this.recoveryPolicy.resetCounter();
@@ -115,6 +118,7 @@ export class SimulationScheduler extends ISimulationScheduler {
     this.releaseBuffers();
     this.activeIndex = 0;
     this.nextForceData = null;
+    this.nextForceExtrema = null;
     this.nextPoincarePoints = null;
     this.pendingBatch = false;
     this.prevSnapshot = null;
@@ -244,6 +248,7 @@ export class SimulationScheduler extends ISimulationScheduler {
     this.releaseBuffers();
     this.activeIndex = 0;
     this.nextForceData = null;
+    this.nextForceExtrema = null;
     this.nextPoincarePoints = null;
     this.cancelTimer();
     this.prefetchCallback = onDone;
@@ -319,6 +324,7 @@ export class SimulationScheduler extends ISimulationScheduler {
           this.nextFrameCount = resp.frameCount;
           this.nextPoolIndex = idx;
           this.nextForceData = resp.forceData ?? null;
+          this.nextForceExtrema = resp.forceExtrema ?? null;
           this.nextPoincarePoints = resp.poincarePoints ?? null;
         } else {
           if (this.activeBuffer) this.pool.release(this.activePoolIndex, this.activeBuffer);
@@ -379,6 +385,7 @@ export class SimulationScheduler extends ISimulationScheduler {
 
     this.releaseBuffers();
     this.nextForceData = null;
+    this.nextForceExtrema = null;
     this.nextPoincarePoints = null;
     this.pendingSequence = -1;
 
@@ -493,8 +500,9 @@ export class SimulationScheduler extends ISimulationScheduler {
 
   private flushDelayed(): void {
     if (this.nextForceData) {
-      commandBus.emit({ type: "lab:forceData", data: this.nextForceData });
+      commandBus.emit({ type: "lab:forceData", data: this.nextForceData, extrema: this.nextForceExtrema ?? undefined });
       this.nextForceData = null;
+      this.nextForceExtrema = null;
     }
     if (this.nextPoincarePoints && this.nextPoincarePoints.length > 0) {
       for (const cb of this.poincareCallbacks) cb(this.nextPoincarePoints);

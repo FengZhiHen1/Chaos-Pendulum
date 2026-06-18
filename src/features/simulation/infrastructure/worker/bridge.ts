@@ -174,6 +174,13 @@ function setupCommandBusHandlers(): () => void {
     useRootStore.setState({ state: payload.state });
   });
 
+  const unsubForceData = commandBus.on("lab:forceData", (payload) => {
+    useRootStore.getState().setLastForceData(payload.data);
+    if (payload.extrema) {
+      useRootStore.getState().setForceExtrema(payload.extrema);
+    }
+  });
+
   return () => {
     unsubBatchReady();
     unsubError();
@@ -194,6 +201,7 @@ function setupCommandBusHandlers(): () => void {
     unsubPrefetchBatch();
     unsubSetRunning();
     unsubOverrideState();
+    unsubForceData();
   };
 }
 
