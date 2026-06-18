@@ -176,7 +176,7 @@ export function DriftCurvePanel({
 
   return (
     <div
-      className="absolute right-2 bottom-2 z-20 rounded-lg overflow-hidden border border-outline-variant/20 shadow-card-hover"
+      className="absolute left-2 bottom-14 z-20 rounded-lg overflow-hidden border border-outline-variant/20 shadow-card-hover"
     >
       <canvas ref={canvasRef} style={{ display: "block" }} />
       <button

@@ -9,8 +9,8 @@ interface ExploreBottomToolbarProps {
   forceActive: boolean;
   onToggleForce: () => void;
   onEnterButterfly: () => void;
-  timeReversalOpen: boolean;
-  onToggleTimeReversal: () => void;
+  historyFrames: number;
+  onStartTimeReversal: () => void;
   /** 当前仿真时间（秒），用于左侧时间读数 */
   elapsedSeconds?: number;
   className?: string;
@@ -33,8 +33,8 @@ export function ExploreBottomToolbar({
   forceActive,
   onToggleForce,
   onEnterButterfly,
-  timeReversalOpen,
-  onToggleTimeReversal,
+  historyFrames,
+  onStartTimeReversal,
   elapsedSeconds = 0,
   className = "",
 }: ExploreBottomToolbarProps) {
@@ -114,13 +114,13 @@ export function ExploreBottomToolbar({
 
         <button
           type="button"
-          onClick={onToggleTimeReversal}
-          title="时间反演实验"
+          onClick={onStartTimeReversal}
+          disabled={historyFrames < 120}
+          title={historyFrames < 120 ? `需要运行 2 秒后才能开始实验（当前 ${(historyFrames / 60).toFixed(1)} 秒）` : "开始时间反演实验 — 验证混沌的数值不可逆性"}
           className={cn(
             toolbarButtonBase,
-            timeReversalOpen
-              ? "bg-surface-container text-primary border border-primary/30"
-              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-transparent hover:border-white/5",
+            "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-transparent hover:border-white/5",
+            historyFrames < 120 && "opacity-40 cursor-not-allowed",
           )}
         >
           <Hourglass className="h-3.5 w-3.5" />

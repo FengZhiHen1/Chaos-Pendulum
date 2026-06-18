@@ -22,6 +22,7 @@ export interface ExploreSlice {
   timeReversalMode: ReversalMode;
 
   // ── EXP-05 时间反演 ──
+  timeReversalIntroOpen: boolean;
   timeReversalActive: boolean;
   timeReversalStartTime: number;
   reversalPhase: ReversalPhase;
@@ -41,6 +42,7 @@ export interface ExploreSlice {
   setTimeReversalActive: (active: boolean) => void;
   setTimeReversalStartTime: (time: number) => void;
   setReversalPhase: (phase: ReversalPhase) => void;
+  setTimeReversalIntroOpen: (open: boolean) => void;
   appendDriftSample: (sample: DriftSample) => void;
   clearDriftHistory: () => void;
   dismissAnnotation: () => void;
@@ -58,6 +60,7 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
   butterflyDelta: 0.001,
   timeReversalMode: "numerical",
 
+  timeReversalIntroOpen: false,
   timeReversalActive: false,
   timeReversalStartTime: 0,
   reversalPhase: "idle",
@@ -76,6 +79,7 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
   setTimeReversalActive: (timeReversalActive) => set({ timeReversalActive }),
   setTimeReversalStartTime: (timeReversalStartTime) => set({ timeReversalStartTime }),
   setReversalPhase: (reversalPhase) => set({ reversalPhase }),
+  setTimeReversalIntroOpen: (timeReversalIntroOpen) => set({ timeReversalIntroOpen }),
   appendDriftSample: (sample) =>
     set((s) => ({ driftHistory: [...s.driftHistory, sample] })),
   clearDriftHistory: () => set({ driftHistory: [] }),
@@ -86,6 +90,7 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
 
   resetReversalState: () =>
     set({
+      timeReversalIntroOpen: false,
       timeReversalActive: false,
       reversalPhase: "idle",
       timeReversalStartTime: 0,

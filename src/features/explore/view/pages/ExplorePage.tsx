@@ -15,6 +15,7 @@ import { useSonification } from "../../viewModel/hooks/useSonification";
 import { ParamPanel, EnergyMonitorPanel, PhaseSpacePanel } from "@/features/simulation";
 import { useSimulationControls } from "@/features/simulation";
 import { useSimulationStore } from "@/features/simulation/store";
+import { useExploreStore } from "@/features/explore/store";
 import { useAppStore } from "@/stores/useAppStore";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import type { PendulumMaterialType, EnvironmentPreset } from "../components/Scene3D";
@@ -127,10 +128,16 @@ export function ExplorePage() {
   const isSimulationActive = useSimulationStore((s) => s.isSimulationActive);
   const simulationTime = useSimulationStore((s) => s.t);
 
-  // GUI 视觉状态：摆体材质、环境、时间反演面板显隐
+  /** 估算历史帧数（≈60fps），用于底部工具栏的禁用状态 */
+  const estimatedHistoryFrames = Math.floor(simulationTime * 60);
+
+  const handleStartTimeReversal = useCallback(() => {
+    useExploreStore.getState().setTimeReversalIntroOpen(true);
+  }, []);
+
+  // GUI 视觉状态：摆体材质、环境
   const [pendulumMaterial, setPendulumMaterial] = useState<PendulumMaterialType>("metal");
   const [environment, setEnvironment] = useState<EnvironmentPreset>("bright-stage");
-  const [timeReversalOpen, setTimeReversalOpen] = useState(false);
 
   // 键盘快捷键：空格切换受力分析，Esc 关闭受力/蝴蝶/反演面板
   useEffect(() => {
@@ -145,7 +152,7 @@ export function ExplorePage() {
         if (butterflyActive) {
           exitButterfly();
         }
-        setTimeReversalOpen(false);
+        useExploreStore.getState().setTimeReversalIntroOpen(false);
       }
     };
 
@@ -224,10 +231,8 @@ export function ExplorePage() {
             isSimulationActive={isSimulationActive}
           />
 
-          {/* 时间反演控制面板 */}
-          <TimeReversal
-            className={timeReversalOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}
-          />
+          {/* 时间反演实验 — 组件自行管理显隐 */}
+          <TimeReversal />
         </section>
 
         {/* 右侧面板 (320px) — 桌面端 */}
@@ -243,8 +248,8 @@ export function ExplorePage() {
         forceActive={forceActive}
         onToggleForce={toggleForce}
         onEnterButterfly={enterButterfly}
-        timeReversalOpen={timeReversalOpen}
-        onToggleTimeReversal={() => setTimeReversalOpen((v) => !v)}
+        historyFrames={estimatedHistoryFrames}
+        onStartTimeReversal={handleStartTimeReversal}
         elapsedSeconds={simulationTime}
         data-ui-controls
         data-panel-bottom

@@ -25,6 +25,9 @@ import { notificationPort } from "@/shared/infrastructure/adapters";
 import { REVERSAL_DEFAULTS, InsufficientHistoryError } from "../../contracts";
 import { useDriftCalculation } from "./useDriftCalculation";
 
+/** Worker 预取超时（毫秒）——超时后自动取消反演准备 */
+const PREFETCH_TIMEOUT_MS = 10_000;
+
 export interface ReversalRunnerAPI {
   mode: "exact" | "numerical";
   setMode: (m: "exact" | "numerical") => void;
@@ -35,19 +38,38 @@ export interface ReversalRunnerAPI {
   historyInsufficient: boolean;
   buttonDisabled: boolean;
   tooltipText: string;
+  /** 按钮禁用时的内联提示文字（空字符串表示无提示） */
+  hintText: string;
+  /** 实验入口卡片是否打开 */
+  introOpen: boolean;
+  openIntro: () => void;
+  closeIntro: () => void;
+  /** 叙事阶段 */
+  narrativePhase: "coinciding" | "separating" | "diverging";
+  /** 最大漂移距离 */
+  maxDrift: number;
+  /** 首次分离的反演时间（秒），null 表示未分离 */
+  separationStartTime: number | null;
+  /** 已进行的反演时间（秒） */
+  elapsedReversalTime: number;
   showAnnotation: boolean;
   annotationDismissed: boolean;
   dismissAnnotation: () => void;
   confirmOpen: boolean;
   dialogPhase: "loading" | "ready";
   completedOpen: boolean;
+  exactCompletedOpen: boolean;
   engineError: string | null;
   startReversal: () => void;
   stopReversal: () => void;
+  pauseReversal: () => void;
+  resumeReversal: () => void;
   handleConfirmReversal: () => void;
   handleCancelReversal: () => void;
   handleRestoreState: () => void;
   handleResetAfterComplete: () => void;
+  handleExactRestoreState: () => void;
+  handleExactResetAfterComplete: () => void;
   history: ReturnType<typeof useSimulationHistory>;
 }
 
@@ -65,6 +87,8 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const annotationDismissed = useExploreStore((s) => s.annotationDismissed);
   const dismissAnnotation = useExploreStore((s) => s.dismissAnnotation);
   const resetAnnotation = useExploreStore((s) => s.resetAnnotation);
+  const introOpen = useExploreStore((s) => s.timeReversalIntroOpen);
+  const setIntroOpen = useExploreStore((s) => s.setTimeReversalIntroOpen);
   const { computeDrift } = useDriftCalculation();
 
   const history = useSimulationHistory();
@@ -86,6 +110,13 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dialogPhase, setDialogPhase] = useState<"loading" | "ready">("loading");
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [exactCompletedOpen, setExactCompletedOpen] = useState(false);
+
+  // Worker 预取超时计时器
+  const prefetchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  // 通过 ref 持有最新 getSimulationHistory，避免 history 对象每帧变化导致 useCallback 依赖失效
+  const getHistoryFnRef = useRef(getSimulationHistory);
+  getHistoryFnRef.current = getSimulationHistory;
 
   const minFrames = REVERSAL_DEFAULTS.minHistoryFrames;
   const historyInsufficient = history.length < minFrames;
@@ -95,6 +126,24 @@ export function useReversalRunner(): ReversalRunnerAPI {
     : mode === "exact" ? "精确反演（对照）— 仅视觉回放，无误差"
     : "数值反演（实验）— 真实反向积分，展示浮点误差指数放大";
 
+  const hintText = phase === "awaitingConfirm" ? "反向积分数据准备中，请稍候…"
+    : historyInsufficient ? `需要至少运行 2 秒才能反演（当前 ${(history.length / 60).toFixed(1)} 秒）`
+    : "";
+
+  // ── 叙事阶段：根据漂移数据自动判定 ──
+  const maxDrift = driftHistory.length > 0 ? Math.max(...driftHistory.map((d) => d.driftDistance)) : 0;
+  const separationSample = driftHistory.find((d) => d.driftDistance > REVERSAL_DEFAULTS.teachingThreshold);
+  /** 叙事阶段：coinciding(重合期) → separating(分离期) → diverging(发散期) */
+  const narrativePhase: "coinciding" | "separating" | "diverging" =
+    phase === "completed" ? "diverging"
+    : maxDrift < REVERSAL_DEFAULTS.teachingThreshold ? "coinciding"
+    : maxDrift < REVERSAL_DEFAULTS.teachingThreshold * 10 ? "separating"
+    : "diverging";
+  /** 首次分离的反演时间（秒），null 表示尚未分离 */
+  const separationStartTime: number | null = separationSample?.reversalTime ?? null;
+  /** 反演已进行的时间（秒） */
+  const elapsedReversalTime = driftHistory.length > 0 ? driftHistory[driftHistory.length - 1]!.reversalTime : 0;
+
   const showAnnotation = mode === "numerical" && phase === "reversing"
     && !annotationDismissed && driftHistory.some((d) => d.driftDistance > REVERSAL_DEFAULTS.teachingThreshold);
 
@@ -102,10 +151,9 @@ export function useReversalRunner(): ReversalRunnerAPI {
     const fwdArray = history.toArray();
     const idx = exactFrameIdxRef.current;
     if (idx >= fwdArray.length) {
+      cancelAnimationFrame(exactRafRef.current);
       setPhase("completed"); setActive(false); isReversingRef.current = false;
-      const first = fwdArray[0]!;
-      commandBus.emit({ type: "scheduler:reset", initialConditions: { theta1: first.theta1, theta1Dot: first.omega1, theta2: first.theta2, theta2Dot: first.omega2 } });
-      commandBus.emit({ type: "scheduler:resume" });
+      setExactCompletedOpen(true);
       return;
     }
     const sv = fwdArray[fwdArray.length - 1 - idx]!;
@@ -120,7 +168,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
 
   const startReversal = useCallback(() => {
     const store = useSimulationStore.getState();
-    const fwdArray = history.toArray();
+    const fwdArray = getHistoryFnRef.current();
     if (fwdArray.length < minFrames) throw new InsufficientHistoryError(fwdArray.length, minFrames);
     reversalStartRef.current = { ...store.state };
     startSimTimeRef.current = store.t;
@@ -129,7 +177,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     setStartTime(store.t); setActive(true);
     isReversingRef.current = true;
     prevSimTimeRef.current = store.t;
-    fwdSnapshotRef.current = getSimulationHistory();
+    fwdSnapshotRef.current = getHistoryFnRef.current();
     clearTrajectoryData();
     const fwdPts = fwdArray.map((sv) => { const p = ball2Position(sv, store.params); return new THREE.Vector3(p.x, p.y, p.z); });
     updateTrajectoryData({ forwardPoints: fwdPts, reversalPoints: [], reversalColor: mode === "exact" ? "#FFD700" : "#00FFFF", visible: true, fadeOutAt: null });
@@ -146,8 +194,14 @@ export function useReversalRunner(): ReversalRunnerAPI {
       setDialogPhase("loading"); setConfirmOpen(true);
       commandBus.emit({ type: "scheduler:prefetchBatch" });
       void commandBus.once("scheduler:prefetchReady", () => { if (!awaitingConfirmRef.current) return; awaitingConfirmRef.current = false; setDialogPhase("ready"); });
+      // 预取超时保护：10 秒后 Worker 仍未响应则自动取消
+      prefetchTimeoutRef.current = setTimeout(() => {
+        if (!awaitingConfirmRef.current) return;
+        notificationPort.notify({ title: "反演准备超时", description: "Worker 未在 10 秒内响应预取请求，请重试", variant: "warning", durationMs: 5000 });
+        handleCancelReversal();
+      }, PREFETCH_TIMEOUT_MS);
     }
-  }, [mode, history, minFrames, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
+  }, [mode, minFrames, setActive, setStartTime, setPhase, clearDriftHistory, resetAnnotation]);
 
   const stopReversal = useCallback(() => {
     isReversingRef.current = false;
@@ -168,10 +222,57 @@ export function useReversalRunner(): ReversalRunnerAPI {
     }
   }, [mode, setPhase, setActive]);
 
-  const handleConfirmReversal = useCallback(() => { setConfirmOpen(false); setPhase("reversing"); commandBus.emit({ type: "scheduler:resume" }); }, [setPhase]);
-  const handleCancelReversal = useCallback(() => { setConfirmOpen(false); commandBus.emit({ type: "scheduler:setDirection", direction: 1 }); commandBus.emit({ type: "scheduler:resume" }); resumeHistoryRecording(); setPhase("idle"); setActive(false); isReversingRef.current = false; clearTrajectoryData(); clearDriftHistory(); }, [setPhase, setActive, clearDriftHistory]);
+  const pauseReversal = useCallback(() => {
+    if (phase !== "reversing") return;
+    setPhase("paused");
+    if (mode === "exact") {
+      cancelAnimationFrame(exactRafRef.current);
+    } else {
+      commandBus.emit({ type: "scheduler:pause" });
+    }
+  }, [mode, phase, setPhase]);
+
+  const resumeReversal = useCallback(() => {
+    if (phase !== "paused") return;
+    setPhase("reversing");
+    prevSimTimeRef.current = useSimulationStore.getState().t;
+    if (mode === "exact") {
+      exactRafRef.current = requestAnimationFrame(exactPlaybackLoop);
+    } else {
+      commandBus.emit({ type: "scheduler:resume" });
+    }
+  }, [mode, phase, setPhase]);
+
+  const openIntro = useCallback(() => { setIntroOpen(true); }, [setIntroOpen]);
+  const closeIntro = useCallback(() => { setIntroOpen(false); }, [setIntroOpen]);
+
+  const handleConfirmReversal = useCallback(() => { setIntroOpen(false); setConfirmOpen(false); setPhase("reversing"); commandBus.emit({ type: "scheduler:resume" }); }, [setPhase, setIntroOpen]);
+  const handleCancelReversal = useCallback(() => {
+    if (prefetchTimeoutRef.current) { clearTimeout(prefetchTimeoutRef.current); prefetchTimeoutRef.current = undefined; }
+    awaitingConfirmRef.current = false;
+    setConfirmOpen(false);
+    setIntroOpen(false);
+    commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
+    commandBus.emit({ type: "scheduler:resume" });
+    resumeHistoryRecording();
+    setPhase("idle"); setActive(false);
+    isReversingRef.current = false;
+    clearTrajectoryData(); clearDriftHistory();
+  }, [setPhase, setActive, clearDriftHistory, setIntroOpen]);
   const handleRestoreState = useCallback(() => { setCompletedOpen(false); const start = reversalStartRef.current; if (start) { useSimulationStore.setState({ initialConditions: { theta1: start.theta1, theta1Dot: start.omega1, theta2: start.theta2, theta2Dot: start.omega2 } }); useSimulationStore.getState().applyCurrentSettings(); startTrajectoryFadeOut(); } }, []);
   const handleResetAfterComplete = useCallback(() => { setCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); }, []);
+
+  const handleExactRestoreState = useCallback(() => {
+    setExactCompletedOpen(false);
+    const start = reversalStartRef.current;
+    if (start) {
+      commandBus.emit({ type: "scheduler:reset", initialConditions: { theta1: start.theta1, theta1Dot: start.omega1, theta2: start.theta2, theta2Dot: start.omega2 } });
+      commandBus.emit({ type: "scheduler:resume" });
+      startTrajectoryFadeOut();
+    }
+  }, []);
+
+  const handleExactResetAfterComplete = useCallback(() => { setExactCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); }, []);
 
   // 数值反演逐帧漂移检测
   useEffect(() => {
@@ -194,7 +295,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     const pos = ball2Position(store.state, params);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
-  }, [mode, phase, simTime, params, history, stopReversal]);
+  }, [mode, phase, simTime, params, stopReversal]);
 
   useEffect(() => { if (phase === "reversing") { isReversingRef.current = true; prevSimTimeRef.current = useSimulationStore.getState().t; } }, [phase]);
 
@@ -208,13 +309,18 @@ export function useReversalRunner(): ReversalRunnerAPI {
     }
   }, [resetTrigger, mode]);
 
-  useEffect(() => { return () => { cancelAnimationFrame(exactRafRef.current); if (isReversingRef.current && mode === "numerical") commandBus.emit({ type: "scheduler:setDirection", direction: 1 }); isReversingRef.current = false; clearTrajectoryData(); }; }, []);
+  useEffect(() => { return () => { if (prefetchTimeoutRef.current) clearTimeout(prefetchTimeoutRef.current); cancelAnimationFrame(exactRafRef.current); if (isReversingRef.current && mode === "numerical") commandBus.emit({ type: "scheduler:setDirection", direction: 1 }); isReversingRef.current = false; clearTrajectoryData(); }; }, []);
 
   return {
     mode, setMode, active, phase, driftHistory, startTime, historyInsufficient, buttonDisabled,
-    tooltipText, showAnnotation, annotationDismissed, dismissAnnotation,
-    confirmOpen, dialogPhase, completedOpen, engineError,
-    startReversal, stopReversal, handleConfirmReversal, handleCancelReversal,
-    handleRestoreState, handleResetAfterComplete, history,
+    tooltipText, hintText, introOpen, openIntro, closeIntro,
+    narrativePhase, maxDrift, separationStartTime, elapsedReversalTime,
+    showAnnotation, annotationDismissed, dismissAnnotation,
+    confirmOpen, dialogPhase, completedOpen, exactCompletedOpen, engineError,
+    startReversal, stopReversal, pauseReversal, resumeReversal,
+    handleConfirmReversal, handleCancelReversal,
+    handleRestoreState, handleResetAfterComplete,
+    handleExactRestoreState, handleExactResetAfterComplete,
+    history,
   };
 }
