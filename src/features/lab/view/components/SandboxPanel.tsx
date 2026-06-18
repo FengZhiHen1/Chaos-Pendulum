@@ -9,9 +9,9 @@ import type { SandboxTemplateId } from "../../contracts";
 
 /** 各模板所需的基础参数之外的额外参数默认值 */
 const TEMPLATE_EXTRA_PARAMS: Record<SandboxTemplateId, number[]> = {
-  spring: [10],        // k (劲度系数)
-  driven: [1, 2],      // drive_amp, drive_freq
-  magnetic: [1, 1],    // charge, B_field
+  spring: [10],         // k (劲度系数)
+  driven: [0.3, 2.5],   // drive_amp, drive_freq
+  magnetic: [0.05, 0.3], // charge, B_field (低值防负阻尼爆炸)
 };
 import { Button } from "@/shared/view/components/ui/button";
 import { Badge } from "@/shared/view/components/ui/badge";
@@ -91,7 +91,7 @@ export function SandboxPanel() {
     const initState = { theta1: sim.theta1, omega1: sim.theta1Dot, theta2: sim.theta2, omega2: sim.theta2Dot };
 
     // 2. 执行代码 + 用用户方程计算轨迹（含 equations() 存在性校验）
-    const trajResult = await computeTrajectory(code, initState, params, 10, 30000);
+    const trajResult = await computeTrajectory(code, initState, params, 5, 15000);
     if (!trajResult.success) {
       setCodeStatus("error");
       setCodeError(trajResult.error ?? "轨迹计算失败");
