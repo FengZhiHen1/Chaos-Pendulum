@@ -205,9 +205,10 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
   setEditMode: (editMode) => set({ editMode }),
 
   setDelta: (deltaDeg) => {
+    const safe = Number.isFinite(deltaDeg) ? deltaDeg : BUTTERFLY_DEFAULTS.minDeltaDeg;
     const clamped = Math.max(
       BUTTERFLY_DEFAULTS.minDeltaDeg,
-      Math.min(BUTTERFLY_DEFAULTS.maxDeltaDeg, deltaDeg),
+      Math.min(BUTTERFLY_DEFAULTS.maxDeltaDeg, safe),
     );
     set({ deltaDeg: clamped });
   },
