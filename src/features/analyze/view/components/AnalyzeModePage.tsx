@@ -8,7 +8,7 @@
  *   - 子组件通过 Props 接收数据
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAnalysisView } from "../../viewModel/hooks/useAnalysisView";
 import { useAnalyzeStore } from "../../store";
 import type { DampingSlice } from "../../types";
@@ -17,6 +17,7 @@ import { LyapunovHeatmap } from "./LyapunovHeatmap";
 import { BifurcationPlot } from "./BifurcationPlot";
 import { PoincareSection } from "./PoincareSection";
 import { EnergyLandscape } from "./EnergyLandscape";
+import type { EnergyLandscapeOverrides } from "./EnergyLandscape";
 import { BarChart3, Activity, ScatterChart, Mountain } from "lucide-react";
 
 const MANIFEST_PATH = "./assets/layer_manifest.json";
@@ -111,6 +112,18 @@ export function AnalyzeModePage() {
 
   const activeDampingSlices = dampingSlicesByLayer[activeLayer] ?? [];
 
+  // 能量景观可调参数
+  const [landscapeOverrides, setLandscapeOverrides] = useState<EnergyLandscapeOverrides>({
+    opacity: 0.6,
+    showContours: true,
+    showCurrentPoint: true,
+  });
+
+  const handleLandscapeOverridesChange = useCallback(
+    (o: EnergyLandscapeOverrides) => setLandscapeOverrides(o),
+    [],
+  );
+
   const availableLayers = new Set(
     (Object.keys(lyapunovPaths) as Array<keyof typeof lyapunovPaths>).filter(
       (k) => !lyapunovPaths[k].endsWith("-missing.json"),
@@ -131,6 +144,8 @@ export function AnalyzeModePage() {
           onDampingChange={setActiveDamping}
           loadStatus={loadStatus}
           layerCacheStatus={layerCacheStatus}
+          landscapeOverrides={landscapeOverrides}
+          onLandscapeOverridesChange={handleLandscapeOverridesChange}
         />
       </aside>
 
@@ -148,7 +163,7 @@ export function AnalyzeModePage() {
         </header>
 
         {/* 视图 Tabs — 文件夹式 */}
-        <nav className="shrink-0 flex items-end gap-1" aria-label="分析视图">
+        <nav className="shrink-0 flex items-end gap-1" aria-label="分析视图" data-story-highlight="analysis-tabs">
           {VIEW_TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeView === tab.id;
@@ -196,7 +211,7 @@ export function AnalyzeModePage() {
               )}
               {activeView === "bifurcation" && <BifurcationPlot dataPath={bifurcationPath} />}
               {activeView === "poincare" && <PoincareSection />}
-              {activeView === "energy-landscape" && <EnergyLandscape />}
+              {activeView === "energy-landscape" && <EnergyLandscape {...landscapeOverrides} />}
             </div>
           )}
         </div>

@@ -42,6 +42,7 @@ export function ExploreBottomToolbar({
     <footer
       data-ui-controls
       data-panel-bottom
+      data-story-highlight="sim-controls"
       className={cn(
         "h-12 shrink-0 w-full bg-surface-container-lowest flex items-center justify-between px-4 select-none",
         className,
@@ -102,6 +103,7 @@ export function ExploreBottomToolbar({
         <button
           type="button"
           onClick={onEnterButterfly}
+          data-story-highlight="butterfly-btn"
           title="进入蝴蝶效应分屏对比"
           className={cn(
             toolbarButtonBase,
@@ -116,6 +118,7 @@ export function ExploreBottomToolbar({
           type="button"
           onClick={onStartTimeReversal}
           disabled={historyFrames < 120}
+          data-story-highlight="time-reversal"
           title={historyFrames < 120 ? `需要运行 2 秒后才能开始实验（当前 ${(historyFrames / 60).toFixed(1)} 秒）` : "开始时间反演实验 — 验证混沌的数值不可逆性"}
           className={cn(
             toolbarButtonBase,

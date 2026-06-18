@@ -32,6 +32,7 @@ export function SonificationToggle({
     <button
       type="button"
       onClick={onToggle}
+      data-story-highlight="sonification-toggle"
       title={isActive ? "关闭物理声效" : "开启物理声效"}
       className={cn(
         "flex items-center justify-center rounded-full border transition-all duration-quick focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-focus-glow",

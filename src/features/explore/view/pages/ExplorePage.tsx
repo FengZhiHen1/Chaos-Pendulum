@@ -184,6 +184,7 @@ export function ExplorePage() {
           <aside
             data-ui-controls
             data-panel-left
+            data-story-highlight="param-panel"
             className="w-[280px] shrink-0 flex flex-col overflow-hidden rounded-lg bg-surface-container-low"
           >
             <div className="flex-1 overflow-y-auto min-h-0">

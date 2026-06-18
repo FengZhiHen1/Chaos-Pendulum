@@ -111,6 +111,29 @@ export function StoryPage() {
     };
   }, []);
 
+  // ── 控件脉冲高亮 ────────────────────────────────
+  // 根据当前阶段的 highlightedControls 数组，对带有
+  // data-story-highlight="id" 属性的 DOM 元素添加/移除脉冲动画。
+  useEffect(() => {
+    const ids = playback.highlightedControls;
+    if (ids.length === 0) return;
+
+    const elements: Element[] = [];
+    for (const id of ids) {
+      const els = document.querySelectorAll(`[data-story-highlight="${id}"]`);
+      els.forEach((el) => {
+        el.classList.add("animate-pulse-glow");
+        elements.push(el);
+      });
+    }
+
+    return () => {
+      for (const el of elements) {
+        el.classList.remove("animate-pulse-glow");
+      }
+    };
+  }, [playback.highlightedControls]);
+
   // ── 点击任意位置打断 ────────────────────────────
   const handleOverlayClick = () => {
     if (isPlaying) {

@@ -31,7 +31,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 25,
     targetMode: "explore" as AppMode,
     subtitle: "一个摆，我们知道它会在哪里",
-    highlightedControls: [],
+    highlightedControls: ["sim-controls"],
     cameraConfig: { azimuth: 0.2, elevation: 0.35, distance: 3.0 },
   },
   {
@@ -39,7 +39,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 25,
     targetMode: "explore" as AppMode,
     subtitle: "再加一个摆，世界变得不可预测",
-    highlightedControls: [],
+    highlightedControls: ["param-panel"],
     cameraConfig: { azimuth: 0.6, elevation: 0.25, distance: 4.5 },
   },
   {
@@ -47,7 +47,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 40,
     targetMode: "explore" as AppMode,
     subtitle: "初始差异仅 0.001°，30 秒后它们形同陌路",
-    highlightedControls: [],
+    highlightedControls: ["butterfly-btn"],
     cameraConfig: { azimuth: 1.2, elevation: 0.4, distance: 3.5 },
     params: { damping: 0.0 },
   },
@@ -56,7 +56,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 30,
     targetMode: "explore" as AppMode,
     subtitle: "混沌不仅能看见，还能听见",
-    highlightedControls: [],
+    highlightedControls: ["sonification-toggle"],
     cameraConfig: { azimuth: 2.0, elevation: 0.6, distance: 4.0 },
   },
   {
@@ -64,14 +64,14 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 30,
     targetMode: "analyze" as AppMode,
     subtitle: "这不是随机，是有结构的复杂",
-    highlightedControls: [],
+    highlightedControls: ["analysis-tabs"],
   },
   {
     startTime: 150,
     duration: 30,
     targetMode: "explore" as AppMode,
     subtitle: "甚至计算机也无法让混沌回头",
-    highlightedControls: [],
+    highlightedControls: ["time-reversal"],
     cameraConfig: { azimuth: 3.5, elevation: 0.3, distance: 3.5 },
   },
   {
@@ -79,7 +79,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     duration: 30,
     targetMode: "explore" as AppMode,
     subtitle: "确定性系统的内在随机性——这就是混沌",
-    highlightedControls: [],
+    highlightedControls: ["sim-controls"],
     cameraConfig: { azimuth: 4.5, elevation: 0.15, distance: 5.0 },
   },
 ];
