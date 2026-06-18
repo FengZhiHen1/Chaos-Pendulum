@@ -297,9 +297,10 @@ export function useReversalRunner(): ReversalRunnerAPI {
     }
     const fwdArray = fwdSnapshotRef.current;
     const reversalTime = startSimTimeRef.current - currentSimTime;
-    const fwdIdx = Math.round(fwdArray.length - 1 - reversalTime * REVERSAL_DEFAULTS.reversalFps);
-    let drift = 0;
-    if (fwdIdx >= 0 && fwdIdx < fwdArray.length) drift = computeDrift(store.state, fwdArray[fwdIdx]!);
+    const rawIdx = Math.round(fwdArray.length - 1 - reversalTime * REVERSAL_DEFAULTS.reversalFps);
+    // 越界时 clamp 到最早的历史帧，漂移不会因"没历史了"而归零
+    const fwdIdx = rawIdx < 0 ? 0 : rawIdx >= fwdArray.length ? fwdArray.length - 1 : rawIdx;
+    const drift = fwdArray.length > 0 ? computeDrift(store.state, fwdArray[fwdIdx]!) : 0;
     useExploreStore.getState().appendDriftSample({ reversalTime: Math.max(0, reversalTime), driftDistance: drift, forwardSimTime: currentSimTime });
     const pos = ball2Position(store.state, reversalParamsRef.current);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
