@@ -1,16 +1,52 @@
 import { useCallback, useEffect } from "react";
 import { CodeEditor } from "./CodeEditor";
+import { SandboxSim3D } from "./SandboxSim3D";
 import { usePyodide } from "../../hooks/usePyodide";
 import { useLabStore } from "../../store";
+import { useSimulationStore } from "@/features/simulation/store";
 import { SANDBOX_TEMPLATES, SANDBOX_DEFAULTS } from "../../contracts";
-import type { SandboxTemplateId } from "../../contracts";
 import { Button } from "@/shared/view/components/ui/button";
 import { Badge } from "@/shared/view/components/ui/badge";
-import { Play, RotateCcw, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Play, Pause, RotateCcw, Loader2, AlertCircle, CheckCircle, SkipForward } from "lucide-react";
 
-/** LAB-03 用户可编程沙箱面板：CodeMirror 编辑器 + 模板 + Pyodide 执行 */
+/** 轨迹播放控制 */
+function PlaybackControls() {
+  const traj = useLabStore((s) => s.sandboxTrajectory);
+  const idx = useLabStore((s) => s.sandboxPlaybackIndex);
+  const isPlaying = useLabStore((s) => s.sandboxIsPlaying);
+
+  if (!traj) return null;
+  const total = traj.time.length;
+  const progress = total > 0 ? idx / (total - 1) : 0;
+  const currentTime = traj.time[idx]?.toFixed(1) ?? "0.0";
+  const totalTime = traj.time[total - 1]?.toFixed(1) ?? "0.0";
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-white/5 shrink-0">
+      <Button
+        variant="primary" size="sm"
+        onClick={() => {
+          if (idx >= total - 1) useLabStore.setState({ sandboxPlaybackIndex: 0 });
+          useLabStore.setState({ sandboxIsPlaying: !isPlaying });
+        }}
+        title={isPlaying ? "暂停" : idx >= total - 1 ? "重播" : "播放"}
+      >
+        {isPlaying ? <Pause className="h-3 w-3" /> : idx >= total - 1 ? <SkipForward className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+      </Button>
+      <div className="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+        <div className="h-full bg-primary rounded-full transition-all duration-100"
+          style={{ width: `${progress * 100}%` }} />
+      </div>
+      <span className="font-mono text-[10px] text-on-surface-variant/60 tabular-nums">
+        {currentTime}s / {totalTime}s
+      </span>
+    </div>
+  );
+}
+
+/** LAB-03 沙箱面板：左编辑器 + 右 3D 预览 */
 export function SandboxPanel() {
-  const { isReady, isLoading, loadError, execute } = usePyodide();
+  const { isReady, isLoading, loadError, execute, computeTrajectory } = usePyodide();
 
   const userCode = useLabStore((s) => s.userCode);
   const setUserCode = useLabStore((s) => s.setUserCode);
@@ -18,54 +54,59 @@ export function SandboxPanel() {
   const setCodeStatus = useLabStore((s) => s.setCodeStatus);
   const codeError = useLabStore((s) => s.codeError);
   const setCodeError = useLabStore((s) => s.setCodeError);
-  const activeTemplate = useLabStore((s) => s.activeTemplate);
+  const traj = useLabStore((s) => s.sandboxTrajectory);
 
-  // 首次加载时填入默认模板代码
-  useEffect(() => {
-    if (!userCode) {
-      setUserCode(SANDBOX_TEMPLATES[0]?.code ?? "");
-    }
-  }, [userCode, setUserCode]);
+  useEffect(() => { if (!userCode) setUserCode(SANDBOX_TEMPLATES[0]?.code ?? ""); }, [userCode, setUserCode]);
 
   const isExecuting = codeStatus === "running";
-
-  const handleLoadTemplate = useCallback((id: SandboxTemplateId) => {
-    const tpl = SANDBOX_TEMPLATES.find((t) => t.id === id);
-    if (tpl) {
-      setUserCode(tpl.code);
-      useLabStore.setState({ activeTemplate: id, codeStatus: "idle", codeError: null });
-    }
-  }, [setUserCode]);
 
   const handleRun = useCallback(async () => {
     const code = useLabStore.getState().userCode;
     if (!code.trim()) return;
+    setCodeStatus("running"); setCodeError(null);
 
-    setCodeStatus("running");
-    setCodeError(null);
-
+    // 1. 先做语法/语义验证
     const result = await execute(code);
-
-    if (result.success) {
-      setCodeStatus("success");
-      setCodeError(null);
-    } else {
+    if (!result.success) {
       setCodeStatus("error");
       setCodeError(result.errorTranslation ?? result.error);
+      return;
     }
-  }, [execute, setCodeStatus, setCodeError]);
+
+    // 2. 获取当前仿真状态作为初始条件
+    const sim = useSimulationStore.getState();
+    const params = [sim.params.m1, sim.params.m2, sim.params.L1, sim.params.L2, sim.params.g, sim.params.damping];
+    const initState = { theta1: sim.theta1, omega1: sim.theta1Dot, theta2: sim.theta2, omega2: sim.theta2Dot };
+
+    // 3. 用用户方程计算轨迹（10 秒，30s 超时）
+    const trajResult = await computeTrajectory(code, initState, params, 10, 30000);
+    if (!trajResult.success) {
+      setCodeStatus("error");
+      setCodeError(trajResult.error ?? "轨迹计算失败");
+      return;
+    }
+
+    // 4. 注入 Store → 3D 预览回放
+    useLabStore.setState({
+      sandboxTrajectory: {
+        time: trajResult.timePoints,
+        theta1: trajResult.states[0] ?? [],
+        theta2: trajResult.states[2] ?? [],
+      },
+      sandboxPlaybackIndex: 0,
+      sandboxIsPlaying: true,
+      codeStatus: "success",
+      codeError: null,
+    });
+  }, [execute, computeTrajectory, setCodeStatus, setCodeError]);
 
   const handleReset = useCallback(() => {
     setUserCode(SANDBOX_TEMPLATES[0]?.code ?? "");
-    useLabStore.setState({ activeTemplate: null, codeStatus: "idle", codeError: null });
+    useLabStore.setState({ activeTemplate: null, codeStatus: "idle", codeError: null, sandboxTrajectory: null, sandboxIsPlaying: false });
   }, [setUserCode]);
 
-  // 提取错误行号用于 CodeMirror 标红
   const errorLine = codeStatus === "error" && codeError
-    ? (() => {
-        const m = codeError.match(/[Ll]ine\s+(\d+)/);
-        return m ? parseInt(m[1]!, 10) : null;
-      })()
+    ? (() => { const m = codeError.match(/[Ll]ine\s+(\d+)/); return m ? parseInt(m[1]!, 10) : null; })()
     : null;
 
   return (
@@ -73,96 +114,70 @@ export function SandboxPanel() {
       {/* 工具栏 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 shrink-0">
         <h4 className="text-xs font-semibold text-on-surface mr-auto">Python 沙箱</h4>
-        <Button
-          variant="primary"
-          size="sm"
+        <Button variant="primary" size="sm"
           disabled={isExecuting || !userCode.trim() || (!isReady && !isLoading)}
           onClick={handleRun}
         >
-          {isExecuting ? (
-            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />运行中</>
-          ) : isLoading ? (
-            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />加载中</>
-          ) : (
-            <><Play className="h-3.5 w-3.5 mr-1" />运行</>
-          )}
+          {isExecuting ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />计算中</>
+            : isLoading ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />加载中</>
+            : <><Play className="h-3.5 w-3.5 mr-1" />运行</>}
         </Button>
-        <Button variant="tertiary" size="sm" onClick={handleReset}>
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
+        <Button variant="tertiary" size="sm" onClick={handleReset}><RotateCcw className="h-3.5 w-3.5" /></Button>
       </div>
 
-      {/* 模板按钮 */}
-      <div className="flex gap-1 px-3 py-1.5 border-b border-white/5 shrink-0">
-        {SANDBOX_TEMPLATES.map((tpl) => (
-          <button
-            key={tpl.id}
-            type="button"
-            onClick={() => handleLoadTemplate(tpl.id)}
-            className={`px-2 py-0.5 text-[10px] rounded border transition-colors ${
-              activeTemplate === tpl.id
-                ? "bg-primary/15 text-primary border-primary/30"
-                : "text-on-surface-variant border-transparent hover:border-white/10"
-            }`}
-            title={tpl.description}
-          >
-            {tpl.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 编辑器 */}
-      <div className="flex-1 overflow-hidden p-2">
-        <CodeEditor
-          value={userCode}
-          onChange={setUserCode}
-          errorLine={errorLine}
-          height={Math.max(200, SANDBOX_DEFAULTS.editorHeight)}
-        />
-      </div>
-
-      {/* 状态栏 */}
-      <div className="shrink-0 px-3 py-2 border-t border-white/5">
-        {codeStatus === "success" && (
-          <div className="flex items-center gap-2 text-emerald-400">
-            <CheckCircle className="h-4 w-4" />
-            <span className="text-xs">代码执行成功</span>
-            <Badge variant="outline" className="text-[10px] ml-auto">
-              {isReady ? "Pyodide ✓" : "就绪"}
-            </Badge>
+      {/* 左右分栏 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左：编辑器 */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-white/5">
+          <div className="flex-1 overflow-hidden">
+            <CodeEditor value={userCode} onChange={setUserCode}
+              errorLine={errorLine} height={SANDBOX_DEFAULTS.editorHeight} />
           </div>
-        )}
-        {codeStatus === "error" && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-red-400">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-xs font-medium">执行错误</span>
-              {errorLine != null && (
-                <Badge variant="outline" className="text-[10px] text-red-400 border-red-400/30">
-                  第 {errorLine} 行
-                </Badge>
-              )}
-            </div>
-            {codeError && (
-              <p className="text-[11px] text-on-surface-variant pl-6">{codeError}</p>
+          {/* 状态栏 */}
+          <div className="shrink-0 px-3 py-1.5 border-t border-white/5">
+            {codeStatus === "success" && traj && (
+              <div className="flex items-center gap-2 text-emerald-400 text-[10px]">
+                <CheckCircle className="h-3.5 w-3.5" />
+                轨迹已计算 · {traj.time.length} 帧 · {traj.time[traj.time.length - 1]?.toFixed(1)}s
+                <Badge variant="outline" className="text-[9px] ml-auto">{isReady ? "Pyodide ✓" : "就绪"}</Badge>
+              </div>
+            )}
+            {codeStatus === "success" && !traj && (
+              <div className="flex items-center gap-2 text-emerald-400 text-[10px]">
+                <CheckCircle className="h-3.5 w-3.5" />代码执行成功
+              </div>
+            )}
+            {codeStatus === "error" && (
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 text-red-400 text-[10px]">
+                  <AlertCircle className="h-3.5 w-3.5" />执行错误
+                  {errorLine != null && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/30">第 {errorLine} 行</Badge>}
+                </div>
+                {codeError && <p className="text-[10px] text-on-surface-variant/70 pl-5 truncate">{codeError}</p>}
+              </div>
+            )}
+            {codeStatus === "idle" && loadError && (
+              <div className="flex items-center gap-2 text-amber-400 text-[10px]"><AlertCircle className="h-3.5 w-3.5" />{loadError}</div>
+            )}
+            {codeStatus === "idle" && !loadError && (
+              <p className="text-[10px] text-on-surface-variant/50">
+                {isLoading ? "加载 Pyodide…（首次 ~50MB）" : isReady ? "就绪 — 点击「运行」计算轨迹" : "初始化中…"}
+              </p>
             )}
           </div>
-        )}
-        {codeStatus === "idle" && loadError && (
-          <div className="flex items-center gap-2 text-amber-400">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-[11px]">{loadError}</span>
+        </div>
+
+        {/* 右：3D 预览 */}
+        <div className="w-[380px] shrink-0 flex flex-col bg-surface-container-lowest">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5 shrink-0">
+            <span className="text-[10px] text-on-surface-variant font-medium">3D 预览</span>
+            {traj && <Badge variant="outline" className="text-[9px]">{traj.time.length} 帧</Badge>}
           </div>
-        )}
-        {codeStatus === "idle" && !loadError && (
-          <p className="text-[10px] text-on-surface-variant/50">
-            {isLoading
-              ? "正在加载 Pyodide 运行时…（首次约需下载 ~40MB）"
-              : isReady
-                ? "Pyodide 就绪，点击「运行」执行代码"
-                : "初始化中…"}
-          </p>
-        )}
+          <div className="flex-1 min-h-0">
+            <SandboxSim3D />
+          </div>
+          <PlaybackControls />
+        </div>
       </div>
     </div>
   );

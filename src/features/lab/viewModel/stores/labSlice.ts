@@ -30,9 +30,16 @@ export interface LabSlice {
   coordinateSystem: CoordinateSystem;
   reportGenerating: boolean;
   forceDecomposition: ForceDecompositionState;
+  /** 沙箱轨迹回放 */
+  sandboxTrajectory: { time: number[]; theta1: number[]; theta2: number[] } | null;
+  sandboxPlaybackIndex: number;
+  sandboxIsPlaying: boolean;
 
   setUserCode: (code: string) => void;
   setCodeStatus: (status: LabSlice["codeStatus"]) => void;
+  setSandboxTrajectory: (t: LabSlice["sandboxTrajectory"]) => void;
+  setSandboxPlaybackIndex: (idx: number) => void;
+  setSandboxPlaying: (playing: boolean) => void;
   setCodeError: (error: string | null) => void;
   setValidationResult: (test: ValidationTestKey, status: ValidationStatus) => void;
   setValidationDetail: (test: ValidationTestKey, detail: string) => void;
@@ -69,8 +76,14 @@ export const createLabSlice: StateCreator<LabSlice, [], [], LabSlice> = (set) =>
   coordinateSystem: "cartesian",
   reportGenerating: false,
   forceDecomposition: { ...initialForceDecomposition },
+  sandboxTrajectory: null,
+  sandboxPlaybackIndex: 0,
+  sandboxIsPlaying: false,
 
   setUserCode: (userCode) => set({ userCode }),
+  setSandboxTrajectory: (sandboxTrajectory) => set({ sandboxTrajectory, sandboxPlaybackIndex: 0, sandboxIsPlaying: false }),
+  setSandboxPlaybackIndex: (sandboxPlaybackIndex) => set({ sandboxPlaybackIndex }),
+  setSandboxPlaying: (sandboxIsPlaying) => set({ sandboxIsPlaying }),
   setCodeStatus: (codeStatus) => set({ codeStatus }),
   setCodeError: (codeError) => set({ codeError }),
   setValidationResult: (test, status) =>

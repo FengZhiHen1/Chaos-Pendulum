@@ -24,9 +24,8 @@ declare global {
 /** Pyodide 实例的最小类型 */
 interface PyodideInstance {
   runPythonAsync(code: string): Promise<unknown>;
-  setInterruptBuffer(buffer: Uint8Array): void;
-  globals: { set(key: string, value: unknown): void };
-  FS: { writeFile(path: string, data: Uint8Array): void };
+  loadPackage(names: string | string[]): Promise<void>;
+  globals: { set(key: string, value: unknown): void; get(key: string): unknown };
 }
 
 /** 全局 Pyodide 实例（惰性单例） */
@@ -80,8 +79,8 @@ async function loadPyodideOnce(): Promise<PyodideInstance> {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/",
     });
 
-    // 预加载 numpy
-    await pyodide.runPythonAsync("import numpy as np");
+    // 安装 numpy + scipy（Pyodide 需先 loadPackage 才能 import）
+    await pyodide.loadPackage(["numpy", "scipy"]);
 
     globalPyodide = pyodide as unknown as PyodideInstance;
     globalLoading = null;
@@ -93,6 +92,15 @@ async function loadPyodideOnce(): Promise<PyodideInstance> {
 
 // ── Hook ────────────────────────────────────────────
 
+/** 轨迹计算结果 */
+export interface SandboxTrajectoryResult {
+  success: boolean;
+  error?: string;
+  timePoints: number[];
+  states: number[][]; // [theta1, omega1, theta2, omega2][]
+  durationMs: number;
+}
+
 export interface UsePyodideAPI {
   /** Pyodide 是否已加载就绪 */
   isReady: boolean;
@@ -102,6 +110,14 @@ export interface UsePyodideAPI {
   loadError: string | null;
   /** 执行 Python 代码 */
   execute: (code: string, timeoutMs?: number) => Promise<ISandboxExecutionResult>;
+  /** 用当前仿真参数计算轨迹 */
+  computeTrajectory: (
+    code: string,
+    initialState: { theta1: number; omega1: number; theta2: number; omega2: number },
+    params: number[],
+    duration: number,
+    timeoutMs?: number,
+  ) => Promise<SandboxTrajectoryResult>;
   /** 手动加载 Pyodide */
   load: () => Promise<void>;
 }
@@ -158,18 +174,25 @@ export function usePyodide(): UsePyodideAPI {
       };
     }
 
-    // 执行
+    // 执行（Promise.race 超时——不依赖 SharedArrayBuffer/COOP 头）
     try {
-      // 用 SharedArrayBuffer 实现超时中断
-      const interruptBuffer = new Uint8Array(new SharedArrayBuffer(1));
-      pyodide.setInterruptBuffer(interruptBuffer);
+      const runPromise = pyodide.runPythonAsync(code).then(() => "success" as const);
 
-      const timeoutId = setTimeout(() => {
-        interruptBuffer[0] = 2; // SIGINT
-      }, timeoutMs);
+      const timeoutPromise = new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), timeoutMs),
+      );
 
-      await pyodide.runPythonAsync(code);
-      clearTimeout(timeoutId);
+      const outcome = await Promise.race([runPromise, timeoutPromise]);
+
+      if (outcome === "timeout") {
+        return {
+          success: false,
+          error: "TimeoutError: 执行超时",
+          errorLine: null,
+          errorTranslation: ERROR_TRANSLATIONS["TimeoutError"] ?? "执行超时（超过5秒），请简化计算或增大步长",
+          durationMs: performance.now() - t0,
+        };
+      }
 
       return {
         success: true,
@@ -193,6 +216,70 @@ export function usePyodide(): UsePyodideAPI {
     }
   }, []);
 
+  const computeTrajectory = useCallback(async (
+    code: string,
+    initialState: { theta1: number; omega1: number; theta2: number; omega2: number },
+    params: number[],
+    duration: number,
+    timeoutMs: number = 30000,
+  ): Promise<SandboxTrajectoryResult> => {
+    const t0 = performance.now();
+    const pyodide = pyodideRef.current ?? globalPyodide;
+    if (!pyodide) {
+      return { success: false, error: "Pyodide 未就绪", timePoints: [], states: [], durationMs: performance.now() - t0 };
+    }
+
+    try {
+      // 1. 先执行用户代码，定义 equations() 函数
+      await pyodide.runPythonAsync(code);
+
+      // 2. 设置初始条件和参数
+      const globals = pyodide.globals;
+      globals.set("_t_span", [0, duration]);
+      globals.set("_y0", [initialState.theta1, initialState.omega1, initialState.theta2, initialState.omega2]);
+      // params 是普通数组，在 Python 中需要转成 tuple
+      await pyodide.runPythonAsync(`import numpy as np; _params = tuple(${JSON.stringify(params)})`);
+
+      // 3. 用 solve_ivp 计算轨迹
+      const outcome = await Promise.race([
+        pyodide.runPythonAsync(`
+from scipy.integrate import solve_ivp
+import numpy as np
+
+sol = solve_ivp(
+    equations, _t_span, _y0,
+    args=(_params,),
+    max_step=0.016,
+    method='RK45',
+    rtol=1e-6, atol=1e-9
+)
+_t_list = sol.t.tolist()
+_y_list = sol.y.tolist()
+`).then(() => "success" as const),
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), timeoutMs)),
+      ]);
+
+      if (outcome === "timeout") {
+        return { success: false, error: "轨迹计算超时（>30s）", timePoints: [], states: [], durationMs: performance.now() - t0 };
+      }
+
+      // 4. 转换结果（Pyodide Python proxy → toJs() → JS 数组）
+      const toJs = (v: unknown) => (v as { toJs(): unknown }).toJs();
+      const timePoints = toJs(pyodide.globals.get("_t_list")) as number[];
+      const yList = toJs(pyodide.globals.get("_y_list")) as number[][];
+
+      return {
+        success: true,
+        timePoints: Array.from(timePoints),
+        states: yList.map((row) => Array.from(row)),
+        durationMs: performance.now() - t0,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg, timePoints: [], states: [], durationMs: performance.now() - t0 };
+    }
+  }, []);
+
   // 自动触发加载（首次 render）
   useEffect(() => {
     if (!globalPyodide && !globalLoading) {
@@ -203,5 +290,5 @@ export function usePyodide(): UsePyodideAPI {
     }
   }, [load, isReady]);
 
-  return { isReady, isLoading, loadError, execute, load };
+  return { isReady, isLoading, loadError, execute, computeTrajectory, load };
 }

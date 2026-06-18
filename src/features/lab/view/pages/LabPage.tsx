@@ -1,110 +1,76 @@
-import { useCallback } from "react";
-import { FlaskConical, CheckCircle, XCircle, Circle, Code, Play, AlertTriangle, Info, Timer, Activity } from "lucide-react";
+import { useState, useCallback } from "react";
+import {
+  FlaskConical, CheckCircle, XCircle, Circle, Play,
+  Activity, PanelLeftClose, PanelLeftOpen, ShieldCheck, Code,
+} from "lucide-react";
 import { useLabStore } from "../../store";
 import { useLabValidation } from "../../hooks/useLabValidation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { SandboxPanel } from "../components/SandboxPanel";
 import { SANDBOX_TEMPLATES } from "../../contracts";
 import type { SandboxTemplateId } from "../../contracts";
-import type { ValidationTestKey, ValidationResult, ValidationMetrics } from "../../validation-runner";
+import type { ValidationTestKey, ValidationResult } from "../../validation-runner";
 import { cn } from "@/shared/lib/cn";
+
+// ── 验证项目定义 ──────────────────────────────────
 
 interface CheckDef {
   key: ValidationTestKey;
   label: string;
+  icon: string;
   desc: string;
 }
 
 const CHECKS: CheckDef[] = [
-  { key: "smallAngle", label: "小角度简正模", desc: "双摆等质量等长度同相模周期吻合 < 2%" },
-  { key: "singlePendulum", label: "单摆退化", desc: "m₂ → 0 时退化为单摆，周期吻合 < 2%" },
-  { key: "energy", label: "能量漂移", desc: "无阻尼 1000s 仿真，能量漂移 < 0.5%" },
+  {
+    key: "smallAngle", label: "小角度简正模", icon: "θ",
+    desc: "θ₀ ≤ 5° 时，双摆退化为线性耦合振子。验证同相模（两个摆同方向摆动）的周期与理论值吻合度 < 2%。若验证失败，说明 ODE 积分器或运动方程存在系统性误差。",
+  },
+  {
+    key: "singlePendulum", label: "单摆退化", icon: "→",
+    desc: "令下摆质量 m₂ → 0，系统应退化为单摆。验证退化后的周期与解析解 T = 2π√(L/g) 的吻合度 < 2%。这是检验方程推导正确性的关键边界测试。",
+  },
+  {
+    key: "energy", label: "能量漂移", icon: "E",
+    desc: "关闭阻尼（damping = 0），仿真 1000 秒。对保守系统，总机械能应守恒。若能量漂移 > 0.5%，说明积分器精度不足或运动方程推导存在能量泄漏。",
+  },
 ];
 
-// ─── 子组件 ──────────────────────────────────────
+// ── 子组件 ──────────────────────────────────────
 
 function StatusIcon({ status }: { status?: "idle" | "running" | "passed" | "failed" }) {
   switch (status) {
-    case "passed":
-      return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-    case "failed":
-      return <XCircle className="w-4 h-4 text-separation-alert" />;
-    case "running":
-      return <Activity className="w-4 h-4 text-amber-400 animate-pulse" />;
-    default:
-      return <Circle className="w-4 h-4 text-on-surface-variant/30" />;
+    case "passed": return <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />;
+    case "failed": return <XCircle className="w-3.5 h-3.5 text-separation-alert" />;
+    case "running": return <Activity className="w-3.5 h-3.5 text-amber-400 animate-pulse" />;
+    default: return <Circle className="w-3.5 h-3.5 text-on-surface-variant/30" />;
   }
 }
 
-/** 阈值对比条——在阈值标尺上标出实际值位置 */
 function ThresholdBar({ value, threshold, unit }: { value: number; threshold: number; unit: string }) {
   if (isNaN(value)) return null;
   const pct = Math.min(value / (threshold * 2), 1);
   const passed = value < threshold;
-  const barColor = passed ? "bg-emerald-400" : "bg-separation-alert";
-
   return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 mb-1">
+    <div className="mt-1.5">
+      <div className="flex items-center justify-between text-[9px] text-on-surface-variant/60 mb-0.5">
         <span>0{unit}</span>
         <span className={cn("font-medium", passed ? "text-emerald-400" : "text-separation-alert")}>
           {(value * 100).toFixed(3)}{unit}
         </span>
-        <span>{threshold * 100}{unit} (阈值)</span>
+        <span>{threshold * 100}{unit}</span>
       </div>
-      <div className="h-1.5 bg-surface-container rounded-full overflow-hidden relative">
-        {/* 阈值线 */}
-        <div
-          className="absolute top-0 h-full w-0.5 bg-on-surface-variant/30 z-10"
-          style={{ left: `${50}%` }}
-        />
-        {/* 实际值 */}
-        <div
-          className={cn("h-full rounded-full transition-all duration-500", barColor)}
-          style={{ width: `${pct * 100}%` }}
-        />
+      <div className="h-1 bg-surface-container rounded-full overflow-hidden relative">
+        <div className="absolute top-0 h-full w-0.5 bg-on-surface-variant/30 z-10" style={{ left: "50%" }} />
+        <div className={cn("h-full rounded-full transition-all duration-500", passed ? "bg-emerald-400" : "bg-separation-alert")}
+          style={{ width: `${pct * 100}%` }} />
       </div>
     </div>
   );
 }
 
-/** 结构化指标展示 */
-function MetricsDisplay({ metrics }: { metrics: ValidationMetrics }) {
-  return (
-    <div className="mt-2 space-y-1">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[11px] text-on-surface-variant/70">实测</span>
-        <span className="text-sm font-mono font-medium text-on-surface tabular-nums">
-          {metrics.measured.toFixed(4)}
-        </span>
-        <span className="text-[10px] text-on-surface-variant/50">{metrics.unit}</span>
-        <span className="text-[10px] text-on-surface-variant/40 mx-1">vs</span>
-        <span className="text-[11px] text-on-surface-variant/70">理论</span>
-        <span className="text-sm font-mono text-on-surface-variant tabular-nums">
-          {metrics.expected.toFixed(4)}
-        </span>
-        <span className="text-[10px] text-on-surface-variant/50">{metrics.unit}</span>
-      </div>
-      {metrics.extra && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-          {Object.entries(metrics.extra).map(([k, v]) => (
-            <span key={k} className="text-[10px] text-on-surface-variant/50">
-              {k}: <span className="text-on-surface-variant/70 font-mono">{v}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** 单张验证卡片 */
-function ValidationCard({
-  check,
-  status,
-  detail,
-  isActive,
-  result,
+function CompactValidationCard({
+  check, status, detail, isActive, result,
 }: {
   check: CheckDef;
   status?: "idle" | "running" | "passed" | "failed";
@@ -113,78 +79,58 @@ function ValidationCard({
   result: ValidationResult | null;
 }) {
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 p-4 rounded-lg transition-all duration-300",
-        isActive && "ring-1 ring-amber-400/30 bg-amber-500/[0.06]",
-        !isActive && status === "passed" && "bg-emerald-500/[0.04]",
-        !isActive && status === "failed" && "bg-separation-alert/[0.04]",
-        !isActive && status === "running" && "bg-amber-500/[0.04]",
-        !isActive && (status === "idle" || !status) && "bg-surface-container-low",
-      )}
-    >
-      <div className="mt-0.5 shrink-0">
-        <StatusIcon status={status} />
+    <div className={cn(
+      "flex items-start gap-2.5 p-3 rounded-lg transition-all duration-300",
+      isActive && "ring-1 ring-amber-400/40 bg-amber-500/[0.08]",
+      !isActive && status === "passed" && "bg-emerald-500/[0.06]",
+      !isActive && status === "failed" && "bg-separation-alert/[0.06]",
+      !isActive && status === "running" && "bg-amber-500/[0.06]",
+      !isActive && (status === "idle" || !status) && "bg-surface-container hover:bg-surface-container-high/50",
+    )}>
+      <div className={cn(
+        "w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-[11px] font-mono font-bold",
+        status === "passed" ? "bg-emerald-500/10 text-emerald-400" :
+        status === "failed" ? "bg-separation-alert/10 text-separation-alert" :
+        status === "running" ? "bg-amber-500/10 text-amber-400" :
+        "bg-surface-container-high text-on-surface-variant/40",
+      )}>
+        {check.icon}
       </div>
       <div className="flex-1 min-w-0">
-        {/* 标题行 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-on-surface font-medium">{check.label}</span>
-          {isActive && (
-            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
-              运行中
-            </span>
-          )}
-          {status === "passed" && !isActive && (
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-              通过
-            </span>
-          )}
-          {status === "failed" && !isActive && (
-            <span className="text-[10px] text-separation-alert bg-separation-alert/10 px-1.5 py-0.5 rounded">
-              未通过
-            </span>
-          )}
-          {/* 耗时 */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-on-surface font-medium">{check.label}</span>
+          {isActive && <span className="text-[9px] text-amber-400 animate-pulse font-medium">运行中</span>}
+          {status === "passed" && !isActive && <StatusIcon status={status} />}
+          {status === "failed" && !isActive && <StatusIcon status={status} />}
           {result && !isActive && (
-            <span className="text-[10px] text-on-surface-variant/40 flex items-center gap-0.5 ml-auto">
-              <Timer className="w-3 h-3" />
-              {result.durationMs < 1000
-                ? `${Math.round(result.durationMs)}ms`
-                : `${(result.durationMs / 1000).toFixed(1)}s`}
+            <span className="text-[9px] text-on-surface-variant/40 ml-auto font-mono">
+              {result.durationMs < 1000 ? `${Math.round(result.durationMs)}ms` : `${(result.durationMs / 1000).toFixed(1)}s`}
             </span>
           )}
         </div>
-
-        {/* 描述 */}
         {!isActive && !detail && (
-          <p className="text-[11px] text-on-surface-variant/60 mt-0.5">{check.desc}</p>
+          <p className="text-[10px] text-on-surface-variant/60 mt-0.5 leading-relaxed line-clamp-2">{check.desc}</p>
         )}
-
-        {/* 运行中 */}
         {isActive && (
-          <div className="mt-2 space-y-2">
-            <p className="text-[11px] text-amber-300/70">Worker 积分计算中…</p>
+          <div className="mt-1.5 space-y-1">
+            <p className="text-[10px] text-amber-300/60">Worker 线程积分计算中…</p>
             <div className="h-1 bg-surface-container rounded-full overflow-hidden">
               <div className="h-full bg-amber-400/50 rounded-full animate-pulse" style={{ width: "60%" }} />
             </div>
           </div>
         )}
-
-        {/* 结果详情 */}
         {detail && !isActive && (
           <>
-            <p className="text-[11px] text-on-surface-variant/70 mt-1 leading-relaxed">{detail}</p>
-            {result?.metrics && <MetricsDisplay metrics={result.metrics} />}
-            {result && !isNaN(result.value) && (
-              <ThresholdBar value={result.value} threshold={result.threshold} unit={result.unit} />
+            <p className="text-[10px] text-on-surface-variant/70 mt-1 leading-relaxed">{detail}</p>
+            {result?.metrics && (
+              <div className="mt-1 text-[10px] text-on-surface-variant/50 font-mono">
+                实测 {result.metrics.measured.toFixed(4)}{result.metrics.unit}
+                {" "}vs{" "}
+                理论 {result.metrics.expected.toFixed(4)}{result.metrics.unit}
+              </div>
             )}
+            {result && !isNaN(result.value) && <ThresholdBar value={result.value} threshold={result.threshold} unit={result.unit} />}
           </>
-        )}
-
-        {/* 空闲时显示 worker 未就绪提示 */}
-        {detail && isActive === false && status === "idle" && (
-          <p className="text-[11px] text-on-surface-variant/70 mt-1 leading-relaxed">{detail}</p>
         )}
       </div>
     </div>
@@ -195,19 +141,16 @@ function ValidationCard({
 
 export function LabPage() {
   const {
-    validationResults,
-    validationDetails,
-    isRunning: validationRunning,
-    allPassed,
-    anyHasRun,
-    activeTest,
-    lastResults,
-    handleRunValidation,
+    validationResults, validationDetails,
+    isRunning: validationRunning, anyHasRun,
+    activeTest, lastResults, handleRunValidation,
   } = useLabValidation();
 
   const activeTemplate = useLabStore((s) => s.activeTemplate);
   const setUserCode = useLabStore((s) => s.setUserCode);
   const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleLoadTemplate = useCallback((id: SandboxTemplateId) => {
     const tpl = SANDBOX_TEMPLATES.find((t) => t.id === id);
@@ -217,62 +160,88 @@ export function LabPage() {
     }
   }, [setUserCode]);
 
+  const passedCount = Object.values(validationResults).filter((v) => v === "passed").length;
+  const failedCount = Object.values(validationResults).filter((v) => v === "failed").length;
+
   return (
     <div className="w-full h-full flex flex-col">
-      {/* 页头 */}
-      <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-surface-container-lowest">
+      {/* ═══ 页头 ═══ */}
+      <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-surface-container-lowest border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <FlaskConical className="w-4 h-4 text-primary" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center ring-1 ring-primary/10">
+            <FlaskConical className="w-4.5 h-4.5 text-primary" />
           </div>
           <div className="flex flex-col">
             <h2 className="text-sm font-semibold text-on-surface tracking-wide">实验模式</h2>
-            <span className="text-[10px] text-on-surface-variant">物理验证 · 代码实验</span>
+            <span className="text-[10px] text-on-surface-variant/70">物理正确性验证 · 用户可编程沙箱</span>
           </div>
         </div>
-        {allPassed && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <CheckCircle className="w-3.5 h-3.5" />
-            物理模型验证通过
-          </span>
-        )}
-        {anyHasRun && !allPassed && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-separation-alert/10 text-separation-alert border border-separation-alert/20">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            部分验证未通过
-          </span>
-        )}
+
+        <div className="flex items-center gap-3">
+          {/* 验证进度指示器 */}
+          {anyHasRun && (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded-full font-medium",
+                passedCount === 3 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400",
+              )}>
+                {passedCount}/3 通过
+              </span>
+              {failedCount > 0 && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-separation-alert/10 text-separation-alert font-medium">
+                  {failedCount} 失败
+                </span>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 rounded-md hover:bg-surface-container transition-colors"
+            title={sidebarOpen ? "收起验证面板" : "展开验证面板"}
+          >
+            {sidebarOpen
+              ? <PanelLeftClose className="w-4 h-4 text-on-surface-variant" />
+              : <PanelLeftOpen className="w-4 h-4 text-on-surface-variant" />}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：物理验证套件 */}
-        <div className="flex-1 p-5 overflow-y-auto">
-          <div className="max-w-2xl">
-            <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
-              物理模型验证
-            </h3>
-
-            {/* Worker 未就绪横幅 */}
-            {!isWorkerReady && (
-              <div className="mb-5 px-4 py-3 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 flex items-start gap-3">
-                <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-amber-300/90 font-medium mb-1">仿真引擎未就绪</p>
-                  <p className="text-[11px] text-amber-300/60 leading-relaxed">
-                    请先切换到「探索模式」点击播放按钮启动仿真，再返回此页面运行验证。
-                  </p>
+        {/* ═══ 左侧：物理验证 ═══ */}
+        {sidebarOpen && (
+          <aside className="w-[250px] shrink-0 overflow-y-auto bg-surface-container-lowest border-r border-white/5 p-4 flex flex-col gap-4">
+            {/* 标题 + 说明 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-amber-500/10 flex items-center justify-center">
+                  <ShieldCheck className="w-3 h-3 text-amber-400" />
                 </div>
+                <h3 className="text-xs font-semibold text-on-surface">物理正确性验证</h3>
+              </div>
+
+              <p className="text-[10px] text-on-surface-variant/70 leading-relaxed">
+                通过三项自动化测试确保仿真引擎在极端边界下的物理可靠性。验证在独立
+                Worker 线程中运行真实仿真路径——而非隔离测试纯函数——以保证测试条件
+                与用户实际体验完全一致。
+              </p>
+            </div>
+
+            {/* Worker 未就绪 */}
+            {!isWorkerReady && (
+              <div className="px-3 py-2.5 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 space-y-1">
+                <p className="text-[10px] text-amber-300/90 font-medium">仿真引擎未就绪</p>
+                <p className="text-[9px] text-amber-300/60 leading-relaxed">
+                  请先切换到「探索模式」并点击播放按钮启动 Worker。
+                </p>
               </div>
             )}
 
-            <p className="text-xs text-on-surface-variant/70 mb-5 leading-relaxed">
-              三项自动化验证确保仿真引擎的物理正确性。
-              验证通过 Worker 执行实际仿真路径，而非隔离测试纯函数。
-            </p>
-
-            <div className="space-y-3">
+            {/* 验证卡片 */}
+            <div className="space-y-2">
               {CHECKS.map((check) => (
-                <ValidationCard
+                <CompactValidationCard
                   key={check.key}
                   check={check}
                   status={validationResults[check.key]}
@@ -283,72 +252,69 @@ export function LabPage() {
               ))}
             </div>
 
-            {/* 验证按钮 */}
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleRunValidation}
-                disabled={validationRunning}
-                className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                  validationRunning
-                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-wait"
-                    : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98]",
-                )}
-              >
-                {validationRunning ? (
-                  <>
-                    <Activity className="w-4 h-4 animate-pulse" />
-                    验证中…
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    {anyHasRun ? "重新运行验证" : "运行全部验证"}
-                  </>
-                )}
-              </button>
-              {!anyHasRun && (
-                <p className="text-[10px] text-on-surface-variant/50 mt-2">
-                  在 Worker 线程中依次运行三项验证，预计耗时 1–3 秒
-                </p>
+            {/* 运行按钮 */}
+            <button
+              type="button"
+              onClick={handleRunValidation}
+              disabled={validationRunning}
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 w-full",
+                validationRunning
+                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-wait"
+                  : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98] shadow-sm shadow-primary/10",
               )}
-            </div>
-          </div>
-        </div>
+            >
+              {validationRunning ? (
+                <><Activity className="w-3.5 h-3.5 animate-pulse" />验证中…</>
+              ) : (
+                <><Play className="w-3.5 h-3.5" />{anyHasRun ? "重新运行全部验证" : "运行全部验证"}</>
+              )}
+            </button>
 
-        {/* 右侧：代码实验区 */}
-        <div className="w-80 shrink-0 flex flex-col bg-surface-container-low border-l border-white/5">
-          <div className="px-4 py-4 border-b border-white/5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center">
-                <Code className="w-3 h-3 text-on-surface-variant" />
-              </div>
-              <h4 className="text-xs font-semibold text-on-surface">代码模板</h4>
+            {!anyHasRun && (
+              <p className="text-[9px] text-on-surface-variant/40 text-center -mt-2">
+                三项验证在 Worker 中依次执行，预计耗时 1–3 秒
+              </p>
+            )}
+          </aside>
+        )}
+
+        {/* ═══ 右侧：Python 沙箱 ═══ */}
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface">
+          {/* 模板栏 */}
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-surface-container-lowest/30">
+            <div className="flex items-center gap-1.5 mr-3">
+              <Code className="w-3.5 h-3.5 text-primary/70" />
+              <span className="text-[11px] font-medium text-on-surface-variant">代码模板</span>
             </div>
-            <div className="space-y-1.5">
-              {SANDBOX_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => handleLoadTemplate(tpl.id)}
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-lg text-xs border transition-all duration-200",
-                    activeTemplate === tpl.id
-                      ? "border-primary/30 bg-primary-container/30 text-primary"
-                      : "border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container",
-                  )}
-                >
-                  <span className="font-medium">{tpl.label}</span>
-                  <span className="text-[10px] text-on-surface-variant/50 ml-2">{tpl.description}</span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-3">
+            <div className="h-4 w-px bg-white/5" />
+            {SANDBOX_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.id}
+                type="button"
+                onClick={() => handleLoadTemplate(tpl.id)}
+                className={cn(
+                  "px-3 py-1.5 text-[11px] rounded-lg border transition-all duration-200",
+                  activeTemplate === tpl.id
+                    ? "bg-primary/10 text-primary border-primary/25 shadow-sm"
+                    : "text-on-surface-variant/70 border-transparent hover:border-white/10 hover:bg-surface-container hover:text-on-surface",
+                )}
+                title={tpl.description}
+              >
+                {tpl.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 沙箱主区域 */}
+          <div className="flex-1 overflow-hidden relative">
+            {/* 编辑器背景微光 */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(75,159,255,0.03),transparent_50%)]" />
+            <div className="relative z-10 h-full">
               <SandboxPanel />
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );
