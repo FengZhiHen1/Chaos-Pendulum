@@ -19,7 +19,11 @@ export function useButterflyMode(): UseButterflyModeAPI {
     if (store.isRunning) {
       getScheduler().pause();
     }
-    setButterflyActive(true);
+    // 延迟一帧再挂载蝴蝶视图，确保主 Scene3D 的 WebGL context 被浏览器释放，
+    // 避免新旧 Canvas 同时存在导致 GPU 资源超限 → context lost → 反复重挂载
+    requestAnimationFrame(() => {
+      setButterflyActive(true);
+    });
   }, []);
 
   const exitButterfly = useCallback(() => {
