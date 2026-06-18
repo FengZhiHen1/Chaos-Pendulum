@@ -1,0 +1,109 @@
+% SOURCE: 2026年辽宁省大学生物理实验竞赛设计报告 — 自选类创新作品 方向2（虚仿）
+\documentclass[12pt,a4paper]{ctexart}
+
+% ==== Layout ====
+\usepackage[margin=1in]{geometry}
+\setlength{\parindent}{2em}
+\renewcommand{\baselinestretch}{1.25}
+
+% ==== Fonts (auto-detected 2026-06-18) ====
+\newcommand{\fontpath}{C:/Users/FengZhiHen/AppData/Local/Microsoft/Windows/Fonts/}
+\setmainfont{Times New Roman}
+\setCJKmainfont{simsun.ttc}[AutoFakeBold=2.5]
+\setCJKsansfont{SimHei.ttf}[AutoFakeBold=1.5]
+\setCJKmonofont{SimHei.ttf}[AutoFakeBold=1.5]
+
+\setCJKfamilyfont{zhonghei}{SimHei.ttf}[AutoFakeBold=1.5]
+\setCJKfamilyfont{zhongkai}{楷体_GB2312.TTF}[AutoFakeBold=2.0, Path=\fontpath]
+\setCJKfamilyfont{zhongfang}{仿宋_GB2312.ttf}[AutoFakeBold=2.5, Path=\fontpath]
+\setCJKfamilyfont{zhongxbs}{方正小标宋简.TTF}[Path=\fontpath]
+
+\newcommand{\heitil}{\CJKfamily{zhonghei}}
+\newcommand{\kaitil}{\CJKfamily{zhongkai}}
+\newcommand{\fangsongl}{\CJKfamily{zhongfang}}
+\newcommand{\xiaobiaosong}{\CJKfamily{zhongxbs}}
+
+% ==== Packages ====
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage[section]{placeins}
+\usepackage{flafter}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit}
+
+% ==== Float control ====
+\setcounter{totalnumber}{5}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.1}
+
+% ==== Graphics path ====
+% 注意：此路径依赖 build.py 在 src/ 目录下运行 xelatex
+% 若手动编译，需 cd 到 src/ 目录执行 xelatex
+\graphicspath{{../figures/output/}}
+
+% ==== Code listings ====
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  language=Python,
+}
+
+% ==== Hyperref ====
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+}
+
+\title{\xiaobiaosong 双摆非线性动力学虚拟仿真实验\\[0.5em] \large ——设计报告}
+\date{\today}
+\author{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本设计报告详述了一个面向本科物理教学的\textbf{双摆非线性动力学虚拟仿真实验}系统的设计与实现。
+该系统以平面理想双摆为物理模型，基于拉格朗日力学导出运动方程，自实现 RKF45 自适应步长积分引擎，
+在 Web Worker 中并行求解 ODE 并通过 Transferable Float64Array 零拷贝传输结果。
+系统提供探索、分析、实验、故事四种工作模式，构建“感知→分析→验证→创造”四层递进认知闭环。
+核心技术栈包括 React 18 + TypeScript + Three.js + Web Audio API + Pyodide，
+产出物为纯客户端、零后端依赖的自包含 HTML5 文件夹，支持离线运行。
+本报告从物理原理、系统架构、数值方法、交互设计、结果验证等方面展开论述。
+物理验证结果表明：小角度线性化偏差低于 0.8\%，单摆退化周期偏差低于 0.05\%，
+1000 秒无阻尼仿真能量漂移仅为 0.38\%，为系统的物理正确性提供了量化背书。
+本报告旨在为同类虚拟仿真教学资源的开发提供完整的技术参考。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ==== 章节 ====
+\input{sections/sec01_introduction}
+\clearpage
+\input{sections/sec02_physics}
+\clearpage
+\input{sections/sec03_design}
+\clearpage
+\input{sections/sec04_usage}
+\clearpage
+\input{sections/sec05_validation}
+\clearpage
+\input{sections/sec06_discussion}
+\clearpage
+\input{sections/sec07_conclusion}
+
+\end{document}

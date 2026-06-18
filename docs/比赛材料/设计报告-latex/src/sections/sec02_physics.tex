@@ -1,0 +1,114 @@
+% SOURCE: docs/比赛材料/设计原理与方法.md §一–§二 + §五–§六
+\section{物理原理}
+
+\subsection{双摆系统定义}
+
+本系统研究的物理对象为\textbf{平面理想双摆}（Planar Ideal Double Pendulum），其力学定义如下：
+
+\begin{itemize}
+  \item 两根质量不计的刚性杆，长度分别为 $L_1$、$L_2$；
+  \item 两个质点 $m_1$、$m_2$ 分别固定于两杆末端；
+  \item 上端支点固定于原点，系统在竖直平面（$xy$ 平面）内运动；
+  \item 均匀重力场 $g$，方向竖直向下（$-y$ 方向）；
+  \item 可选线性粘滞阻尼，阻尼力矩 $\tau_i = -b\,\dot{\theta}_i$（$i = 1,2$）。
+\end{itemize}
+
+选取两杆与竖直向下方向的偏角 $(\theta_1, \theta_2)$ 为广义坐标，逆时针为正方向。
+以悬挂点为原点，$y$ 轴向上，笛卡尔坐标到广义坐标的映射为：
+
+\begin{equation}
+\begin{aligned}
+  x_1 &= L_1 \sin\theta_1, \quad y_1 = -L_1 \cos\theta_1 \\
+  x_2 &= x_1 + L_2 \sin\theta_2, \quad y_2 = y_1 - L_2 \cos\theta_2
+\end{aligned}
+\label{eq:kinematics}
+\end{equation}
+
+\subsection{拉格朗日方程与运动方程}
+
+系统动能 $T$ 与势能 $V$ 为：
+
+\begin{equation}
+\begin{aligned}
+  T &= \frac{1}{2}m_1 L_1^2 \dot{\theta}_1^2
+     + \frac{1}{2}m_2\Bigl[L_1^2\dot{\theta}_1^2 + L_2^2\dot{\theta}_2^2
+     + 2L_1 L_2\dot{\theta}_1\dot{\theta}_2\cos(\theta_2-\theta_1)\Bigr] \\[0.5em]
+  V &= -(m_1+m_2)gL_1\cos\theta_1 - m_2 g L_2 \cos\theta_2
+\end{aligned}
+\label{eq:energy}
+\end{equation}
+
+拉格朗日函数 $L = T - V$，代入欧拉--拉格朗日方程：
+
+\begin{equation}
+  \frac{d}{dt}\frac{\partial L}{\partial \dot{\theta}_i} - \frac{\partial L}{\partial \theta_i} = -b\,\dot{\theta}_i, \quad i = 1,2
+\label{eq:euler_lagrange}
+\end{equation}
+
+引入角度差 $\delta = \theta_2 - \theta_1$，经矩阵求逆，得到角加速度的显式表达式——\textbf{即本系统 ODE 右端函数的实现依据}：
+
+\begin{equation}
+\boxed{
+\begin{aligned}
+\ddot{\theta}_1 &= \frac{m_2 L_1 \dot{\theta}_1^2 \sin\delta\cos\delta
+                  + m_2 g \sin\theta_2 \cos\delta
+                  + m_2 L_2 \dot{\theta}_2^2 \sin\delta
+                  - (m_1+m_2)g\sin\theta_1}
+                  {L_1\bigl[m_1 + m_2\sin^2\delta\bigr]} - b\,\dot{\theta}_1 \\[1.5em]
+\ddot{\theta}_2 &= \frac{-m_2 L_2 \dot{\theta}_2^2 \sin\delta\cos\delta
+                  + (m_1+m_2)\bigl(g\sin\theta_1\cos\delta
+                  - L_1\dot{\theta}_1^2\sin\delta
+                  - g\sin\theta_2\bigr)}
+                  {L_2\bigl[m_1 + m_2\sin^2\delta\bigr]} - b\,\dot{\theta}_2
+\end{aligned}
+}
+\label{eq:ode_system}
+\end{equation}
+
+其中分母 $m_1 + m_2\sin^2\delta$ 在极端参数组合下可能趋近于零，代码中以 \texttt{DENOM\_EPSILON = 1e-12} 做近零保护。
+
+\subsection{退化验证}
+
+上述运动方程在两个经典极限情形下退化：
+
+\textbf{单摆退化}（$m_2 \to 0$）：分母趋近 $m_1$，$\ddot{\theta}_1 \to -(g/L_1)\sin\theta_1$，退化为标准单摆方程，
+其小角度周期 $T_0 = 2\pi\sqrt{L_1/g}$。
+
+\textbf{小角度线性化}（$|\theta_1|,|\theta_2| \ll 1$，$b = 0$）：在 $(0,0)$ 处 Taylor 展开至一阶，得到耦合线性振动系统，存在两个正则模（Normal Modes）。
+正则模频率为：
+\begin{equation}
+  \omega^2_{\pm} = \frac{g}{2}\left[\frac{m_1+m_2}{m_1}\left(\frac{1}{L_1}+\frac{1}{L_2}\right)
+                   \pm \sqrt{\left(\frac{m_1+m_2}{m_1}\right)^2\left(\frac{1}{L_1}+\frac{1}{L_2}\right)^2
+                   - \frac{4(m_1+m_2)}{m_1 L_1 L_2}}\,\right]
+\label{eq:normal_modes}
+\end{equation}
+
+上述退化情形均已编码为物理验证套件的自动化测试场景，确保 ODE 实现的物理正确性。
+
+\subsection{混沌的数学定义：Lyapunov 指数}
+
+混沌系统最核心的量化特征是其对初值的指数级敏感性。\linebreak
+对于状态向量 $\mathbf{x} = (\theta_1,\dot{\theta}_1,\theta_2,\dot{\theta}_2)^T$，定义最大 Lyapunov 指数（MLE）：
+
+\begin{equation}
+  \lambda_{\max} = \lim_{t\to\infty}\lim_{\delta\mathbf{x}_0\to 0}\,\frac{1}{t}\ln\frac{\|\delta\mathbf{x}(t)\|}{\|\delta\mathbf{x}_0\|}
+\label{eq:lyapunov_def}
+\end{equation}
+
+其中 $\delta\mathbf{x}(t)$ 是初始微扰 $\delta\mathbf{x}_0$ 随时间的演化。$\lambda_{\max} > 0$ 是混沌的充分条件。
+
+本系统采用 Benettin 算法估算 MLE：并行积分参考轨线与扰动轨线，每隔固定周期 $\tau$ 测量扰动增长倍数并重新归一化扰动方向，
+最终 $\lambda_{\max} = \frac{1}{N\tau}\sum_{k=1}^{N}\ln(d_k/\delta_0)$。
+离线预计算脚本在参数空间 $(L_2/L_1,\;\theta_{1,0})$ 上生成 $100 \times 100$ 网格的 MLE 矩阵，为前端的 Lyapunov 热力图提供数据源。
+
+\subsection{时间反演与蝴蝶效应}
+
+双摆的哈密顿量在无阻尼条件下可逆——若以 $(\theta_1, \theta_2, -\dot{\theta}_1, -\dot{\theta}_2)$ 为初值，
+理论轨迹应沿原路径反向返回。但在数值仿真中，浮点舍入误差（$\sim 10^{-16}$）被正 Lyapunov 指数放大约 $e^{\lambda t}$ 倍，
+导致数值反演轨迹逐渐偏离原路径。这一现象构成了“哈密顿可逆性 vs 数值不可逆性”的核心教学命题。
+
+蝴蝶效应本质上是同一数学事实的另一面：两个仅相差 $\Delta\theta_1(0) \approx 10^{-6\circ}$ 的初始条件，
+其轨迹差异 $\|\Delta\mathbf{x}(t)\|$ 随时间指数增长，在李雅普诺夫时间 $\tau_L = 1/\lambda_{\max}$ 尺度上变得宏观可见。
+本系统的蝴蝶效应对比器以双 Worker 并行积分、双 Viewport 并排渲染的方式，将此抽象概念转化为直观的视觉叙事。
+
+\endinput

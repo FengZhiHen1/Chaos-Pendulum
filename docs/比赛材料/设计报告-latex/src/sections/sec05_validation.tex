@@ -1,0 +1,148 @@
+% SOURCE: docs/比赛材料/设计原理与方法.md §五–§六 + 项目说明书-初稿.md §四
+\section{结果分析与验证}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.90\textwidth]{I01_explore-mode-3d-main-scene.png}
+  \caption{系统主界面——探索模式。左侧为 10 项物理参数滑杆面板，中央为 Three.js 实时渲染的 3D 双摆场景，
+          运动尾迹以颜色映射速度（蓝色低 $\to$ 红色高），底部为实时能量曲线。}
+  \label{fig:main_scene}
+\end{figure}
+
+\subsection{物理正确性验证}
+
+\subsubsection{小角度线性化验证}
+
+将双摆初始角度设为小角度（$\theta_1 = 3^\circ,\;\theta_2 = 2^\circ$，阻尼关闭），
+运行 RKF45 数值积分 10 s，与线性化解析解进行比较。
+线性化解析解基于式\eqref{eq:normal_modes}的两个正则模频率 $\omega_\pm$ 构造。
+相对偏差定义为 $\|\bm{\theta}_\text{num}(t) - \bm{\theta}_\text{lin}(t)\| / \|\bm{\theta}_\text{lin}(t)\|$，
+系统断言最大偏差 $< 2\%$。
+
+测试结果表明，默认参数下最大相对偏差约 $0.8\%$——主要来源于线性化近似本身（舍去的高阶项 $O(\theta^3)$），
+而非数值误差。这验证了 ODE 右端函数在小角度极限下的正确性。
+
+\subsubsection{单摆退化验证}
+
+设置 $m_2 = 0.001\;\mathrm{kg}$（趋近于零，使下摆对系统的影响可忽略），
+$\theta_1 = 10^\circ$，$\theta_2 = 0^\circ$。运行仿真 20 s，检测 $\theta_1(t)$ 的摆动周期。
+系统断言所测周期与 $T_0 = 2\pi\sqrt{L_1/g}$ 的偏差 $< 1\%$。
+
+测试结果：所测周期 $T_\text{meas} = 2.007\;\mathrm{s}$，
+理论值 $T_0 = 2.006\;\mathrm{s}$，偏差 $0.05\%$——验证了当 $m_2 \to 0$ 时运动方程正确退化为标准单摆方程。
+
+\subsubsection{能量守恒验证}
+
+关闭阻尼（$b = 0$），以默认混沌参数（$\theta_1(0) = 120^\circ,\;\theta_2(0) = -60^\circ$）
+运行仿真 1000 s。记录 $E(t) = K(t) + V(t)$ 的时间序列，计算相对漂移 $\eta(t) = |E(t) - E(0)| / |E(0)|$ 在全时间序列上的最大值 $\eta_{\max}$。
+系统断言 $\eta_{\max} < 0.5\%$。
+
+测试结果：$\eta_{\max} = 0.38\%$——证明了 RKF45 自适应步长控制的出色保能量性能。
+相比之下，Velocity Verlet 在相同条件下 $\eta = 1.2\%$，显式 Euler 在 30 s 内 $\eta$ 即超过 $50\%$。
+
+\subsection{混沌特征分析}
+
+\subsubsection{Lyapunov 指数热力图}
+
+图\ref{fig:lyapunov}展示了离线预计算的 Lyapunov 指数谱热力图。
+参数空间为 $(L_2/L_1,\;\theta_{1,0})$，网格密度 $100 \times 100$。
+Benettin 算法参数：瞬态抛弃 $T_\text{trans} = 100$ s，重归一化间隔 $\tau = 10$ s，迭代次数 $N = 50$。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{I11_analyze-lyapunov-heatmap.png}
+  \caption{Lyapunov 指数谱热力图。红色区域（$\lambda_{\max} > 0$）为混沌参数区，
+          蓝色区域（$\lambda_{\max} \approx 0$）为规则运动区。
+          点击任意单元格可将对应参数一键注入仿真。}
+  \label{fig:lyapunov}
+\end{figure}
+
+热力图清晰显示了从规则区（蓝色）到混沌区（红色）的渐变过渡，
+以及混沌海洋中嵌入的周期窗口（Periodic Windows）——这是非线性系统中自相似结构的典型表现。
+MLE 的取值范围约为 $-0.5$ 至 $+0.8\;\mathrm{s}^{-1}$，
+正 Lyapunov 区域占比约 $60\%$（在当前参数范围内）。
+
+\subsubsection{分岔图}
+
+分岔图以 $\theta_{1,0} \in [0, 2\pi]$ 为控制参数，对每个参数值积分 500 s 后抛弃前 200 s 瞬态，
+记录剩余 300 s 中 $\theta_2(t)$ 的所有局部极大值。分岔图的结构特征为：
+小角度区域为规则周期运动（少数孤立点），随 $\theta_{1,0}$ 增大，经过倍周期分岔序列进入混沌（雾状带），
+混沌区域中夹杂清晰的周期窗口——展示了非线性系统经典的“通向混沌之路”。
+
+\subsubsection{庞加莱截面}
+
+在 $\theta_1 = 0,\;\dot{\theta}_1 > 0$ 截面条件下：
+\begin{itemize}
+  \item 规则运动（$\theta_1(0) = 30^\circ,\;\theta_2(0) = 20^\circ$）：截面上呈现若干离散聚焦点，对应拟周期轨线；
+  \item 混沌运动（$\theta_1(0) = 120^\circ,\;\theta_2(0) = -60^\circ$）：截面上呈现弥散分布，局部有分形自相似结构迹象。
+\end{itemize}
+截面散点分布模式与经典双摆文献中的观测一致。
+
+\subsection{蝴蝶效应——初值敏感性的定量展示}
+
+蝴蝶效应对比器（图\ref{fig:butterfly}）是本系统对混沌核心概念的标志性展示。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{I05_butterfly-effect-split-comparison.png}
+  \caption{蝴蝶效应双视口对比。金色摆 A（左）与紫色摆 B（右）初始角度仅差 $10^{-6\circ}$，
+          运行约 20 秒后运动轨迹出现显著分离。}
+  \label{fig:butterfly}
+\end{figure}
+
+初始差异 $\Delta\theta_1(0) = 10^{-6\circ} \approx 1.7 \times 10^{-8}\;\mathrm{rad}$。
+对于 $\lambda_{\max} \approx 0.5\;\mathrm{s}^{-1}$ 的典型混沌参数，
+李雅普诺夫时间 $\tau_L = 1/\lambda_{\max} \approx 2\;\mathrm{s}$。
+在运行约 $10\tau_L \approx 20\;\mathrm{s}$ 后（图\ref{fig:butterfly}），
+两摆的轨迹出现肉眼可辨的显著分离——直观展示了指数放大的物理效应。
+
+\subsection{时间反演实验}
+
+时间反演实验（图\ref{fig:time_reversal}）是本系统最具教学深度的功能之一。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.80\textwidth]{I07_time-reversal-drift-curve.png}
+  \caption{时间反演漂移曲线。精确反演（环形缓冲区回放）零误差——验证了系统的数据完整性；
+          数值反演（Worker 以 $-dt$ 重新积分）因浮点误差被混沌指数放大而逐渐偏离。}
+  \label{fig:time_reversal}
+\end{figure}
+
+实验结果揭示了三个关键教学要点：
+\begin{enumerate}[label=(\arabic*), leftmargin=*]
+  \item \textbf{精确反演的成功}证明了环形缓冲区历史存储的完整性和系统无阻尼条件下的哈密顿可逆性；
+  \item \textbf{数值反演的漂移}直接体现了“浮点舍入误差（$\sim 10^{-16}$）$\times$ 混沌指数放大”的物理效应——
+       这与天气预测的时间上限（约 2 周）出于同一数学原理；
+  \item \textbf{两者对比}将“经典力学的决定论”与“数值计算的不可预测性”之间的微妙张力转化为可交互、可测量的实验，
+       直击混沌教学的核心哲学难点。
+\end{enumerate}
+
+\subsection{物理验证套件——全部通过}
+
+图\ref{fig:validation}展示了物理验证套件的全部通过状态。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.80\textwidth]{I16_lab-validation-suite-passed.png}
+  \caption{物理验证套件全部通过。三项标准检验——小角度线性化（偏差 $< 2\%$）、
+          单摆退化（周期匹配 $T_0$）、能量守恒（1000 s 漂移 $< 0.5\%$）——一键运行并自动判定。}
+  \label{fig:validation}
+\end{figure}
+
+三项验证全部通过为系统的物理正确性提供了可复现的量化背书。
+绿色徽章机制不仅是视觉反馈，更承载教学功能——让学生意识到“数值仿真需要物理验证”这一元层次科学素养。
+
+\subsection{结果的可拓展性}
+
+上述验证结果不仅证明了当前双摆仿真的正确性，还具备以下可拓展价值：
+
+\begin{enumerate}[label=(\arabic*), leftmargin=*]
+  \item \textbf{模型框架的通用性}：ODE 右端函数与积分器通过策略模式解耦，替换运动方程即可支持弹簧摆、受迫摆、磁力摆等拓展模型，
+       Python 可编程沙箱中的三个预设模板已验证了这一拓展路径；
+  \item \textbf{预计算管线的可复用性}：Lyapunov 热力图和分岔图的离线预计算管线
+      （Python 参数扫描 $\to$ JSON $\to$ 浏览器加载 $\to$ IndexedDB 缓存）可复用于任意二维非线性系统的参数空间分析；
+  \item \textbf{教学梯度可延伸}：四层认知架构的上限（创造层——Python 沙箱）支持学生自行编写任意运动方程，
+       使本平台可从本科教学工具延伸为科研训练基础框架，覆盖本科毕业论文选题的初步探索阶段。
+\end{enumerate}
+
+\endinput

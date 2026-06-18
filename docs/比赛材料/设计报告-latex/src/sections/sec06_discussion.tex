@@ -1,0 +1,74 @@
+% SOURCE: docs/比赛材料/参赛材料准备清单.md §T17-T18 + 技术栈设计.md §10
+\section{讨论}
+
+\subsection{作品的局限性}
+
+本作品在以下方面存在已知限制：
+
+\begin{enumerate}[label=(\arabic*), leftmargin=*]
+  \item \textbf{物理模型简化}：当前模型为平面理想双摆——忽略杆的质量、弹性形变、转轴摩擦的非线性特性。
+       三维空间双摆（Spherical Double Pendulum）作为四自由度系统具有更复杂的动力学行为，但超出了本作品的教学聚焦范围；
+
+  \item \textbf{数值精度边界}：RKF45 在 $\Delta t = 1/60$ s 标称步长下能量漂移约 $0.38\%/1000$ s。
+       对于极端参数组合（如 $\theta_1(0) \approx 180^\circ$，近倒立不稳定平衡点），
+       步长自适应机制可能将步长压缩至 $< 10^{-5}$ s 以维持精度，导致仿真出现短暂“慢动作”现象。
+       已通过步长坍缩回退（Euler 降级）和仿真帧率保底（$\geq 30$ fps）策略缓解；
+
+  \item \textbf{Lyapunov 指数估算的系统误差}：Benettin 算法对收敛参数（$T_\text{trans},\;\tau,\;N$）的选择敏感。
+       在规则窗口边界（$\lambda_{\max} \approx 0$）附近，热力图可能因收敛不足而产生分类模糊。
+       离线预计算的 $100 \times 100$ 网格分辨率也可能遗漏更小尺度的分形结构；
+
+  \item \textbf{浏览器兼容性}：WebGL 2.0 和 Web Audio API 在 Safari 15 以下的版本中存在已知限制
+      （如 AudioContext 采样率锁定为 44.1 kHz、缺少 \texttt{ConvolverNode} 的部分功能）。
+      移动端浏览器（iOS Safari、Android Chrome）因 GPU 性能差异，3D 帧率可能降至 20--30 fps；
+
+  \item \textbf{Pyodide 冷启动延迟}：Lab 模式首次加载 Python 运行时约需 5--10 秒（取决于网络与磁盘速度），
+      虽通过三级缓存（本地文件 $\to$ IndexedDB $\to$ CDN）和加载进度指示器优化体验，
+      但在极低带宽或完全无 Pyodide 离线包的环境中无法使用编程沙箱；
+
+  \item \textbf{无协作功能}：当前系统为单用户设计，不支持多人协同仿真或实验结果的云端共享。
+      实验报告和快照均存储在本地 IndexedDB 中，更换设备或清除浏览器数据后会丢失。
+\end{enumerate}
+
+\subsection{改进思路}
+
+基于上述局限性，未来版本可从以下方向扩展：
+
+\begin{enumerate}[label=(\arabic*), leftmargin=*]
+  \item \textbf{扩展物理模型}：
+        \begin{itemize}
+          \item 支持三维空间双摆（球坐标，4 自由度），引入空间混沌的更丰富动力学行为；
+          \item 加入杆的分布质量（物理摆，Physical Pendulum）和弹性形变；
+          \item 支持非均匀重力场、运动支点、外部周期驱动力等拓展场景。
+        \end{itemize}
+
+  \item \textbf{提升数值精度与效率}：
+        \begin{itemize}
+          \item 引入 DOPRI8(7) 等高阶嵌入对，将能量漂移降至 $0.01\%$ 以下；
+          \item 利用 WebGPU Compute Shader 实现 GPU 并行批量积分，将预计算时间从小时级降至分钟级；
+          \item 自适应网格细化（Adaptive Mesh Refinement, AMR）：在 Lyapunov 热力图的分类模糊区域（$|\lambda_{\max}| < 0.05$）自动提高分辨率。
+        \end{itemize}
+
+  \item \textbf{增强协作与数据管理}：
+        \begin{itemize}
+          \item 引入可选后端服务（Firebase/Supabase），支持云端保存与分享实验报告、快照和参数预设；
+          \item 支持生成可分享的 URL（参数编码于 URL hash），便于教师分发教学链接；
+          \item 实现多窗口同步模式——同一设备上两个浏览器 Tab 可作为蝴蝶效应的 A/B 通道独立运行。
+        \end{itemize}
+
+  \item \textbf{教学资源生态}：
+        \begin{itemize}
+          \item 配套开发教师手册（含教案、课堂活动设计、课后探究题目）和学生学习指南；
+          \item 集成 SRS（Student Response System）——学生在仿真中完成预设任务，结果自动汇总至教师端；
+          \item 开放预设市场——教师社群可上传和分享自定义参数预设与教学场景。
+        \end{itemize}
+
+  \item \textbf{国际化与无障碍}：
+        \begin{itemize}
+          \item 支持中英文多语言界面切换；
+          \item 为视障用户提供完整的屏幕阅读器支持（ARIA 标签）和增强的声音化反馈模式；
+          \item 为色盲用户提供除颜色外另有形状/线型区分的数据可视化模式。
+        \end{itemize}
+\end{enumerate}
+
+\endinput

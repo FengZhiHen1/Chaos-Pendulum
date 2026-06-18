@@ -1,0 +1,264 @@
+% SOURCE: docs/比赛材料/设计原理与方法.md §三 + docs/双摆混沌实验室-技术栈设计.md
+\section{系统设计与实现}
+
+\subsection{分层架构设计}
+
+本系统采用前端五层 Clean Architecture，自底向上为（图\ref{fig:architecture}）：
+
+\begin{description}[leftmargin=*, itemsep=0.5em]
+  \item[Domain 层] 实体/值对象/领域服务：ODE 右端函数、三种积分器\linebreak
+                    （RKF45/VelocityVerlet/Euler）、能量与漂移计算器、庞加莱截面穿越检测、力分量计算器。
+  \item[Application 层] 无状态用例：BootSequence、SaveSnapshot、ExportData、RunValidation 等。
+  \item[Infrastructure 层] 端口实现：Worker 调度器与批量积分管线、IndexedDB 缓存管理、
+                           音频合成引擎（Web Audio API）、PDF/CSV/PNG 导出器、Pyodide 桥接。
+  \item[ViewModel 层] Zustand Store + 自定义 Hooks：管理仿真状态、模式切换、快照管理、多视图联动。
+  \item[View 层] React 组件（纯渲染，不含业务逻辑）：3D 场景（R3F）、2D 图表（D3.js Canvas）、
+                 控制面板（shadcn/ui）、代码编辑器（CodeMirror 6）。
+\end{description}
+
+依赖方向铁律：上层可依赖下层，反向绝对禁止。View 层不直接调用 API 或 Worker，全部通过 ViewModel 层 Hooks 间接消费数据。
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{%
+    \begin{minipage}{0.85\textwidth}
+      \vspace{1em}
+      \begin{center}
+        \textbf{五层 Clean Architecture}\\[0.5em]
+        \small
+        \begin{tabularx}{\linewidth}{|c|>{\centering\arraybackslash}p{5cm}|X|}
+          \hline
+          \textbf{层级} & \textbf{技术实现} & \textbf{职责} \\
+          \hline
+          View & React + R3F + D3.js + shadcn/ui & 纯渲染、用户交互 \\
+          \hline
+          ViewModel & Zustand Store + Hooks & 状态管理、业务编排 \\
+          \hline
+          Infrastructure & Worker 调度器、IndexedDB、Audio API、Pyodide & 端口实现 \\
+          \hline
+          Application & 无状态用例 (Boot/Save/Export/Validate) & 业务流程 \\
+          \hline
+          Domain & ODE 右端函数、积分器、力计算器 & 纯领域逻辑 \\
+          \hline
+        \end{tabularx}
+      \end{center}
+      \vspace{0.5em}
+    \end{minipage}
+  }
+  \caption{系统五层架构示意图}
+  \label{fig:architecture}
+\end{figure}
+
+\subsection{仿真数据管线}
+
+仿真数据管线是本系统的核心基础设施，其设计目标为：高频积分不阻塞 UI、零拷贝数据传输、历史数据可回溯（图\ref{fig:pipeline}）。
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{%
+    \begin{minipage}{0.85\textwidth}
+      \vspace{0.8em}
+      \begin{center}
+        \textbf{仿真数据流}\\[0.5em]
+        \begin{tabular}{c c c c c}
+          ODE 积分器 & $\xrightarrow{\text{写入}}$ & Float64Array 池 & $\xrightarrow{\text{Transferable}}$ & 主线程 Zustand \\
+          (Worker) & & (10 $\times$ 4000 元素) & & (Store) \\[1em]
+          & & & & $\downarrow$ \\[0.5em]
+          & & & & \shortstack{R3F 3D 场景 \\ D3.js 2D 图表 \\ Web Audio 声音化}
+        \end{tabular}
+      \end{center}
+      \vspace{0.5em}
+    \end{minipage}
+  }
+  \caption{仿真数据管线——从 ODE 积分到多视图渲染}
+  \label{fig:pipeline}
+\end{figure}
+
+关键设计要点：
+
+\begin{enumerate}[label=(\arabic*), leftmargin=*]
+  \item \textbf{Web Worker 隔离}：ODE 积分在独立线程中执行，主线程永不阻塞，确保 3D 渲染维持在 60 fps；
+  \item \textbf{Transferable 零拷贝}：\texttt{Float64Array} 通过 \texttt{postMessage} 的 Transferable 机制传输，
+       所有权转移而非内存复制，避免高频 GC 抖动。池化设计（10 块 $\times$ 4000 元素 $\approx$ 320 KB）覆盖 2 秒轨迹缓冲；
+  \item \textbf{批量积分与预取}：Worker 以 10 帧批次（\texttt{FRAMES\_PER\_BATCH}）为单位积分，
+       预取阈值 \texttt{BATCH\_PREFETCH\_THRESHOLD = 5} 触发下一批次的异步准备，确保缓冲区永不枯竭；
+  \item \textbf{环形缓冲区 历史存储}：容量 6000 帧（= 100 s @ 60 fps），循环覆盖，O(1) 写入与随机访问，
+       作为时间反演回放与历史回溯的数据源。
+\end{enumerate}
+
+\subsection{数值积分方法}
+
+本系统实现了三种积分器，以策略模式（Strategy Pattern）组织，通过 \texttt{IIntegrator} 契约接口统一调用。
+
+\subsubsection{RKF45 自适应积分器（默认）}
+
+采用 Fehlberg 4(5) 嵌入对，Butcher 表系数直接编码。核心特性：
+
+\begin{itemize}
+  \item \textbf{自适应步长控制}：每子步计算 4 阶与 5 阶估计的差值作为误差估计，以容差 $\text{tol} = 10^{-7}$ 为标准动态调整步长；
+  \item \textbf{步长坍缩回退}：当误差持续超标导致 $h < 10^{-10}$ 时，自动退化为 Euler 子步避免死循环；
+  \item \textbf{方向感知}：支持正向（$dt > 0$）与反向（$dt < 0$）积分，为时间反演实验提供数值基础。
+\end{itemize}
+
+RKF45 在 $\Delta t = 1/60\,\mathrm{s}$ 标称步长下，1000 s 仿真能量漂移控制在 $0.5\%$ 以下。
+
+\subsubsection{Velocity Verlet 积分器}
+
+Velocity Verlet 是一种辛积分器变体。需要特别指出：其辛性严格依赖于正则坐标 $(q, p)$ 的使用。
+本系统以 $(\theta, \dot{\theta})$ 为状态变量（而非正则动量 $p = \partial L/\partial \dot{\theta}$），
+因此 Velocity Verlet 在此并非严格辛（symplectic）的。实验中学生可观察到其长时能量漂移甚至可能劣于 RKF45——这本身构成一个重要的教学点。
+
+\subsubsection{显式 Euler（教学对照）}
+
+局部截断误差仅 $O(\Delta t^2)$。对于混沌双摆，数秒内即导致能量发散。保留此积分器作为教学对照案例，让学生直观体会低阶方法的局限性。
+
+\subsection{核心技术栈}
+
+\begin{table}[htbp]
+  \centering
+  \caption{核心技术栈一览}
+  \label{tab:tech_stack}
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{维度} & \textbf{技术} & \textbf{用途} \\
+    \midrule
+    语言/框架 & TypeScript 5.6 + React 18.3 & 前端 UI 与状态管理 \\
+    构建工具 & Vite 5.4 & 开发/构建/自包含产物输出 \\
+    3D 渲染 & Three.js 0.184 + R3F 8.17 + drei 9.114 & 实时 3D 场景、能量景观曲面、力矢量 \\
+    2D 图表 & D3.js 7.x（按需模块） & 分岔图、热力图、庞加莱截面散点图 \\
+    状态管理 & Zustand 4.5 & 全局状态与多视图联动 \\
+    ODE 求解 & 自实现 RKF45/VelocityVerlet/Euler & Web Worker 常驻积分 \\
+    音频合成 & Web Audio API（原生） & 混沌声音化引擎 \\
+    Python 沙箱 & Pyodide 0.26 + CodeMirror 6 & 浏览器内 Python 可编程 \\
+    样式 & Tailwind CSS 3.x + shadcn/ui & 原子化 CSS + 无障碍组件 \\
+    测试 & Vitest + Testing Library & 单元测试 + 物理回归测试 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{代码归属说明}
+
+按竞赛要求，明确区分已有函数、引用代码与自写代码：
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{代码归属分类}
+  \label{tab:code_ownership}
+  \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{类别} & \textbf{内容} \\
+    \midrule
+    \textbf{自主编写} &
+    运动方程右端函数（\texttt{derivatives.ts}）；三种积分器（RKF45 / Velocity Verlet / Euler）；
+    Worker 调度器与批量积分管线；Command Bus 通信协议；环形缓冲区存储（容量 6000 帧）；
+    能量监控模块（含投影校正与漂移告警）；运动尾迹缓冲与颜色映射着色；
+    蝴蝶效应双 Worker 同步控制；时间反演状态机与漂移计算；
+    力分量计算器（支持笛卡尔 / 极坐标 / 自然坐标三坐标系切换）；
+    物理验证三项自动化测试；庞加莱截面穿越检测（线性插值 + 二分定位）；
+    分岔图与 Lyapunov 热力图的 Canvas 渲染引擎 \\
+    \midrule
+    \textbf{算法引用} &
+    RKF45 Butcher 表系数（Fehlberg 嵌入对）；Benettin 最大 Lyapunov 指数估计；
+    Modified Gram-Schmidt 正交归一化 \\
+    \midrule
+    \textbf{第三方库} &
+    React 18（UI 框架）；Three.js / R3F / drei（3D 渲染）；
+    D3.js（2D 图表缩放与坐标变换）；Zustand（状态管理）；
+    CodeMirror 6（代码编辑器）；Web Audio API（浏览器原生音频）；
+    Pyodide v0.26.1（Python WASM 运行时）；Tailwind CSS + shadcn/ui（样式系统）；
+    jsPDF（PDF 报告生成） \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{仿真流程}
+
+系统仿真主循环的执行流程如图\ref{fig:sim_flowchart}所示。
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+    node distance=1.2cm and 1.8cm,
+    box/.style={rectangle, draw, rounded corners=3pt, minimum width=5cm, minimum height=0.8cm, align=center, font=\small},
+    decision/.style={diamond, draw, aspect=2, minimum width=3.5cm, minimum height=1cm, align=center, font=\small},
+    arrow/.style={->, >=Stealth, thick},
+  ]
+    % Nodes
+    \node[box] (init) {主线程创建 Worker + 初始化 Float64Array 池};
+    \node[box, below=of init] (param) {用户调整参数（滑块 / 数值输入）};
+    \node[box, below=of param, fill=blue!8] (batch) {Worker 批量积分 10 帧 \\(RKF45, $\Delta t = 1/60$ s)};
+    \node[box, below=of batch, fill=green!8] (transfer) {Transferable postMessage \\(Float64Array 零拷贝传输)};
+    \node[box, below=of transfer] (store) {主线程写入 Zustand Store};
+    \node[box, below=of store, fill=yellow!8, minimum height=1.2cm] (render) {多视图同步渲染：\\R3F 3D 场景 + D3.js 图表 + Web Audio 声音化};
+    \node[box, below=of render] (ring) {环形缓冲区追加历史帧（容量 6000 = 100 s）};
+    \node[decision, below=of ring] (check) {缓冲区消耗 \\$\leq 5$ 帧？};
+    \node[box, right=of check, xshift=4cm, fill=orange!10] (prefetch) {Worker 异步预取\\下一批次数据};
+
+    % Arrows
+    \draw[arrow] (init) -- (param);
+    \draw[arrow] (param) -- (batch) node[midway, right, font=\footnotesize, align=left] {连续参数即时更新\\初始条件释放时触发};
+    \draw[arrow] (batch) -- (transfer);
+    \draw[arrow] (transfer) -- (store);
+    \draw[arrow] (store) -- (render);
+    \draw[arrow] (render) -- (ring);
+    \draw[arrow] (ring) -- (check);
+    \draw[arrow] (check) -- node[above, font=\footnotesize] {是} (prefetch);
+    \draw[arrow] (prefetch.north) -- ++(0, 2.5) -| ([xshift=2cm]batch.east) -- (batch.east);
+    \draw[arrow] (check.west) -- ++(-1.8,0) |- (batch.west);
+
+  \end{tikzpicture}
+  \caption{仿真主循环流程图}
+  \label{fig:sim_flowchart}
+\end{figure}
+
+各步骤具体说明如下：
+
+\begin{enumerate}[label=步骤 \arabic*:, leftmargin=*]
+  \item \textbf{初始化}：主线程创建 Web Worker 实例，初始化 Float64Array 池（10 块 $\times$ 4000 元素）。
+       Worker 加载 ODE 右端函数和积分器，等待启动指令；
+  \item \textbf{参数变更}：用户通过滑块/数值输入修改物理参数。
+       连续参数（$m, L, g, b$）即时推送至 Worker 更新 ODE 系数；
+       初始条件参数（$\theta, \dot{\theta}$）在释放滑块时触发 Worker Reset + 清空尾迹；
+  \item \textbf{批量积分}：Worker 每批次积分 10 帧（$\Delta t = 1/60$ s），
+       结果写入从池中获取的 Float64Array，通过 Transferable postMessage 发送至主线程；
+  \item \textbf{多视图同步}：主线程接收轨迹缓冲，写入 Zustand Store。React 调度器同步触发：
+       (a) R3F 更新摆臂旋转、球位置、尾迹追加；(b) D3.js Canvas 更新相空间图/能量曲线；
+       (c) Web Audio API 更新振荡器频率与音色；(d) 环形缓冲区追加历史帧；
+  \item \textbf{预取判断}：当缓冲区消耗至 5 帧以下时，主线程向 Worker 发送预取命令，
+       Worker 异步准备下一批次数据，确保缓冲区永不枯竭；
+  \item \textbf{缓冲归还}：渲染完成后，Float64Array 归还至池，等待下一次分配。
+\end{enumerate}
+
+\subsection{交互设计逻辑}
+
+系统包含四种工作模式，通过键盘数字键 1--4 一键切换，模式切换时仿真不中断，确保分析工具读取的是连续的运动数据：
+
+\begin{table}[htbp]
+  \centering
+  \caption{四种工作模式与认知层级对应}
+  \label{tab:modes}
+  \begin{tabularx}{\textwidth}{c c l X}
+    \toprule
+    \textbf{快捷键} & \textbf{模式} & \textbf{认知层} & \textbf{核心功能} \\
+    \midrule
+    1 & 探索 & 感知 & 3D 实时渲染、参数拖拽调节、运动尾迹、声音化、蝴蝶效应分屏、时间反演 \\
+    2 & 分析 & 理解 & Lyapunov 热力图、分岔图、庞加莱截面、能量监控面板 \\
+    3 & 实验 & 验证 & 物理验证套件（三项标准）、受力拆解视图、Python 可编程沙箱 \\
+    4 & 故事 & 展示 & 7 阶段自动演示、电影式字幕讲解、点击打断恢复手动控制 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\textbf{参数分类响应策略}：系统管理 10 个物理参数，采用分类响应策略以平衡即时反馈与计算效率：
+
+\begin{itemize}
+  \item \textbf{连续参数}（$m_1, m_2, L_1, L_2, g, b$）：拖拽滑块即时生效，仅更新 Worker 中的 ODE 系数，不重启积分状态；
+  \item \textbf{初始条件参数}（$\theta_1, \dot{\theta}_1, \theta_2, \dot{\theta}_2$）：拖拽时在 3D 场景中半透明预览摆杆的新位置，
+       释放滑块时才触发 Worker Reset 并清空尾迹——避免拖动过程中产生大量无效历史帧。
+\end{itemize}
+
+\textbf{响应式布局}：系统适配桌面（三栏：控制面板 | 3D 场景 | 图表面板）、平板（底部抽屉式控制面板）、手机（单栏聚焦 3D 场景，折叠高级功能）三类设备，
+通过 Tailwind CSS 断点与 ResizeObserver 动态调整布局与渲染质量。
+
+\endinput
