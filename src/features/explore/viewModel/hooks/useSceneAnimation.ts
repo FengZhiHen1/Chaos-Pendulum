@@ -218,9 +218,11 @@ export function useSceneAnimation(
       ball2Pos = new Vector3(store.x2, store.y2, 0);
     }
 
-    // 尾迹
+    // 尾迹：单摆退化时追踪上摆球，常规模式追踪下摆球
     if (effectiveRunning) {
-      appendTrailPoint({ position: ball2Pos.clone(), velocity: p.L2 * Math.abs(omega2) }, p, sv);
+      const trailPos = p.m2 <= 0 ? ball1Pos : ball2Pos;
+      const trailVel = (p.m2 <= 0 ? p.L1 : p.L2) * Math.abs(p.m2 <= 0 ? omega1 : omega2);
+      appendTrailPoint({ position: trailPos.clone(), velocity: trailVel }, p, sv);
     }
 
     // 当 L 参数刚变更时，Worker 帧中的笛卡尔坐标还基于旧 L 值。
