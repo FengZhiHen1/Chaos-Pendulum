@@ -226,11 +226,19 @@ export function useSceneAnimation(
       ball2Pos = new Vector3(sx2, sy2, 0);
     }
 
-    // 更新网格
+    // 单摆退化：m₂=0 时隐藏第二摆，仅展示上摆杆和上摆球
+    const isSinglePendulum = p.m2 <= 0;
     if (ball1Ref.current) ball1Ref.current.position.copy(ball1Pos);
-    if (ball2Ref.current) ball2Ref.current.position.copy(ball2Pos);
+    if (ball2Ref.current) {
+      ball2Ref.current.position.copy(ball2Pos);
+      ball2Ref.current.visible = !isSinglePendulum;
+    }
     updateArm(arm1Ref.current, new Vector3(0, 0, 0), ball1Pos, p.L1);
-    updateArm(arm2Ref.current, ball1Pos, ball2Pos, p.L2);
+    if (isSinglePendulum) {
+      if (arm2Ref.current) arm2Ref.current.visible = false;
+    } else {
+      updateArm(arm2Ref.current, ball1Pos, ball2Pos, p.L2);
+    }
 
     // 相机管理
     if (viewPreset === "chaos") {

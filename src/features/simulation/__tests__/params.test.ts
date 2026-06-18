@@ -215,11 +215,11 @@ describe("validateParam (internal logic)", () => {
     expect(true).toBe(true);
   });
 
-  it("零质量被拒绝（hardMin=1e-6）", () => {
+  it("零质量被允许（hardMin=0，低于 sliderMin 仅 warning）", () => {
     const store = useSimulationStore.getState();
     store.setParam("m2", 0);
     const s = useSimulationStore.getState();
-    expect(s.fieldErrors["m2"]?.level).toBe("error");
-    expect(s.params.m2).toBe(1.0); // 未更新
+    expect(s.fieldErrors["m2"]?.level).toBe("warning");
+    expect(s.params.m2).toBe(0);
   });
 });

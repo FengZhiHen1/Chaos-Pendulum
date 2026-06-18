@@ -82,8 +82,8 @@ export const DEFAULT_METHOD: IntegratorMethod = "RKF45";
 // ─── 参数元数据表 ───────────────────────────────
 
 export const PARAM_META: ParamFieldMeta[] = [
-  { key: "m1",    label: "上摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 1 },
-  { key: "m2",    label: "下摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 2 },
+  { key: "m1",    label: "上摆质量",   unit: "kg",    hardMin: 0,    hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 1 },
+  { key: "m2",    label: "下摆质量",   unit: "kg",    hardMin: 0,    hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 2 },
   { key: "L1",    label: "上摆杆长",   unit: "m",     hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 3.0,         sliderStep: 0.05, decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 3 },
   { key: "L2",    label: "下摆杆长",   unit: "m",     hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 3.0,         sliderStep: 0.05, decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 4 },
   { key: "g",     label: "重力加速度", unit: "m/s²",  hardMin: 0,    hardMax: null, sliderMin: 0.0, sliderMax: 20.0,        sliderStep: 0.1,  decimalPlaces: 2, defaultValue: 9.81,       group: "environment", order: 9 },
@@ -95,7 +95,7 @@ export const PARAM_META: ParamFieldMeta[] = [
 ];
 
 /** 硬约束常量 */
-export const HARD_MIN_MASS = 1e-6;
+export const HARD_MIN_MASS = 0;
 export const HARD_MIN_LENGTH = 1e-6;
 export const HARD_MIN_GRAVITY = 0;
 export const HARD_MIN_DAMPING = 0;
@@ -114,7 +114,7 @@ export const PRESETS: ParamPreset[] = [
     id: "single-pendulum",
     label: "单摆退化",
     description: "将 m₂ 降至极小，退化为单摆",
-    params: { m2: 0.001 },
+    params: { m2: 0 },
     initialConditions: {},
   },
   {
