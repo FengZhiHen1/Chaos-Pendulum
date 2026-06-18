@@ -54,6 +54,7 @@ export function ParamPanel({ hideGlobalControls = false }: ParamPanelProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const params = useSimulationStore((s) => s.params);
   const initialConditions = useSimulationStore((s) => s.initialConditions);
+  const isPreviewActive = useSimulationStore((s) => s.isPreviewActive);
   const method = useSimulationStore((s) => s.method);
 
   const handleResetClick = () => {
@@ -77,11 +78,20 @@ export function ParamPanel({ hideGlobalControls = false }: ParamPanelProps) {
       )}
 
       {/* 参数更改待生效提示 */}
-      {paramsDirty && isWorkerReady && (
+      {paramsDirty && isWorkerReady && !isPreviewActive && (
         <div className="shrink-0 px-3 py-2 bg-amber-500/[0.04] border-b border-amber-500/15 flex items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
           <p className="text-xs text-amber-300/80 leading-relaxed flex-1">
             参数已更改，点击 <span className="font-semibold text-amber-200/90">重置</span> 以应用新设置
+          </p>
+        </div>
+      )}
+      {/* 初始条件拖拽中提示——松手即应用，无需点击重置 */}
+      {paramsDirty && isWorkerReady && isPreviewActive && (
+        <div className="shrink-0 px-3 py-2 bg-amber-500/[0.04] border-b border-amber-500/15 flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <p className="text-xs text-amber-300/80 leading-relaxed flex-1">
+            初始条件已更改，<span className="font-semibold text-amber-200/90">松手</span>即可重置
           </p>
         </div>
       )}
