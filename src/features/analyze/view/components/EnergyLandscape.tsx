@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useSimulationStore } from "@/features/simulation";
 import { normalizeAngle } from "@/features/simulation";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { DEFAULT_ENERGY_LANDSCAPE_CONFIG } from "../../contracts";
 import {
   computePotential,
@@ -18,6 +19,12 @@ import {
   LYAPUNOV_CHAOTIC,
 } from "./colorTokens";
 
+export interface EnergyLandscapeOverrides {
+  opacity?: number;
+  showContours?: boolean;
+  showCurrentPoint?: boolean;
+}
+
 /**
  * ANL-04 能量景观地形图 — 3D 半透明势能曲面。
  *
@@ -25,7 +32,7 @@ import {
  * 实时光点标记当前 (θ₁,θ₂) 在曲面上的位置。
  * 底部 CanvasTexture 等高线投影。
  */
-export function EnergyLandscape() {
+export function EnergyLandscape(props?: EnergyLandscapeOverrides) {
   return (
     <div className="w-full h-full">
       <Canvas
@@ -33,13 +40,13 @@ export function EnergyLandscape() {
         gl={{ antialias: true, alpha: false }}
       >
         <color attach="background" args={[SURFACE]} />
-        <EnergyLandscapeScene />
+        <EnergyLandscapeScene overrides={props} />
       </Canvas>
     </div>
   );
 }
 
-function EnergyLandscapeScene() {
+function EnergyLandscapeScene({ overrides }: { overrides?: EnergyLandscapeOverrides }) {
   const params = useSimulationStore((s) => s.params);
   const theta1 = useSimulationStore((s) => s.theta1);
   const theta2 = useSimulationStore((s) => s.theta2);
@@ -48,9 +55,39 @@ function EnergyLandscapeScene() {
   const prevGeoRef = useRef<THREE.BufferGeometry | null>(null);
 
   const config = DEFAULT_ENERGY_LANDSCAPE_CONFIG;
-  const { resolution, thetaRange, opacity } = config;
+  const { resolution, thetaRange } = config;
+  const opacity = overrides?.opacity ?? config.opacity;
+  const showContours = overrides?.showContours ?? config.showContours;
+  const showCurrentPoint = overrides?.showCurrentPoint ?? config.showCurrentPoint;
   const [tMin, tMax] = thetaRange;
   const planeSize = tMax - tMin; // 2*Math.PI when [-π, π]
+
+  // ── 独立 rAF tick 回路驱动 Worker（与庞加莱截面同模式） ──
+  // 切换至分析模式后 Scene3D 被卸载，原有的 tick 来源（useSceneAnimation）断流。
+  // 此处用独立 rAF 回路接管，确保 theta1/theta2 持续更新、实时光点运动。
+  useEffect(() => {
+    const simStore = useSimulationStore.getState();
+    if (!simStore.isRunning) {
+      simStore.setRunning(true);
+    }
+
+    let lastTime = performance.now();
+    let rafId: number;
+
+    const tick = () => {
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+      commandBus.emit({ type: "scheduler:requestTick", delta });
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   // ── 等高线 CanvasTexture ──────────────────────────
   const contourTexture = useMemo(
@@ -137,18 +174,19 @@ function EnergyLandscapeScene() {
         />
       </mesh>
       {/* 底部等高线投影（CanvasTexture 精确等高线） */}
-      {config.showContours && contourTexture && (
+      {showContours && contourTexture && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -5]}>
           <planeGeometry args={[planeSize, planeSize]} />
           <meshBasicMaterial
             map={contourTexture}
+            side={THREE.DoubleSide}
             transparent
             depthWrite={false}
           />
         </mesh>
       )}
       {/* 实时光点 */}
-      {config.showCurrentPoint && (
+      {showCurrentPoint && (
         <mesh ref={pointRef}>
           <sphereGeometry args={[0.08, 16, 16]} />
           <meshStandardMaterial color={PRIMARY} emissive={PRIMARY} emissiveIntensity={0.5} />

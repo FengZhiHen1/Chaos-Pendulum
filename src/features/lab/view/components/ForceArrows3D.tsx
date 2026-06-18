@@ -8,12 +8,12 @@ import { FORCE_STRIDE, ForceField } from "../../viewModel/selectors/physics";
 
 // ─── 常量 ────────────────────────────────────
 
-// 力矢量颜色 —— 与 force-decomposition.contract FORCE_DISPLAY_COLORS 保持一致
+// 力矢量颜色 —— 高饱和版本，确保在暗色背景下清晰可辨
 const COLORS = {
-  gravity: "#4ADE80",
-  tension: "#F87171",
-  tensionNeg: "#E056A0",
-  inertial: "#60A5FA",
+  gravity: "#3EFF8C",
+  tension: "#FF4D4D",
+  tensionNeg: "#FF5CAC",
+  inertial: "#5CADFF",
 } as const;
 
 const SHAFT_R = 0.018;
@@ -84,22 +84,22 @@ function SingleArrow({ meta }: SingleArrowProps) {
   const [hovered, setHovered] = useState(false);
 
   // ── 实例级材质池（不与其他箭头共享，避免颜色串扰）──
-  const matPoolRef = useRef<THREE.MeshStandardMaterial[] | null>(null);
+  const matPoolRef = useRef<THREE.MeshBasicMaterial[] | null>(null);
   const matIdxRef = useRef(0);
 
   /** 获取实例私有的材质池 */
-  function getMatPool(): THREE.MeshStandardMaterial[] {
+  function getMatPool(): THREE.MeshBasicMaterial[] {
     if (!matPoolRef.current) {
       matPoolRef.current = Array.from(
         { length: PER_ARROW_POOL_SIZE },
-        () => new THREE.MeshStandardMaterial({ depthTest: false }),
+        () => new THREE.MeshBasicMaterial({ depthTest: false }),
       );
     }
     return matPoolRef.current;
   }
 
   /** 从实例私有池取一个材质 */
-  function acquireMaterial(): THREE.MeshStandardMaterial {
+  function acquireMaterial(): THREE.MeshBasicMaterial {
     const pool = getMatPool();
     return pool[matIdxRef.current++ % pool.length]!;
   }
@@ -223,7 +223,7 @@ function SingleArrow({ meta }: SingleArrowProps) {
     let rawLen = Math.abs(mag) / refVal * baseScale;
     const isSmall = rawLen < MIN_LEN;
     const finalLen = isSmall ? MIN_LEN : rawLen;
-    const opacity = isSmall ? 0.3 : 1;
+    const opacity = isSmall ? 0.55 : 1;
     const shaftLen = Math.max(finalLen - HEAD_L * 0.6, 0.01);
 
     const dirKey = meta.key as keyof typeof dirs;

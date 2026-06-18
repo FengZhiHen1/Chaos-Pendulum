@@ -22,10 +22,10 @@ export const CONTOUR_LEVEL_COUNT = 12;
 export const TEXTURE_SIZE = 1024;
 
 /** 等高线最大不透明度 (高层级 / 混沌侧) */
-const CONTOUR_MAX_OPACITY = 0.28;
+const CONTOUR_MAX_OPACITY = 0.40;
 
 /** 等高线最小不透明度 (低层级 / 稳定侧) */
-const CONTOUR_MIN_OPACITY = 0.10;
+const CONTOUR_MIN_OPACITY = 0.18;
 
 /** 等高线绘制宽度 (px) */
 const CONTOUR_LINE_WIDTH = 1.0;

@@ -7,10 +7,11 @@
  *   - 不直接调用 API 或操作 store
  */
 
-import { SlidersHorizontal, LayoutGrid, CheckCircle2 } from "lucide-react";
+import { SlidersHorizontal, LayoutGrid, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import type { AnalysisView } from "../../viewModel/stores/analyzeSlice";
 import type { LyapunovLayerType, LoadStatus } from "../../types";
 import { SEMANTIC_GRADIENT } from "./colorTokens";
+import type { EnergyLandscapeOverrides } from "./EnergyLandscape";
 
 interface AnalysisControlsProps {
   activeView: AnalysisView;
@@ -22,6 +23,9 @@ interface AnalysisControlsProps {
   onDampingChange: (value: number) => void;
   loadStatus: LoadStatus;
   layerCacheStatus: Record<LyapunovLayerType, LoadStatus>;
+  /** 能量景观覆盖参数 */
+  landscapeOverrides?: EnergyLandscapeOverrides;
+  onLandscapeOverridesChange?: (overrides: EnergyLandscapeOverrides) => void;
 }
 
 const LAYER_OPTIONS: Array<{ value: LyapunovLayerType; label: string }> = [
@@ -79,9 +83,12 @@ export function AnalysisControls({
   activeDamping,
   onDampingChange,
   loadStatus,
+  landscapeOverrides,
+  onLandscapeOverridesChange,
 }: AnalysisControlsProps) {
   const showLayerControls = activeView === "lyapunov";
   const showDamping = showLayerControls && dampingSlices.length > 1;
+  const showLandscapeControls = activeView === "energy-landscape";
 
   const dampingMin = dampingSlices[0]?.value ?? 0;
   const dampingMax = dampingSlices[dampingSlices.length - 1]?.value ?? 0;
@@ -180,8 +187,87 @@ export function AnalysisControls({
         </div>
       )}
 
+      {/* ── Energy Landscape Controls ── */}
+      {showLandscapeControls && landscapeOverrides && onLandscapeOverridesChange && (
+        <div className="flex flex-col gap-4">
+          <span className="text-label-md text-on-surface-variant">曲面设置</span>
+
+          {/* 透明度滑块 */}
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-end">
+              <span className="text-[11px] text-on-surface-variant/70">透明度</span>
+              <span className="font-mono text-xs text-primary font-medium">
+                {(landscapeOverrides.opacity ?? 0.6).toFixed(2)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0.25}
+              max={1}
+              step={0.05}
+              value={landscapeOverrides.opacity ?? 0.6}
+              onChange={(e) => onLandscapeOverridesChange({
+                ...landscapeOverrides,
+                opacity: parseFloat(e.target.value),
+              })}
+              className="w-full h-1 bg-surface-container-high rounded-full appearance-none outline-none accent-primary cursor-pointer
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5
+                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
+                [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full
+                [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+            />
+          </div>
+
+          {/* 等高线 / 实时光点 开关 */}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => onLandscapeOverridesChange({
+                ...landscapeOverrides,
+                showContours: !landscapeOverrides.showContours,
+              })}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-quick
+                ${landscapeOverrides.showContours !== false
+                  ? "bg-primary/15 text-primary"
+                  : "text-on-surface-variant hover:bg-surface-container"
+                }`}
+            >
+              <span className="flex items-center gap-2">
+                {landscapeOverrides.showContours !== false ? (
+                  <Eye className="w-3.5 h-3.5" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5" />
+                )}
+                等高线投影
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onLandscapeOverridesChange({
+                ...landscapeOverrides,
+                showCurrentPoint: !landscapeOverrides.showCurrentPoint,
+              })}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-quick
+                ${landscapeOverrides.showCurrentPoint !== false
+                  ? "bg-primary/15 text-primary"
+                  : "text-on-surface-variant hover:bg-surface-container"
+                }`}
+            >
+              <span className="flex items-center gap-2">
+                {landscapeOverrides.showCurrentPoint !== false ? (
+                  <Eye className="w-3.5 h-3.5" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5" />
+                )}
+                实时光点
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Color Legend */}
-      {showLayerControls && (
+      {(showLayerControls || showLandscapeControls) && (
         <div className="flex flex-col gap-2">
           <span className="text-label-md text-on-surface-variant">图例 (Legend)</span>
           <div

@@ -7,6 +7,7 @@ import type { AppMode } from "@/shared/domain/valueObjects";
 import { MODE_REGISTRY } from "@/shared/domain/valueObjects";
 import { GlobalNavBar } from "./GlobalNavBar";
 import { ModeErrorBoundary } from "./ModeErrorBoundary";
+import { StoryOverlay } from "@/features/data/view/components/StoryOverlay";
 
 interface AppShellProps {
   children?: ReactNode;
@@ -67,6 +68,9 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </ModeErrorBoundary>
         </main>
+
+        {/* 故事模式全局覆盖层——跨模式持久，不随 setMode 卸载 */}
+        <StoryOverlay />
 
         {/* 平板/手机端底部导航 */}
         {!isDesktop && (
