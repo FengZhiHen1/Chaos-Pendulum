@@ -52,8 +52,9 @@ export class ButterflySideRunner {
       worker.onerror = (event) => this.handleCrash(event, ic, params);
       worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
       this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+      console.log(`[BF:${this.side}] Worker 已创建, init 消息已发送, 超时=${INIT_TIMEOUT_MS}ms`);
     } catch (err) {
-      console.error(`ButterflySideRunner ${this.side}: Worker 创建失败`, err);
+      console.error(`[BF:${this.side}] Worker 创建失败`, err);
       this.onReady?.(this.side, false);
       notificationPort.notify({
         title: `摆 ${this.side} 仿真引擎创建失败`,
@@ -80,13 +81,12 @@ export class ButterflySideRunner {
   }
 
   private handleMessage(resp: WorkerResponse): void {
-    if (!this.sw) return;
+    if (!this.sw) { console.warn(`[BF:${this.side}] 收到消息但 sw 为 null, type=${resp.type}`); return; }
     switch (resp.type) {
       case "ready": {
+        console.log(`[BF:${this.side}] Worker 返回 ready`);
         if (this.sw.initTimeoutId) { clearTimeout(this.sw.initTimeoutId); this.sw.initTimeoutId = null; }
         this.onReady?.(this.side, true);
-        // 不在此处 tryRequestBatch——由 ButterflyScheduler 的 rAF 循环统一驱动，
-        // 避免 Worker 快速响应时形成 batchReady→tryRequestBatch→batchReady 的紧循环
         break;
       }
       case "batchReady": {
@@ -114,7 +114,9 @@ export class ButterflySideRunner {
 
   private onInitTimeout(ic: InitialConditions, params: PendulumParams): void {
     if (!this.sw) return;
+    console.warn(`[BF:${this.side}] Worker init 超时 (${INIT_TIMEOUT_MS}ms), retry=${this.sw.initRetries}`);
     if (this.sw.initRetries >= 1) {
+      console.error(`[BF:${this.side}] 两次 init 超时, 放弃`);
       this.onReady?.(this.side, false);
       notificationPort.notify({ title: `摆 ${this.side} 仿真引擎启动失败`, description: "请刷新页面后重试", variant: "error", durationMs: 8000 });
       return;
@@ -127,10 +129,10 @@ export class ButterflySideRunner {
       worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
       worker.onerror = (event) => this.handleCrash(event, ic, params);
       worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
-      // 重试也设超时，防止永久挂起
       this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+      console.log(`[BF:${this.side}] 重试: 新 Worker 已创建`);
     } catch (err) {
-      console.error(`ButterflySideRunner ${this.side}: 重试 Worker 创建失败`, err);
+      console.error(`[BF:${this.side}] 重试 Worker 创建失败`, err);
       this.onReady?.(this.side, false);
       notificationPort.notify({ title: `摆 ${this.side} 仿真引擎创建失败`, description: "请检查浏览器是否支持 Web Worker", variant: "error", durationMs: 8000 });
     }

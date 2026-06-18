@@ -60,7 +60,11 @@ const ctx: WorkerContext = {
 
 self.onmessage = (e: MessageEvent<WorkerCommand>) => {
   const cmd = e.data;
-  if (!cmd || typeof cmd.type !== "string") return;
+  if (!cmd || typeof cmd.type !== "string") {
+    console.warn("[ode-worker] 收到无效消息", cmd);
+    return;
+  }
+  console.log(`[ode-worker] 收到消息 type=${cmd.type}`);
 
   switch (cmd.type) {
     case "init":
@@ -124,12 +128,15 @@ function resetWorkerState(
 // ─── 初始化 ─────────────────────────────────────
 
 function handleInit(cmd: { params: PendulumParams; initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number }; method: IntegratorMethod }): void {
+  console.log("[ode-worker] handleInit 开始");
   const err = validateParams(cmd.params);
   if (err) {
+    console.error("[ode-worker] 参数校验失败:", err);
     postResponse({ type: "error", code: "INVALID_STATE", message: err, simTime: -1 });
     return;
   }
   resetWorkerState(cmd.initialConditions, cmd.params, cmd.method);
+  console.log("[ode-worker] 发送 ready");
   postResponse({ type: "ready" });
 }
 
