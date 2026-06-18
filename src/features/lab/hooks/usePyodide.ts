@@ -230,8 +230,24 @@ export function usePyodide(): UsePyodideAPI {
     }
 
     try {
-      // 1. 先执行用户代码，定义 equations() 函数
+      // 1. 先执行用户代码
       await pyodide.runPythonAsync(code);
+
+      // 1.5 验证 equations() 是否被正确定义
+      await pyodide.runPythonAsync(`
+try:
+    _equations_ok = callable(equations)
+except NameError:
+    _equations_ok = False
+`);
+      const hasEquations = pyodide.globals.get("_equations_ok") as boolean;
+      if (!hasEquations) {
+        return {
+          success: false,
+          error: "代码未定义可调用的 equations(t, state, params) 函数",
+          timePoints: [], states: [], durationMs: performance.now() - t0,
+        };
+      }
 
       // 2. 设置初始条件和参数
       const globals = pyodide.globals;

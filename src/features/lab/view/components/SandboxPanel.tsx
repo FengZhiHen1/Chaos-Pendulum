@@ -54,7 +54,7 @@ function PlaybackControls() {
 
 /** LAB-03 沙箱面板：左编辑器 + 右 3D 预览 */
 export function SandboxPanel() {
-  const { isReady, isLoading, loadError, execute, computeTrajectory } = usePyodide();
+  const { isReady, isLoading, loadError, computeTrajectory } = usePyodide();
 
   const userCode = useLabStore((s) => s.userCode);
   const setUserCode = useLabStore((s) => s.setUserCode);
@@ -82,15 +82,7 @@ export function SandboxPanel() {
     if (!code.trim()) return;
     setCodeStatus("running"); setCodeError(null);
 
-    // 1. 先做语法/语义验证
-    const result = await execute(code);
-    if (!result.success) {
-      setCodeStatus("error");
-      setCodeError(result.errorTranslation ?? result.error);
-      return;
-    }
-
-    // 2. 获取当前仿真状态作为初始条件，按模板拼接额外参数
+    // 1. 获取当前仿真状态作为初始条件，按模板拼接额外参数
     const sim = useSimulationStore.getState();
     const templateId = useLabStore.getState().activeTemplate as SandboxTemplateId | null;
     const baseParams = [sim.params.m1, sim.params.m2, sim.params.L1, sim.params.L2, sim.params.g, sim.params.damping];
@@ -98,7 +90,7 @@ export function SandboxPanel() {
     const params = [...baseParams, ...extra];
     const initState = { theta1: sim.theta1, omega1: sim.theta1Dot, theta2: sim.theta2, omega2: sim.theta2Dot };
 
-    // 3. 用用户方程计算轨迹（10 秒，30s 超时）
+    // 2. 执行代码 + 用用户方程计算轨迹（含 equations() 存在性校验）
     const trajResult = await computeTrajectory(code, initState, params, 10, 30000);
     if (!trajResult.success) {
       setCodeStatus("error");
@@ -106,7 +98,7 @@ export function SandboxPanel() {
       return;
     }
 
-    // 4. 注入 Store → 3D 预览回放
+    // 3. 注入 Store → 3D 预览回放
     useLabStore.setState({
       sandboxTrajectory: {
         time: trajResult.timePoints,
@@ -118,7 +110,7 @@ export function SandboxPanel() {
       codeStatus: "success",
       codeError: null,
     });
-  }, [execute, computeTrajectory, setCodeStatus, setCodeError]);
+  }, [computeTrajectory, setCodeStatus, setCodeError]);
 
   const handleReset = useCallback(() => {
     setUserCode(SANDBOX_TEMPLATES[0]?.code ?? "");
