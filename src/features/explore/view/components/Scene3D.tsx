@@ -20,11 +20,10 @@ import { ForceArrows3D } from "@/features/lab/view/components/ForceArrows3D";
 import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
 import { globalWatermarkRenderer } from "@/features/data/infrastructure/adapters/watermarkRendererSingleton";
 
-export type PendulumMaterialType = "metal" | "wood" | "glass";
+export type PendulumMaterialType = "metal";
 export type EnvironmentPreset = "dark-lab" | "white-teaching";
 
 export interface Scene3DProps {
-  pendulumMaterial?: PendulumMaterialType;
   environment?: EnvironmentPreset;
   showGrid?: boolean;
   enableShadows?: boolean;
@@ -36,8 +35,6 @@ export interface Scene3DProps {
 
 const MATERIAL_CONFIGS: Record<PendulumMaterialType, { color: string; metalness: number; roughness: number; opacity: number }> = {
   metal: { color: "#D4D9E0", metalness: 0.95, roughness: 0.12, opacity: 1.0 },
-  wood: { color: "#A0724A", metalness: 0.0, roughness: 0.65, opacity: 1.0 },
-  glass: { color: "#D6EAF8", metalness: 0.05, roughness: 0.02, opacity: 0.75 },
 };
 
 const ENVIRONMENT_CONFIGS: Record<EnvironmentPreset, { background: string; ambientIntensity: number; spotIntensity: number; spotPosition: Vector3; gridColor: string }> = {
@@ -48,7 +45,6 @@ const ENVIRONMENT_CONFIGS: Record<EnvironmentPreset, { background: string; ambie
 // ─── Canvas 内子组件 ────────────────────────
 
 interface SCProps {
-  pendulumMaterial: PendulumMaterialType;
   environment: EnvironmentPreset;
   enableShadows: boolean;
   showGrid: boolean;
@@ -60,8 +56,8 @@ interface SCProps {
   onNanTrigger: () => void;
 }
 
-function SceneContent({
-  pendulumMaterial, environment, enableShadows, showGrid, sphereSegments, cylinderSegments,
+export function SceneContent({
+  environment, enableShadows, showGrid, sphereSegments, cylinderSegments,
   butterflySide, ballColor, onParamChange, onNanTrigger,
 }: SCProps) {
   const orbitRef = useRef<any>(null);
@@ -93,7 +89,7 @@ function SceneContent({
   useEffect(() => { if (anim.nanToast) onNanTrigger(); }, [anim.nanToast]);
 
   const envConfig = ENVIRONMENT_CONFIGS[environment];
-  const materialConfig = MATERIAL_CONFIGS[pendulumMaterial];
+  const materialConfig = MATERIAL_CONFIGS["metal"];
   const ballMaterialColor = ballColor ?? materialConfig.color;
   const params = useSimulationStore((s) => s.params);
   const isPreviewActive = useSimulationStore((s) => s.isPreviewActive);
@@ -114,7 +110,7 @@ function SceneContent({
       )}
       <PendulumGeometry
         cylinderSegments={cylinderSegments} sphereSegments={sphereSegments}
-        pendulumMaterial={pendulumMaterial} ballColor={ballMaterialColor}
+        ballColor={ballMaterialColor}
         materialConfig={materialConfig} isPreviewActive={isPreviewActive}
         previewTheta1={previewTheta1} previewTheta2={previewTheta2}
         paramsL1={params.L1} paramsL2={params.L2}
@@ -132,7 +128,7 @@ function SceneContent({
 // ─── 主组件 ─────────────────────────────────
 
 export function Scene3D({
-  pendulumMaterial = "metal", environment = "dark-lab", showGrid = true,
+  environment = "dark-lab", showGrid = true,
   enableShadows = true, className = "w-full h-full", butterflySide, ballColor, canvasChildren,
 }: Scene3DProps) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -165,7 +161,7 @@ export function Scene3D({
         frameloop="always" style={{ background: envConfig.background }}
         onCreated={({ gl }) => { if (gl) { gl.shadowMap.type = THREE.PCFShadowMap; onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement }); } }}>
         <SceneContent
-          pendulumMaterial={pendulumMaterial} environment={environment}
+          environment={environment}
           enableShadows={effectiveEnableShadows} showGrid={effectiveShowGrid}
           sphereSegments={sphereSegments} cylinderSegments={cylinderSegments}
           butterflySide={butterflySide} ballColor={ballColor}

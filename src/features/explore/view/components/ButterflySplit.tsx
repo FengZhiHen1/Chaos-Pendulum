@@ -1,30 +1,31 @@
-import { useState, useCallback } from "react";
+import { useRef } from "react";
+import { Canvas } from "@react-three/fiber";
+import { View } from "@react-three/drei";
+import * as THREE from "three";
 import { useExploreStore } from "@/features/explore";
 import { useButterflyStore } from "../../store";
 import { useButterflySimulation } from "../../viewModel/hooks/useButterflySimulation";
-import { Scene3D } from "./Scene3D";
+import { SceneContent } from "./Scene3D";
 import { SeparationAlert, DeltaPanel } from "./ButterflyUI";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/view/components/ui/button";
 import { Play, Pause, RotateCcw } from "lucide-react";
 
-// DESIGN: Pendulum A gold-tinted trail #FBBF24 / Pendulum B violet-tinted trail #A78BFA
-const BALL_COLOR_A = "#FBBF24"; // 金色摆
-const BALL_COLOR_B = "#A78BFA"; // 紫色摆
+const BALL_COLOR_A = "#FBBF24";
+const BALL_COLOR_B = "#A78BFA";
 
 interface ButterflySplitProps {
   className?: string;
 }
 
 /**
- * 蝴蝶效应分屏对比器。
+ * 蝴蝶效应分屏对比器 — 单 Canvas 双 View 实现。
  *
- * 桌面端：左右两个 3D 视口，中央暗色裂隙。
- * 非桌面端：单视口 + A/B 切换。
+ * 使用 @react-three/drei 的 View 组件在单个 WebGL context 内渲染两个独立
+ * 视口（左侧摆 A / 右侧摆 B），避免双 Canvas 导致的 GPU 资源耗尽。
  */
 export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitProps) {
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
-  // 使用精确选择器，避免每帧 store 更新触发整个组件树重渲染
   const isBfRunning = useButterflyStore((s) => s.isRunning);
   const isFullyDecoupled = useButterflyStore((s) => s.separation.isFullyDecoupled);
   const separationRad = useButterflyStore((s) => s.separation.currentSeparation);
@@ -36,9 +37,8 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
 
   const workersReady = sideAWorkerReady && sideBWorkerReady;
 
-  const [activeSide, setActiveSide] = useState<"A" | "B">("A");
-  const switchToA = useCallback(() => setActiveSide("A"), []);
-  const switchToB = useCallback(() => setActiveSide("B"), []);
+  const viewportARef = useRef<HTMLDivElement>(null);
+  const viewportBRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className={cn("relative flex flex-col", className)}>
@@ -81,58 +81,75 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
         />
       </div>
 
-      {/* 单视口 + A/B 切换（所有平台统一，避免双 WebGL context 导致 GPU 资源耗尽） */}
+      {/* 双视口区域：DOM 层两个 div 定位左右，Canvas 层用 View track 到 div */}
       <div
         className={cn(
           "flex-1 relative min-h-0",
           isFullyDecoupled && "animate-alert-edge",
         )}
       >
-        <div className="relative w-full h-full">
-          {/* 侧边标签 + A/B 切换 */}
-          <div className="absolute top-3 left-4 z-10 flex gap-2">
-            <button
-              type="button"
-              onClick={switchToA}
-              className={cn(
-                "px-2 py-0.5 rounded text-xs font-bold transition-all",
-                activeSide === "A"
-                  ? "text-amber-300 bg-black/70 ring-1 ring-amber-500/50"
-                  : "text-amber-300/50 bg-black/30",
-              )}
-            >
+        {/* DOM 锚点：Canvas 通过 View.track 将渲染裁剪到这些 div */}
+        <div className="absolute inset-0 flex">
+          <div ref={viewportARef} className="relative flex-1 min-w-0">
+            <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-amber-300 bg-black/50 backdrop-blur pointer-events-none">
               摆 A — δ=0
-            </button>
-            <button
-              type="button"
-              onClick={switchToB}
-              className={cn(
-                "px-2 py-0.5 rounded text-xs font-bold transition-all",
-                activeSide === "B"
-                  ? "text-purple-300 bg-black/70 ring-1 ring-purple-500/50"
-                  : "text-purple-300/50 bg-black/30",
-              )}
-            >
-              摆 B — δ={butterflyDelta}°
-            </button>
-          </div>
-
-          {/* 分离度指示器（替代暗色裂隙） */}
-          {isFullyDecoupled && (
-            <div className="absolute top-3 right-4 z-10 px-2 py-0.5 rounded text-[10px] font-bold text-separation-alert bg-black/70 ring-1 ring-separation-alert/50">
-              |Δθ| = {(separationRad * 180 / Math.PI).toFixed(1)}°
             </div>
-          )}
-
-          <Scene3D
-            ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
-            environment="dark-lab"
-            showGrid
-            enableShadows
-            className="w-full h-full"
-            butterflySide={activeSide}
+          </div>
+          <div
+            className={cn(
+              "shrink-0 bg-surface transition-all duration-dramatic",
+              isFullyDecoupled ? "w-3" : "w-1",
+            )}
           />
+          <div ref={viewportBRef} className="relative flex-1 min-w-0">
+            <div className="absolute top-3 left-4 z-10 px-2 py-0.5 rounded text-xs font-bold text-purple-300 bg-black/50 backdrop-blur pointer-events-none">
+              摆 B — δ={butterflyDelta}°
+            </div>
+            {isFullyDecoupled && (
+              <div className="absolute top-3 right-4 z-10 px-2 py-0.5 rounded text-[10px] font-bold text-separation-alert bg-black/70 ring-1 ring-separation-alert/50">
+                |Δθ| = {(separationRad * 180 / Math.PI).toFixed(1)}°
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* 单个 Canvas，通过 View 拆分到两个 DOM 区域 */}
+        <Canvas
+          shadows
+          camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
+          frameloop="always"
+          style={{ position: "absolute", inset: 0, background: "#1A1D22" }}
+          onCreated={({ gl }) => { gl.shadowMap.type = THREE.PCFShadowMap; }}
+        >
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <View track={viewportARef as any}>
+            <SceneContent
+              environment="dark-lab"
+              enableShadows
+              showGrid
+              sphereSegments={64}
+              cylinderSegments={32}
+              butterflySide="A"
+              ballColor={BALL_COLOR_A}
+              onParamChange={() => {}}
+              onNanTrigger={() => {}}
+            />
+          </View>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <View track={viewportBRef as any}>
+            <SceneContent
+              environment="dark-lab"
+              enableShadows
+              showGrid
+              sphereSegments={64}
+              cylinderSegments={32}
+              butterflySide="B"
+              ballColor={BALL_COLOR_B}
+              onParamChange={() => {}}
+              onNanTrigger={() => {}}
+            />
+          </View>
+        </Canvas>
 
         {/* 分离警报 */}
         <SeparationAlert
