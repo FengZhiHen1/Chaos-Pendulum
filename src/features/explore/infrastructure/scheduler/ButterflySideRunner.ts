@@ -74,7 +74,8 @@ export class ButterflySideRunner {
       case "ready": {
         if (this.sw.initTimeoutId) { clearTimeout(this.sw.initTimeoutId); this.sw.initTimeoutId = null; }
         this.onReady?.(this.side, true);
-        this.tryRequestBatch();
+        // 不在此处 tryRequestBatch——由 ButterflyScheduler 的 rAF 循环统一驱动，
+        // 避免 Worker 快速响应时形成 batchReady→tryRequestBatch→batchReady 的紧循环
         break;
       }
       case "batchReady": {
@@ -88,7 +89,7 @@ export class ButterflySideRunner {
         this.onFrame?.(this.side, state, energy, derived, buf[offset]!);
         this.sw.currentSimTime = buf[offset]!;
         this.sw.pool.releaseBuffer(resp.buffer);
-        this.tryRequestBatch();
+        // 不在此处 tryRequestBatch——下一批次由 ButterflyScheduler.loop() 在下一帧请求
         break;
       }
       case "error": {
