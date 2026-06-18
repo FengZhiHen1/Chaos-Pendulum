@@ -31,6 +31,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
 
   const isDesktop = deviceType === "desktop";
   const isFullyDecoupled = store.separation.isFullyDecoupled;
+  const workersReady = store.sideA.workerReady && store.sideB.workerReady;
 
   const [activeSide, setActiveSide] = useState<"A" | "B">("A");
   const switchToA = useCallback(() => setActiveSide("A"), []);
@@ -44,14 +45,18 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
           <Button
             variant="primary"
             size="sm"
+            disabled={!workersReady}
             onClick={store.isRunning ? handlePause : handlePlay}
+            title={!workersReady ? "仿真引擎初始化中…" : undefined}
           >
-            {store.isRunning ? (
+            {!workersReady ? (
+              <span className="h-3.5 w-3.5 mr-1 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : store.isRunning ? (
               <Pause className="h-3.5 w-3.5 mr-1" />
             ) : (
               <Play className="h-3.5 w-3.5 mr-1" />
             )}
-            {store.isRunning ? "暂停" : "播放"}
+            {!workersReady ? "初始化…" : store.isRunning ? "暂停" : "播放"}
           </Button>
           <Button
             variant="tertiary"

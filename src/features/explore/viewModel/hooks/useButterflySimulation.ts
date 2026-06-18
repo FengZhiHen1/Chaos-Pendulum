@@ -4,6 +4,7 @@ import { useExploreStore } from "@/features/explore";
 import { useRootStore } from "@/stores/rootStore";
 import { ButterflyScheduler } from "../../butterfly-scheduler";
 import { BUTTERFLY_DEFAULTS } from "../../contracts";
+import { notificationPort } from "@/shared/infrastructure/adapters";
 
 // ─── 全局单例管理 ──────────────────────────────
 
@@ -65,13 +66,33 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
   }, []);
 
   // 控制回调
-  const handlePlay = useCallback(() => schedulerRef.current.play(), []);
+  const handlePlay = useCallback(() => {
+    try {
+      schedulerRef.current.play();
+    } catch (err) {
+      notificationPort.notify({
+        title: "蝴蝶效应启动失败",
+        description: err instanceof Error ? err.message : "仿真引擎初始化异常，请重试",
+        variant: "error",
+        durationMs: 5000,
+      });
+    }
+  }, []);
   const handlePause = useCallback(() => schedulerRef.current.pause(), []);
   const handleReset = useCallback(() => {
-    const simStore = useSimulationStore.getState();
-    useRootStore.getState().reset();
-    schedulerRef.current.reset();
-    schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    try {
+      const simStore = useSimulationStore.getState();
+      useRootStore.getState().reset();
+      schedulerRef.current.reset();
+      schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    } catch (err) {
+      notificationPort.notify({
+        title: "蝴蝶效应重置失败",
+        description: err instanceof Error ? err.message : "请退出后重试",
+        variant: "error",
+        durationMs: 5000,
+      });
+    }
   }, [butterflyDelta]);
 
   const handleDeltaChange = useCallback(
