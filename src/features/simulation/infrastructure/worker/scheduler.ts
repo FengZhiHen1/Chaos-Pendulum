@@ -124,10 +124,6 @@ export class SimulationScheduler extends ISimulationScheduler {
 
   override updateParams(params: Partial<PendulumParams>): void {
     this.workerGateway.sendUpdateParams(params);
-    // 非运行态下参数变更使预计算批次失效，丢弃并触发重算
-    if (!this._running) {
-      this.prefetchBatch(() => {});
-    }
   }
 
   override setMethod(method: IntegratorMethod): void {
