@@ -12,6 +12,7 @@
  */
 
 import type { IDriftCalculator } from "../contracts";
+import { normalizeAngle } from "@/features/simulation/domain/services/stateVector";
 
 /** 漂移计算器——纯函数实现 IDriftCalculator */
 class DriftCalculator implements IDriftCalculator {
@@ -19,9 +20,10 @@ class DriftCalculator implements IDriftCalculator {
     forwardState: { theta1: number; omega1: number; theta2: number; omega2: number },
     reversedState: { theta1: number; omega1: number; theta2: number; omega2: number },
   ): number {
-    const dTheta1 = forwardState.theta1 - reversedState.theta1;
+    // 用最短角度差（归一化到 [-π,π]），消除 ±2π 的归一化 artifact
+    const dTheta1 = normalizeAngle(forwardState.theta1 - reversedState.theta1);
     const dOmega1 = forwardState.omega1 - reversedState.omega1;
-    const dTheta2 = forwardState.theta2 - reversedState.theta2;
+    const dTheta2 = normalizeAngle(forwardState.theta2 - reversedState.theta2);
     const dOmega2 = forwardState.omega2 - reversedState.omega2;
 
     return Math.sqrt(
