@@ -260,6 +260,18 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
   commitInitialConditionPreview: () => {
     const s = get();
     if (!s.isPreviewActive) return;
+
+    // 从当前 initialConditions + params 立即计算笛卡尔坐标，
+    // 确保松手后主摆位置同步更新（不再依赖 Worker 首帧异步回传）
+    const t1 = s.initialConditions.theta1;
+    const t2 = s.initialConditions.theta2;
+    const L1 = s.params.L1;
+    const L2 = s.params.L2;
+    const nx1 = L1 * Math.sin(t1);
+    const ny1 = -L1 * Math.cos(t1);
+    const nx2 = nx1 + L2 * Math.sin(t2);
+    const ny2 = ny1 - L2 * Math.cos(t2);
+
     set({
       isPreviewActive: false,
       isRunning: false,
@@ -268,10 +280,15 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
       paramsDirty: false,
       energyInitial: null, energyDrift: 0, driftExceeded: false,
       energyMin: 0, energyMax: 0, isSimulationActive: false,
-      consumedFrameIndex: 0, _nanSkipCount: 0,
-      _stoppedFrameCount: 0, isPendulumStopped: false,
-      // 注意：实际 theta1/theta2 在 consumeFrameFromBuffer 中更新
-      // 这里仅触发 resetTrigger 让 bridge.ts 的 isResetAction 分支执行 reset + start
+      consumedFrameIndex: 0, energyCorrection: 0, lyapunovExponent: 0,
+      _nanSkipCount: 0, _stoppedFrameCount: 0, isPendulumStopped: false,
+      // 立即更新主摆位置，确保 3D 场景正确渲染
+      theta1: t1, theta1Dot: 0,
+      theta2: t2, theta2Dot: 0,
+      x1: nx1, y1: ny1, x2: nx2, y2: ny2,
+      kineticEnergy: 0, potentialEnergy: 0, totalEnergy: 0,
+      alpha1: 0, alpha2: 0,
+      state: { theta1: t1, omega1: 0, theta2: t2, omega2: 0 },
     });
   },
 

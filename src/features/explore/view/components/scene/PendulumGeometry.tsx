@@ -110,34 +110,41 @@ export function PendulumGeometry({
       </mesh>
 
       {/* 半透明预览摆 */}
-      {isPreviewActive && (
+      {isPreviewActive && (() => {
+        // 预览摆位置计算——与主摆的 computeDerived 和 updateArm 逻辑一致
+        const pvBall1X = paramsL1 * Math.sin(previewTheta1);
+        const pvBall1Y = -paramsL1 * Math.cos(previewTheta1);
+        const pvBall2X = pvBall1X + paramsL2 * Math.sin(previewTheta2);
+        const pvBall2Y = pvBall1Y - paramsL2 * Math.cos(previewTheta2);
+        // 杆旋转角：将 CylinderGeometry 的 Y 轴对齐到物理方向 (sinθ, -cosθ)
+        const arm1RotZ = previewTheta1 + Math.PI;
+        const arm2RotZ = previewTheta2 + Math.PI;
+        // 杆中点（与 updateArm 中 start.clone().add(end).multiplyScalar(0.5) 一致）
+        const arm1MidX = pvBall1X / 2;
+        const arm1MidY = pvBall1Y / 2;
+        const arm2MidX = pvBall1X + (pvBall2X - pvBall1X) / 2;
+        const arm2MidY = pvBall1Y + (pvBall2Y - pvBall1Y) / 2;
+        return (
         <group>
-          <mesh position={[0, 0, 0]} rotation={[0, 0, previewTheta1 - Math.PI / 2]}>
+          <mesh position={[arm1MidX, arm1MidY, 0]} rotation={[0, 0, arm1RotZ]}>
             <cylinderGeometry args={[0.015, 0.015, paramsL1, 16]} />
             <meshStandardMaterial color={ballColor} transparent opacity={0.35} depthWrite={false} />
           </mesh>
-          <mesh
-            position={[paramsL1 * Math.sin(previewTheta1), -paramsL1 * Math.cos(previewTheta1), 0]}
-            rotation={[0, 0, previewTheta2 - Math.PI / 2]}
-          >
+          <mesh position={[arm2MidX, arm2MidY, 0]} rotation={[0, 0, arm2RotZ]}>
             <cylinderGeometry args={[0.015, 0.015, paramsL2, 16]} />
             <meshStandardMaterial color={ballColor} transparent opacity={0.35} depthWrite={false} />
           </mesh>
-          <mesh position={[paramsL1 * Math.sin(previewTheta1), -paramsL1 * Math.cos(previewTheta1), 0]}>
+          <mesh position={[pvBall1X, pvBall1Y, 0]}>
             <sphereGeometry args={[0.06, 24, 24]} />
             <meshStandardMaterial color={ballColor} transparent opacity={0.4} depthWrite={false} />
           </mesh>
-          <mesh
-            position={[
-              paramsL1 * Math.sin(previewTheta1) + paramsL2 * Math.sin(previewTheta2),
-              -paramsL1 * Math.cos(previewTheta1) - paramsL2 * Math.cos(previewTheta2), 0,
-            ]}
-          >
+          <mesh position={[pvBall2X, pvBall2Y, 0]}>
             <sphereGeometry args={[0.06, 24, 24]} />
             <meshStandardMaterial color={ballColor} transparent opacity={0.4} depthWrite={false} />
           </mesh>
         </group>
-      )}
+        );
+      })()}
     </>
   );
 }
