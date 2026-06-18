@@ -71,6 +71,20 @@ export function SceneContent({
       if (orbitRef.current) { globalOrbitControlsAdapter.injectControls(orbitRef.current); orbitInjectedRef.current = true; clearInterval(id); }
       if (++attempts >= 50) clearInterval(id);
     }, 100);
+
+    // 注入相机姿态设置函数（供故事模式使用）
+    globalOrbitControlsAdapter.injectSetCamera((azimuth, elevation, distance) => {
+      if (!orbitRef.current) return;
+      const spherical = new THREE.Spherical(distance, elevation, azimuth);
+      const offset = new Vector3().setFromSpherical(spherical);
+      const target = orbitRef.current.target as Vector3;
+      // 不改变 look-at 目标，仅移动相机
+      if (orbitRef.current.object) {
+        (orbitRef.current.object as { position: Vector3 }).position.copy(target.clone().add(offset));
+        orbitRef.current.update();
+      }
+    });
+
     return () => clearInterval(id);
   }, []);
 

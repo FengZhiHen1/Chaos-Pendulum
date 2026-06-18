@@ -41,6 +41,9 @@ export interface IOrbitControlsAdapter {
   /** 获取当前自动旋转状态 */
   isAutoRotating(): boolean;
 
+  /** 设置相机目标姿态（方位角/仰角/距离） */
+  setCameraTarget(azimuth: number, elevation: number, distance: number): void;
+
   /** 注册用户交互回调——触碰控件时触发 */
   onUserInteraction(callback: () => void): void;
 

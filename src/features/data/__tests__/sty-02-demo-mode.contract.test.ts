@@ -43,6 +43,10 @@ class MockOrbitControlsAdapter implements IOrbitControlsAdapter {
     this.callbacks.push(callback);
   }
 
+  setCameraTarget(_azimuth: number, _elevation: number, _distance: number): void {
+    // noop — 演示模式测试不需要相机控制
+  }
+
   offUserInteraction(callback: () => void): void {
     this.callbacks = this.callbacks.filter((cb) => cb !== callback);
   }

@@ -12,11 +12,19 @@ import { Film, RefreshCw } from "lucide-react";
 import { useStoryViewModel } from "@/features/data/viewModel/hooks/useStoryViewModel";
 import { StoryPlayer } from "@/features/data/view/components/StoryPlayer";
 import { useAppStore } from "@/stores/useAppStore";
-import type { AppMode } from "@/shared/domain/valueObjects";
+import { useSimulationStore } from "@/features/simulation";
+import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
+import type { CameraConfig } from "@/features/data/contracts";
+import type { AppMode, PendulumParams } from "@/shared/domain/valueObjects";
 
 /** 阶段事件 data 中携带的 stage 信息 */
 interface StageEventData {
-  stage: { targetMode: AppMode; subtitle: string };
+  stage: {
+    targetMode: AppMode;
+    subtitle: string;
+    cameraConfig?: CameraConfig;
+    params?: Partial<PendulumParams>;
+  };
   index: number;
 }
 
@@ -32,7 +40,7 @@ export function StoryPage() {
     };
   })();
 
-  // ── 故事事件 → 模式切换 + 导航锁定 ─────────────
+  // ── 故事事件 → 模式切换 + 相机 + 参数 + 导航锁定 ─
   const handleStoryEvent = useCallback((event: string, data?: unknown) => {
     const app = useAppStore.getState();
 
@@ -43,8 +51,38 @@ export function StoryPage() {
 
       case "stageEnter": {
         const d = data as StageEventData | undefined;
-        if (d?.stage?.targetMode) {
-          app.setMode(d.stage.targetMode);
+        const stage = d?.stage;
+        if (!stage) break;
+
+        // 1. 切换模式
+        if (stage.targetMode) {
+          app.setMode(stage.targetMode);
+        }
+
+        // 2. 相机姿态（仅在 explore 模式下有效）
+        if (stage.cameraConfig) {
+          const { azimuth, elevation, distance } = stage.cameraConfig;
+          globalOrbitControlsAdapter.setCameraTarget(azimuth, elevation, distance);
+        }
+
+        // 3. 参数注入（当前仅在 explore 模式有 3D 场景时生效）
+        if (stage.params) {
+          const params = stage.params;
+          const newParams: Partial<PendulumParams> = {};
+          const newIC: Record<string, number> = {};
+          const IC_KEYS = new Set(["theta1", "theta2", "theta1Dot", "theta2Dot"]);
+          for (const [k, v] of Object.entries(params)) {
+            if (v === undefined) continue;
+            if (IC_KEYS.has(k)) {
+              newIC[k] = v as number;
+            } else {
+              (newParams as Record<string, number>)[k] = v as number;
+            }
+          }
+          if (Object.keys(newParams).length > 0 || Object.keys(newIC).length > 0) {
+            const simStore = useSimulationStore.getState();
+            simStore.injectParams(newParams, newIC as Record<string, number>);
+          }
         }
         break;
       }

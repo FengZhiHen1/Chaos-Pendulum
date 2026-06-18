@@ -29,6 +29,9 @@ export class OrbitControlsAdapter implements IOrbitControlsAdapter {
   /** 内部标记：是否自动旋转中 */
   private _autoRotating: boolean = false;
 
+  /** 外部注入的相机控制回调（由 Scene3D 提供） */
+  private _setCameraFn: ((azimuth: number, elevation: number, distance: number) => void) | null = null;
+
   /**
    * 注入 OrbitControls 实例（运行时调用）。
    * @param controls Three.js OrbitControls 或兼容对象
@@ -50,6 +53,13 @@ export class OrbitControlsAdapter implements IOrbitControlsAdapter {
     }
   }
 
+  /**
+   * 注入相机姿态设置函数（由 Scene3D 提供，封装 Three.js 球坐标计算）。
+   */
+  injectSetCamera(fn: (azimuth: number, elevation: number, distance: number) => void): void {
+    this._setCameraFn = fn;
+  }
+
   /** 启用/禁用自动旋转。 */
   setAutoRotate(enabled: boolean, speed: number): void {
     if (!this.controls) {
@@ -62,6 +72,13 @@ export class OrbitControlsAdapter implements IOrbitControlsAdapter {
     this.controls.autoRotate = enabled;
     this.controls.autoRotateSpeed = speed;
     this._autoRotating = enabled;
+  }
+
+  /** 设置相机目标姿态。 */
+  setCameraTarget(azimuth: number, elevation: number, distance: number): void {
+    if (this._setCameraFn) {
+      this._setCameraFn(azimuth, elevation, distance);
+    }
   }
 
   /** 获取当前自动旋转状态。 */

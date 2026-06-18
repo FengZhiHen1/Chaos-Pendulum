@@ -16,6 +16,15 @@ import type { AppMode } from "@/shared/domain/valueObjects";
  * 每个阶段包含完整的 startTime/duration/targetMode/subtitle。
  * 阶段间按 startTime 单调递增，无缝衔接。
  */
+/**
+ * 硬编码的 7 阶段故事脚本——总时长 210s (3 分 30 秒)。
+ *
+ * 每个阶段包含完整的 startTime/duration/targetMode/subtitle。
+ * 阶段间按 startTime 单调递增，无缝衔接。
+ *
+ * 相机坐标系：azimuth = 方位角 (rad, 绕 Y 轴)，elevation = 仰角 (rad, 水平面上方)，
+ * distance = 距目标距离。Front view: azimuth≈0, elevation≈0.3, distance≈3.5
+ */
 const STORY_SCRIPT_DATA: StoryStage[] = [
   {
     startTime: 0,
@@ -23,6 +32,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "一个摆，我们知道它会在哪里",
     highlightedControls: [],
+    cameraConfig: { azimuth: 0.2, elevation: 0.35, distance: 3.0 },
   },
   {
     startTime: 25,
@@ -30,6 +40,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "再加一个摆，世界变得不可预测",
     highlightedControls: [],
+    cameraConfig: { azimuth: 0.6, elevation: 0.25, distance: 4.5 },
   },
   {
     startTime: 50,
@@ -37,6 +48,8 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "初始差异仅 0.001°，30 秒后它们形同陌路",
     highlightedControls: [],
+    cameraConfig: { azimuth: 1.2, elevation: 0.4, distance: 3.5 },
+    params: { damping: 0.0 },
   },
   {
     startTime: 90,
@@ -44,6 +57,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "混沌不仅能看见，还能听见",
     highlightedControls: [],
+    cameraConfig: { azimuth: 2.0, elevation: 0.6, distance: 4.0 },
   },
   {
     startTime: 120,
@@ -58,6 +72,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "甚至计算机也无法让混沌回头",
     highlightedControls: [],
+    cameraConfig: { azimuth: 3.5, elevation: 0.3, distance: 3.5 },
   },
   {
     startTime: 180,
@@ -65,6 +80,7 @@ const STORY_SCRIPT_DATA: StoryStage[] = [
     targetMode: "explore" as AppMode,
     subtitle: "确定性系统的内在随机性——这就是混沌",
     highlightedControls: [],
+    cameraConfig: { azimuth: 4.5, elevation: 0.15, distance: 5.0 },
   },
 ];
 
