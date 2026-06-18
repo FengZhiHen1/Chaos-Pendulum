@@ -66,8 +66,9 @@ export class SimulationScheduler extends ISimulationScheduler {
   /** Worker 已通过 createOdeWorker 预初始化注入（标志 ready 消息已被消费） */
   private _workerInjected = false;
 
-  /** 验证运行 Promise resolver——runValidation 的请求-响应配对 */
+  /** 验证运行 Promise resolver/rejecter——runValidation 的请求-响应配对 */
   private validationResolver: ((result: WorkerValidationResultResponse) => void) | null = null;
+  private validationRejecter: ((reason: Error) => void) | null = null;
 
   // 插值快照
   private prevSnapshot: InterpSnapshot | null = null;
@@ -255,13 +256,21 @@ export class SimulationScheduler extends ISimulationScheduler {
     simDuration: number,
   ): Promise<WorkerValidationResultResponse> {
     return new Promise((resolve, reject) => {
+      // 检查 Worker 是否已注入
+      if (!this._workerInjected) {
+        reject(new Error("仿真引擎未就绪，请先在探索模式中启动仿真"));
+        return;
+      }
+
       this.validationResolver = resolve;
+      this.validationRejecter = reject;
       this.workerGateway.sendRunValidation(scenarioId, params, ic, simDuration);
 
       // 超时保护：最长等待 30 秒
       setTimeout(() => {
         if (this.validationResolver) {
           this.validationResolver = null;
+          this.validationRejecter = null;
           reject(new Error(`验证 ${scenarioId} 超时 (${simDuration}s 仿真)`));
         }
       }, 30000);
@@ -388,12 +397,19 @@ export class SimulationScheduler extends ISimulationScheduler {
         }
         commandBus.emit({ type: "worker:error", code: resp.code, message: resp.message, simTime: resp.simTime });
         if (resp.code === "DIVERGED") this._running = false;
+        // 若验证 Promise 挂起，立即 reject 避免永久等待
+        if (this.validationRejecter) {
+          this.validationRejecter(new Error(resp.message));
+          this.validationResolver = null;
+          this.validationRejecter = null;
+        }
         break;
       }
       case "validationResult": {
         if (this.validationResolver) {
           this.validationResolver(resp);
           this.validationResolver = null;
+          this.validationRejecter = null;
         }
         break;
       }
