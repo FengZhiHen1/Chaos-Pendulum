@@ -30,9 +30,12 @@ export function useLabValidation(): UseLabValidationAPI {
   const setAllPassed = useLabStore((s) => s.setAllPassed);
 
   const handleRunValidation = useCallback(() => {
+    console.log("[useLabValidation] handleRunValidation 被调用");
     // ── 预检：Worker 是否就绪 ──
     const simStore = useSimulationStore.getState();
+    console.log(`[useLabValidation] isWorkerReady=${simStore.isWorkerReady}, isRunning=${simStore.isRunning}`);
     if (!simStore.isWorkerReady) {
+      console.warn("[useLabValidation] Worker 未就绪，中止验证");
       for (const test of ALL_TESTS) {
         setValidationDetail(test, WORKER_NOT_READY_MSG);
       }

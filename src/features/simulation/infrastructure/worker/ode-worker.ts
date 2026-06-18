@@ -412,7 +412,10 @@ function handleRunValidation(cmd: {
   initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number };
   simDuration: number;
 }): void {
+  console.log(`[ode-worker] handleRunValidation 开始: scenario=${cmd.scenarioId}, duration=${cmd.simDuration}s, hasState=${ctx.state !== null}, hasParams=${ctx.params !== null}`);
+
   if (!ctx.state || !ctx.params) {
+    console.warn("[ode-worker] handleRunValidation 失败: Worker 未初始化");
     postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
     return;
   }
@@ -434,15 +437,18 @@ function handleRunValidation(cmd: {
   ctx.simTime = 0;
 
   const totalFrames = Math.ceil(cmd.simDuration / VALIDATION_DT);
+  console.log(`[ode-worker] 验证积分开始: frames=${totalFrames}, method=${savedMethod}`);
   const theta1Samples: number[] = new Array(totalFrames);
   const energySamples: number[] = [];
   let energyInitial = 0;
   let divergedAt: number | undefined;
 
+  const integrateStart = performance.now();
   for (let i = 0; i < totalFrames; i++) {
     integratorStep(ctx.state, ctx.params, VALIDATION_DT, savedMethod);
 
     if (hasInvalidValue(ctx.state)) {
+      console.warn(`[ode-worker] 验证积分发散: frame=${i}, simTime=${ctx.simTime.toFixed(4)}`);
       divergedAt = ctx.simTime;
       break;
     }
@@ -459,6 +465,7 @@ function handleRunValidation(cmd: {
       energySamples.push(derived.totalEnergy);
     }
   }
+  console.log(`[ode-worker] 验证积分完成: elapsed=${(performance.now() - integrateStart).toFixed(1)}ms, diverged=${divergedAt !== undefined}`);
 
   // 恢复原始 Worker 状态
   ctx.state = savedState;
@@ -466,6 +473,7 @@ function handleRunValidation(cmd: {
   ctx.method = savedMethod;
   ctx.simTime = savedSimTime;
   ctx.direction = savedDirection;
+  console.log("[ode-worker] Worker 状态已恢复，发送 validationResult");
 
   postResponse({
     type: "validationResult",

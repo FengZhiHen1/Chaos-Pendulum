@@ -255,9 +255,11 @@ export class SimulationScheduler extends ISimulationScheduler {
     ic: InitialConditions,
     simDuration: number,
   ): Promise<WorkerValidationResultResponse> {
+    console.log(`[scheduler] runValidation 请求: scenario=${scenarioId}, duration=${simDuration}s, workerInjected=${this._workerInjected}`);
     return new Promise((resolve, reject) => {
       // 检查 Worker 是否已注入
       if (!this._workerInjected) {
+        console.warn("[scheduler] runValidation 失败: Worker 未注入");
         reject(new Error("仿真引擎未就绪，请先在探索模式中启动仿真"));
         return;
       }
@@ -399,6 +401,7 @@ export class SimulationScheduler extends ISimulationScheduler {
         if (resp.code === "DIVERGED") this._running = false;
         // 若验证 Promise 挂起，立即 reject 避免永久等待
         if (this.validationRejecter) {
+          console.warn(`[scheduler] Worker 返回 error，reject 验证 Promise: ${resp.message}`);
           this.validationRejecter(new Error(resp.message));
           this.validationResolver = null;
           this.validationRejecter = null;
@@ -406,10 +409,13 @@ export class SimulationScheduler extends ISimulationScheduler {
         break;
       }
       case "validationResult": {
+        console.log(`[scheduler] 收到 validationResult: scenario=${resp.scenarioId}, theta1Samples=${resp.theta1Samples.length}, energySamples=${resp.energySamples.length}, divergedAt=${resp.divergedAt}`);
         if (this.validationResolver) {
           this.validationResolver(resp);
           this.validationResolver = null;
           this.validationRejecter = null;
+        } else {
+          console.warn("[scheduler] 收到 validationResult 但无等待中的 resolver");
         }
         break;
       }

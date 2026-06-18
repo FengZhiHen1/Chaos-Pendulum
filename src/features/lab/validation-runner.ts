@@ -191,9 +191,11 @@ export async function runAllValidations(
   onProgress?: (test: ValidationTestKey, result: ValidationResult) => void,
 ): Promise<ValidationResult[]> {
   const scheduler = getScheduler();
+  console.log("[validation-runner] runAllValidations 开始, scheduler 已获取");
   const results: ValidationResult[] = [];
 
   for (const scenario of SCENARIOS) {
+    console.log(`[validation-runner] 开始验证: ${scenario.id}, duration=${scenario.simDuration}s`);
     let data: WorkerValidationResultResponse;
     try {
       data = await scheduler.runValidation(
@@ -202,8 +204,10 @@ export async function runAllValidations(
         scenario.ic,
         scenario.simDuration,
       );
+      console.log(`[validation-runner] Worker 返回数据: ${scenario.id}, theta1Samples=${data.theta1Samples.length}, divergedAt=${data.divergedAt}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[validation-runner] ${scenario.id} Worker 异常:`, msg);
       const failedResult: ValidationResult = {
         test: scenario.id,
         passed: false,
