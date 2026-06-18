@@ -54,8 +54,14 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
 
   function ballR(m: number) { return Math.max(BALL_MIN, Math.min(BALL_MAX, 0.08 * Math.pow(Math.max(m, 0.1), 1 / 3))); }
 
+  const initializedRef = useRef(false);
   useFrame(() => {
     const bf = useButterflyStore.getState();
+    // 等待 butterflySlice 初始化（sideA.params.L1 有合法值）
+    if (!initializedRef.current) {
+      if (!bf.sideA.params || bf.sideA.params.L1 <= 0) return;
+      initializedRef.current = true;
+    }
     const p = bf.sideA.params;
 
     // 动态球半径
@@ -74,9 +80,10 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
       ptsB.current.push(new Vector3(bf.sideB.x2 + X_OFF, bf.sideB.y2, 0));
       if (ptsA.current.length > TRAIL_LEN) ptsA.current = ptsA.current.slice(-TRAIL_LEN);
       if (ptsB.current.length > TRAIL_LEN) ptsB.current = ptsB.current.slice(-TRAIL_LEN);
+      // 仅在运行中追加点时更新尾迹几何，避免空转时每帧重建
+      updTrail(tA.current, ptsA.current);
+      updTrail(tB.current, ptsB.current);
     }
-    updTrail(tA.current, ptsA.current);
-    updTrail(tB.current, ptsB.current);
   });
 
   return (
