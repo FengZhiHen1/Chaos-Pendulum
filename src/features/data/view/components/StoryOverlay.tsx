@@ -27,7 +27,7 @@ interface StageEventData {
 
 export function StoryOverlay() {
   const viewModel = useStoryViewModel();
-  const { playback, play, pause, onEvent, offEvent } = viewModel;
+  const { playback, play, pause, sync, onEvent, offEvent } = viewModel;
   const [visible, setVisible] = useState(false);
 
   // 监听 playback 状态，控制覆盖层可见性（不包含 storyEnd 的 setVisible，消除闪烁）
@@ -63,6 +63,7 @@ export function StoryOverlay() {
   const handleStoryEvent = useCallback((event: string, data?: unknown) => {
     switch (event) {
       case "storyStart":
+        sync(); // 强制同步引擎状态（play() 在 StoryPage 实例中调用，本实例状态陈旧）
         setVisible(true);
         break;
 
@@ -102,6 +103,7 @@ export function StoryOverlay() {
             simStore.injectParams(newParams, newIC);
           }
         }
+        sync(); // 阶段切换后同步引擎状态，确保本地 playback 与引擎一致
         break;
       }
 

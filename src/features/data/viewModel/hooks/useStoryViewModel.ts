@@ -40,6 +40,8 @@ export interface StoryViewModelActions {
   stop: () => Promise<void>;
   /** 清除错误 */
   clearError: () => void;
+  /** 从引擎强制同步当前状态到本地 React state */
+  sync: () => void;
   /** 注册故事事件回调 */
   onEvent: (cb: (event: string, data?: unknown) => void) => void;
   /** 移除故事事件回调 */
@@ -126,6 +128,11 @@ export function useStoryViewModel(): StoryViewModel {
     storyEngine.offEvent(cb);
   }, []);
 
+  /** 强制从引擎同步当前状态——供跨组件实例使用（如 StoryOverlay 在事件回调中刷新）。 */
+  const sync = useCallback(() => {
+    setPlayback(storyEngine.getCurrentState());
+  }, []);
+
   return {
     playback,
     isLoading,
@@ -135,6 +142,7 @@ export function useStoryViewModel(): StoryViewModel {
     resume,
     stop,
     clearError,
+    sync,
     onEvent,
     offEvent,
   };
