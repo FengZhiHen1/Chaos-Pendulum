@@ -26,13 +26,9 @@ export function ButterflySplit({
   const isBfRunning = useButterflyStore((s) => s.isRunning);
   const isFullyDecoupled = useButterflyStore((s) => s.separation.isFullyDecoupled);
   const separationRad = useButterflyStore((s) => s.separation.currentSeparation);
-  const sideAWorkerReady = useButterflyStore((s) => s.sideA.workerReady);
-  const sideBWorkerReady = useButterflyStore((s) => s.sideB.workerReady);
   const editMode = useButterflyStore((s) => s.editMode);
   const bfSetEditMode = useButterflyStore((s) => s.setEditMode);
-  const { handlePlay, handlePause, handleReset, handleDeltaChange, initError } = useButterflySimulation();
-
-  const workersReady = sideAWorkerReady && sideBWorkerReady;
+  const { handlePlay, handlePause, handleReset, handleDeltaChange } = useButterflySimulation();
 
   return (
     <div className={cn("relative flex flex-col", className)}>
@@ -43,13 +39,9 @@ export function ButterflySplit({
           <Button
             variant="primary"
             size="sm"
-            disabled={!workersReady && !initError}
             onClick={isBfRunning ? handlePause : handlePlay}
-            title={initError ? "仿真引擎启动失败" : !workersReady ? "仿真引擎初始化中…" : undefined}
           >
-            {initError ? "启动失败"
-              : !workersReady ? "初始化…"
-              : isBfRunning ? <><Pause className="h-3.5 w-3.5 mr-1" />暂停</>
+            {isBfRunning ? <><Pause className="h-3.5 w-3.5 mr-1" />暂停</>
               : <><Play className="h-3.5 w-3.5 mr-1" />播放</>}
           </Button>
           <Button variant="tertiary" size="sm" onClick={handleReset}>

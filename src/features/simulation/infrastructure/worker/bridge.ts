@@ -123,21 +123,7 @@ function setupCommandBusHandlers(): () => void {
     useRootStore.getState().clearHistory();
   });
 
-  const unsubButterflyFrame = commandBus.on("butterfly:frame", (payload) => {
-    useRootStore.getState()._updateSide(payload.side, payload.state, payload.energy, payload.derived);
-  });
-
-  const unsubButterflyWorkerReady = commandBus.on("butterfly:workerReady", (payload) => {
-    useRootStore.getState()._setWorkerReady(payload.side, payload.ready);
-  });
-
-  const unsubButterflyPlay = commandBus.on("butterfly:play", () => {
-    useRootStore.getState().play();
-  });
-
-  const unsubButterflyPause = commandBus.on("butterfly:pause", () => {
-    useRootStore.getState().pause();
-  });
+  // 蝴蝶效应已改为 ButterflySimulator 主线程方案，不再需要 bridge 转发
 
   // Scheduler 控制命令（解耦 TimeReversal / Scene3D 的直接引用）
   const unsubRequestTick = commandBus.on("scheduler:requestTick", (payload) => {
@@ -189,10 +175,6 @@ function setupCommandBusHandlers(): () => void {
     unsubFrameConsume();
     unsubHistoryPush();
     unsubHistoryClear();
-    unsubButterflyFrame();
-    unsubButterflyWorkerReady();
-    unsubButterflyPlay();
-    unsubButterflyPause();
     unsubRequestTick();
     unsubSetDirection();
     unsubSchedPause();
