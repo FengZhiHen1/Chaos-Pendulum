@@ -155,6 +155,15 @@ export function Scene3D({
 
   useEffect(() => { if (stageRef.current) globalWatermarkRenderer.injectContainer(stageRef.current); }, []);
 
+  // 蝴蝶模式：禁用 Canvas 指针事件，阻断 R3F 事件系统 + OrbitControls 监听器
+  // 避免点击 Canvas 时主线程死锁（OrbitControls 即使 enabled=false 仍注册 DOM 事件）
+  useEffect(() => {
+    const canvas = stageRef.current?.querySelector("canvas");
+    if (canvas) {
+      canvas.style.pointerEvents = butterflyActive ? "none" : "auto";
+    }
+  }, [butterflyActive]);
+
   if (!webglSupported) {
     return (
       <div className={`${className} flex items-center justify-center bg-surface text-on-surface`}>
