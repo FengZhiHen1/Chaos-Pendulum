@@ -146,9 +146,10 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <line ref={tB as any}><bufferGeometry /><lineBasicMaterial color={PURPLE} transparent opacity={0.55} depthTest={false} /></line>
 
-      <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08}
+      {/* OrbitControls 完全移除——即使 enableRotate=false，组件内部仍注册 Canvas DOM 事件监听器 */}
+      {/* <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08}
         enableRotate={false} enableZoom={false} enablePan={false}
-        minDistance={2} maxDistance={14} maxPolarAngle={Math.PI} target={[0, -1, 0]} />
+        minDistance={2} maxDistance={14} maxPolarAngle={Math.PI} target={[0, -1, 0]} /> */}
     </>
   );
 }
