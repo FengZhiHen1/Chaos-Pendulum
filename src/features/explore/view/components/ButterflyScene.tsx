@@ -36,15 +36,28 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
   // 尾迹
   const tA = useRef<THREE.Line>(null); const tB = useRef<THREE.Line>(null);
   const ptsA = useRef<THREE.Vector3[]>([]); const ptsB = useRef<THREE.Vector3[]>([]);
+  // 预分配 trail 缓冲区，复用避免每帧 dispose BufferGeometry
+  const trailBufA = useRef(new Float32Array(TRAIL_LEN * 3));
+  const trailBufB = useRef(new Float32Array(TRAIL_LEN * 3));
+  const trailGeomInit = useRef(false);
 
   useEffect(() => {
-    let n = 0;
-    const id = setInterval(() => {
-      if (injectedRef.current) { clearInterval(id); return; }
-      if (orbitRef.current) { globalOrbitControlsAdapter.injectControls(orbitRef.current); injectedRef.current = true; clearInterval(id); }
-      if (++n >= 50) clearInterval(id);
+    // OrbitControls 在 Canvas 内异步挂载，用单次 requestAnimationFrame
+    // 等待下一帧 ref 就绪后注入适配器，避免 setInterval 轮询的不可靠延迟
+    const raf = requestAnimationFrame(() => {
+      if (orbitRef.current && !injectedRef.current) {
+        globalOrbitControlsAdapter.injectControls(orbitRef.current);
+        injectedRef.current = true;
+      }
+    });
+    // 兜底：若 rAF 被跳过，100ms 后再次尝试
+    const fallback = setTimeout(() => {
+      if (orbitRef.current && !injectedRef.current) {
+        globalOrbitControlsAdapter.injectControls(orbitRef.current);
+        injectedRef.current = true;
+      }
     }, 100);
-    return () => clearInterval(id);
+    return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
   }, []);
 
   const env = useMemo(() => ({
@@ -80,9 +93,10 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
       ptsB.current.push(new Vector3(bf.sideB.x2 + X_OFF, bf.sideB.y2, 0));
       if (ptsA.current.length > TRAIL_LEN) ptsA.current = ptsA.current.slice(-TRAIL_LEN);
       if (ptsB.current.length > TRAIL_LEN) ptsB.current = ptsB.current.slice(-TRAIL_LEN);
-      // 仅在运行中追加点时更新尾迹几何，避免空转时每帧重建
-      updTrail(tA.current, ptsA.current);
-      updTrail(tB.current, ptsB.current);
+      // 写入预分配 Float32Array → needsUpdate，避免每帧 dispose/create BufferGeometry
+      updTrailBuf(tA.current, trailBufA.current, ptsA.current, !trailGeomInit.current);
+      updTrailBuf(tB.current, trailBufB.current, ptsB.current, !trailGeomInit.current);
+      trailGeomInit.current = true;
     }
   });
 
@@ -151,11 +165,31 @@ function updArm(m: THREE.Mesh | null, s: Vector3, e: Vector3, len: number) {
   m.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), d));
 }
 
-function updTrail(line: THREE.Line | null, pts: THREE.Vector3[]) {
+/** 将 trail 点写入预分配 Float32Array，复用 BufferGeometry（避免每帧 dispose 导致 GPU 抖动） */
+function updTrailBuf(line: THREE.Line | null, buf: Float32Array, pts: THREE.Vector3[], initGeom: boolean) {
   if (!line || pts.length < 2) { if (line) line.visible = false; return; }
   line.visible = true;
-  const a: number[] = []; for (const p of pts) a.push(p.x, p.y, p.z);
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(a, 3));
-  line.geometry.dispose(); line.geometry = g;
+  const count = Math.min(pts.length, buf.length / 3);
+  for (let i = 0; i < count; i++) {
+    const p = pts[pts.length - count + i]!;
+    buf[i * 3] = p.x;
+    buf[i * 3 + 1] = p.y;
+    buf[i * 3 + 2] = p.z;
+  }
+  if (initGeom) {
+    // 首次：创建 BufferGeometry 并挂载到 line
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(buf.slice(0, count * 3), 3));
+    g.setDrawRange(0, count);
+    line.geometry.dispose();
+    line.geometry = g;
+  } else {
+    // 后续帧：原地更新缓冲区，仅标记 needsUpdate
+    const attr = line.geometry.attributes.position as THREE.BufferAttribute;
+    if (attr && attr.array instanceof Float32Array && attr.array.length >= count * 3) {
+      attr.array.set(buf.subarray(0, count * 3));
+      attr.needsUpdate = true;
+      (line.geometry as THREE.BufferGeometry).setDrawRange(0, count);
+    }
+  }
 }
