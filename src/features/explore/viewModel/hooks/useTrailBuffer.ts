@@ -101,6 +101,8 @@ export function useTrailBuffer(): TrailBufferAPI {
     (_point: TrailPoint, params: PendulumParams, state: StateVector) => {
       const isRunning = useSimulationStore.getState().isRunning;
       if (!isRunning) return;
+      // 时间反演进行中时冻结尾迹，避免反向轨迹与正向历史混淆
+      if (useExploreStore.getState().timeReversalActive) return;
 
       // NaN 检测
       if (

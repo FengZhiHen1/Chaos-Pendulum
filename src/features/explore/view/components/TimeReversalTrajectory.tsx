@@ -13,6 +13,10 @@ import * as THREE from "three";
 // ═══════════════════════════════════════════════════
 
 const FADE_OUT_DURATION = 10; // 秒
+/** 正向轨迹不透明度——低于反演轨迹以形成视觉层次 */
+const FWD_OPACITY = 0.35;
+/** 正向轨迹颜色——深灰，在亮色舞台 (#EAECEF) 上清晰可见 */
+const FWD_COLOR = "#494D55";
 
 interface TrajectoryData {
   forwardPoints: THREE.Vector3[];
@@ -90,8 +94,8 @@ export function TimeReversalTrajectoryOverlay() {
     const revLine = reversalLineRef.current;
 
     if (fwdLine?.material) {
-      const mat = fwdLine.material as THREE.LineDashedMaterial;
-      mat.opacity = Math.max(0, 0.4 * (1 - progress));
+      const mat = fwdLine.material as THREE.LineBasicMaterial;
+      mat.opacity = Math.max(0, FWD_OPACITY * (1 - progress));
     }
     if (revLine?.material) {
       const mat = revLine.material as THREE.LineBasicMaterial;
@@ -105,7 +109,7 @@ export function TimeReversalTrajectoryOverlay() {
     }
   });
 
-  // ── 正向轨迹（虚线：Line + LineDashedMaterial + computeLineDistances）──
+  // ── 正向轨迹（半透明深灰线，低不透明度与反演实线形成视觉层次）──
   useEffect(() => {
     const line = forwardLineRef.current;
     if (!line) return;
@@ -124,8 +128,6 @@ export function TimeReversalTrajectoryOverlay() {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     line.geometry.dispose();
     line.geometry = geo;
-    // computeLineDistances 是 LineDashedMaterial 正常工作的必要条件
-    line.computeLineDistances();
   }, [data.forwardPoints, data.visible]);
 
   // ── 反演轨迹（实线）──
@@ -151,17 +153,15 @@ export function TimeReversalTrajectoryOverlay() {
 
   return (
     <>
-      {/* 正向轨迹：白色虚线 */}
+      {/* 正向轨迹：半透明深灰线，区别于反演实线 */}
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <line ref={forwardLineRef as any}>
         <bufferGeometry />
-        <lineDashedMaterial
-          color="#FFFFFF"
+        <lineBasicMaterial
+          color={FWD_COLOR}
           transparent
-          opacity={0.4}
+          opacity={FWD_OPACITY}
           depthTest
-          dashSize={0.3}
-          gapSize={0.15}
         />
       </line>
 
