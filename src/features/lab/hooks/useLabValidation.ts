@@ -84,14 +84,17 @@ export function useLabValidation(): UseLabValidationAPI {
       },
     })
       .then((results) => {
+        console.log("[useLabValidation] .then 触发, results=", results.length, "allPassed=", results.every(r => r.passed));
         const allOk = results.every((r) => r.passed);
         setAllPassed(allOk);
         setValidationRunning(false);
         setActiveTest(null);
+        console.log("[useLabValidation] 开始 restoreSimulation");
         restoreSimulation(simStore, cachedParams, cachedIC, wasRunning);
+        console.log("[useLabValidation] .then 完成");
       })
       .catch((err) => {
-        console.error("[useLabValidation] 验证异常:", err);
+        console.error("[useLabValidation] .catch 触发:", err);
         setValidationRunning(false);
         setActiveTest(null);
         const msg = err instanceof Error ? err.message : String(err);
@@ -125,11 +128,15 @@ function restoreSimulation(
   cachedIC: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number },
   wasRunning: boolean,
 ): void {
+  console.log("[useLabValidation] restoreSimulation 开始, wasRunning=", wasRunning);
   try {
     simStore.injectParams(cachedParams, cachedIC);
+    console.log("[useLabValidation] injectParams 完成");
     if (wasRunning) {
       simStore.setRunning(true);
+      console.log("[useLabValidation] setRunning(true) 完成");
     }
+    console.log("[useLabValidation] restoreSimulation 完成");
   } catch (err) {
     console.error("[useLabValidation] 恢复仿真状态失败:", err);
   }
