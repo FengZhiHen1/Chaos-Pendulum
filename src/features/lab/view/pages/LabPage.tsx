@@ -1,16 +1,13 @@
+import { useCallback } from "react";
 import { FlaskConical, CheckCircle, XCircle, Circle, Code, Play, AlertTriangle, Info, Timer, Activity } from "lucide-react";
 import { useLabStore } from "../../store";
 import { useLabValidation } from "../../hooks/useLabValidation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { SandboxPanel } from "../components/SandboxPanel";
+import { SANDBOX_TEMPLATES } from "../../contracts";
+import type { SandboxTemplateId } from "../../contracts";
 import type { ValidationTestKey, ValidationResult, ValidationMetrics } from "../../validation-runner";
 import { cn } from "@/shared/lib/cn";
-
-const TEMPLATES = [
-  { id: "spring", name: "弹簧摆", file: "spring-pendulum.py" },
-  { id: "forced", name: "受迫双摆", file: "forced-pendulum.py" },
-  { id: "magnetic", name: "磁力摆", file: "magnetic-pendulum.py" },
-];
 
 interface CheckDef {
   key: ValidationTestKey;
@@ -19,7 +16,7 @@ interface CheckDef {
 }
 
 const CHECKS: CheckDef[] = [
-  { key: "smallAngle", label: "小角度近似", desc: "θ₀ ≤ 5° 时线性近似误差 < 2%" },
+  { key: "smallAngle", label: "小角度简正模", desc: "双摆等质量等长度同相模周期吻合 < 2%" },
   { key: "singlePendulum", label: "单摆退化", desc: "m₂ → 0 时退化为单摆，周期吻合 < 2%" },
   { key: "energy", label: "能量漂移", desc: "无阻尼 1000s 仿真，能量漂移 < 0.5%" },
 ];
@@ -209,7 +206,16 @@ export function LabPage() {
   } = useLabValidation();
 
   const activeTemplate = useLabStore((s) => s.activeTemplate);
+  const setUserCode = useLabStore((s) => s.setUserCode);
   const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
+
+  const handleLoadTemplate = useCallback((id: SandboxTemplateId) => {
+    const tpl = SANDBOX_TEMPLATES.find((t) => t.id === id);
+    if (tpl) {
+      setUserCode(tpl.code);
+      useLabStore.setState({ activeTemplate: id, codeStatus: "idle", codeError: null });
+    }
+  }, [setUserCode]);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -321,21 +327,20 @@ export function LabPage() {
               <h4 className="text-xs font-semibold text-on-surface">代码模板</h4>
             </div>
             <div className="space-y-1.5">
-              {TEMPLATES.map((t) => (
+              {SANDBOX_TEMPLATES.map((tpl) => (
                 <button
-                  key={t.id}
+                  key={tpl.id}
                   type="button"
-                  disabled
+                  onClick={() => handleLoadTemplate(tpl.id)}
                   className={cn(
                     "w-full text-left px-3 py-2.5 rounded-lg text-xs border transition-all duration-200",
-                    activeTemplate === t.id
+                    activeTemplate === tpl.id
                       ? "border-primary/30 bg-primary-container/30 text-primary"
                       : "border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container",
-                    "opacity-50 cursor-not-allowed",
                   )}
                 >
-                  <span className="font-medium">{t.name}</span>
-                  <span className="text-[10px] text-on-surface-variant/50 ml-2">{t.file}</span>
+                  <span className="font-medium">{tpl.label}</span>
+                  <span className="text-[10px] text-on-surface-variant/50 ml-2">{tpl.description}</span>
                 </button>
               ))}
             </div>

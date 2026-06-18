@@ -54,7 +54,7 @@ const SCENARIOS: ValidationScenario[] = [
     id: "singlePendulum",
     params: { m1: 1.0, m2: 1e-6, L1: 1.0, L2: 1.0, g: 9.81, damping: 0 },
     ic: {
-      theta1: Math.PI / 4,
+      theta1: (5 * Math.PI) / 180,   // 5° — 小角度保证周期公式精度
       theta1Dot: 0,
       theta2: 0,
       theta2Dot: 0,
@@ -65,9 +65,9 @@ const SCENARIOS: ValidationScenario[] = [
     id: "energy",
     params: { m1: 1.0, m2: 1.0, L1: 1.0, L2: 1.0, g: 9.81, damping: 0 },
     ic: {
-      theta1: Math.PI / 2,
+      theta1: 1.5,                 // ≈ 86° — 大角度混沌初始条件
       theta1Dot: 0,
-      theta2: Math.PI / 2,
+      theta2: 2.0,                 // ≈ 115°
       theta2Dot: 0,
     },
     simDuration: 1000,
@@ -112,7 +112,9 @@ function analyzeSmallAngle(data: WorkerValidationResultResponse): AnalysisResult
 
   const g = SCENARIOS[0]!.params.g;
   const L1 = SCENARIOS[0]!.params.L1;
-  const expectedPeriod = 2 * Math.PI * Math.sqrt(L1 / g);
+  // 双摆等质量等长度小角度简正模——主导模（同相模）周期
+  // ω² = (g/L)(2 - √2) → T = 2π/√[(g/L)(2-√2)]
+  const expectedPeriod = (2 * Math.PI) / Math.sqrt((g / L1) * (2 - Math.SQRT2));
 
   const crossings = detectZeroCrossings(data.theta1Samples);
   const measuredPeriod = averagePeriod(crossings);
@@ -127,7 +129,7 @@ function analyzeSmallAngle(data: WorkerValidationResultResponse): AnalysisResult
   return {
     passed: error < threshold,
     value: error,
-    detail: `线性周期 ${expectedPeriod.toFixed(4)}s，实测 ${measuredPeriod.toFixed(4)}s`,
+    detail: `同相模周期 ${expectedPeriod.toFixed(4)}s，实测 ${measuredPeriod.toFixed(4)}s`,
     metrics: {
       measured: measuredPeriod,
       expected: expectedPeriod,
@@ -215,7 +217,7 @@ function analyzeEnergy(data: WorkerValidationResultResponse): AnalysisResult {
 // ─── 场景元数据 ────────────────────────────────────
 
 const SCENARIO_META: Record<ValidationTestKey, { label: string; threshold: number; unit: string }> = {
-  smallAngle: { label: "小角度近似 (<2%)", threshold: 0.02, unit: "%" },
+  smallAngle: { label: "小角度简正模 (<2%)", threshold: 0.02, unit: "%" },
   singlePendulum: { label: "单摆退化", threshold: 0.02, unit: "%" },
   energy: { label: "能量漂移 (<0.5%)", threshold: 0.005, unit: "%" },
 };
