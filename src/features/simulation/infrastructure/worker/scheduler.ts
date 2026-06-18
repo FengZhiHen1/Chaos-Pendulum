@@ -60,6 +60,9 @@ export class SimulationScheduler extends ISimulationScheduler {
   private prefetchCallback: (() => void) | null = null;
   private discardNextBatch = false;
 
+  /** Worker 已通过 createOdeWorker 预初始化注入（标志 ready 消息已被消费） */
+  private _workerInjected = false;
+
   // 插值快照
   private prevSnapshot: InterpSnapshot | null = null;
   private currSnapshot: InterpSnapshot | null = null;
@@ -163,7 +166,15 @@ export class SimulationScheduler extends ISimulationScheduler {
 
   override get isRunning(): boolean { return this._running; }
 
-  override onReady(cb: () => void): void { this.readyCallbacks.push(cb); }
+  override onReady(cb: () => void): void {
+    if (this._workerInjected) {
+      // createOdeWorker 已将 Worker 初始化完毕，ready 消息已被消费，
+      // 此处直接触发回调，避免 isWorkerReady 永为 false
+      cb();
+    } else {
+      this.readyCallbacks.push(cb);
+    }
+  }
 
   override onPoincarePoints(cb: (pts: PoincarePoint[]) => void): () => void {
     this.poincareCallbacks.push(cb);
@@ -213,6 +224,10 @@ export class SimulationScheduler extends ISimulationScheduler {
   injectWorker(worker: Worker): void {
     this.workerGateway.injectWorker(worker);
     worker.onerror = (event) => this.handleCrash(event);
+    this._workerInjected = true;
+    // 注入时 ready 回调可能已注册，触发它们
+    for (const cb of this.readyCallbacks) cb();
+    this.readyCallbacks.length = 0;
   }
 
   /** 开关力计算 */
