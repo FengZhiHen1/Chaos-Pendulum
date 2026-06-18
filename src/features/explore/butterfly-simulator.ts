@@ -34,7 +34,11 @@ export class ButterflySimulator {
   // ═══════════════════════════════════════════
 
   start(baseParams: PendulumParams, baseState: StateVector, deltaDeg: number): void {
-    if (this.running) return;
+    // 显式停止当前循环并复位 running 标志，防御因 StrictMode 双调
+    // 或异常卸载/重载周期导致的 running 残留
+    if (this.running) {
+      this.pause();
+    }
     const deltaRad = deltaDeg * (Math.PI / 180);
 
     this.stateA = new Float64Array([baseState.theta1, baseState.omega1, baseState.theta2, baseState.omega2]);
