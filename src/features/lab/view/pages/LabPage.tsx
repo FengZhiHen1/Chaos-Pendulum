@@ -281,8 +281,22 @@ export function LabPage() {
 
         {/* ═══ 右侧：Python 沙箱 ═══ */}
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface">
+          {/* 使用说明 */}
+          <div className="shrink-0 px-4 py-3 border-b border-white/5 bg-surface-container-lowest/20">
+            <div className="flex items-start gap-2.5">
+              <Code className="w-4 h-4 text-primary/60 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-on-surface">Python 可编程沙箱</h3>
+                <p className="text-[10px] text-on-surface-variant/70 leading-relaxed">
+                  编写自定义 ODE 方程 <code className="text-[10px] text-primary/80 font-mono">equations(t, state, params)</code>，
+                  点击「运行」后 Pyodide + SciPy 计算轨迹并在右侧 3D 视图中回放。
+                  预设模板提供弹簧摆、受迫摆、磁力摆三种变体，也可从零开始编写自己的物理模型。
+                </p>
+              </div>
+            </div>
+          </div>
           {/* 模板栏 */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-surface-container-lowest/30">
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-surface-container-lowest/30">
             <div className="flex items-center gap-1.5 mr-3">
               <Code className="w-3.5 h-3.5 text-primary/70" />
               <span className="text-[11px] font-medium text-on-surface-variant">代码模板</span>
