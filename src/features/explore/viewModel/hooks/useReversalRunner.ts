@@ -244,8 +244,15 @@ export function useReversalRunner(): ReversalRunnerAPI {
     }
   }, [mode, phase, setPhase]);
 
-  const openIntro = useCallback(() => { setIntroOpen(true); }, [setIntroOpen]);
-  const closeIntro = useCallback(() => { setIntroOpen(false); }, [setIntroOpen]);
+  const openIntro = useCallback(() => {
+    commandBus.emit({ type: "scheduler:pause" });
+    setIntroOpen(true);
+  }, [setIntroOpen]);
+
+  const closeIntro = useCallback(() => {
+    setIntroOpen(false);
+    commandBus.emit({ type: "scheduler:resume" });
+  }, [setIntroOpen]);
 
   const handleCancelReversal = useCallback(() => {
     if (prefetchTimeoutRef.current) { clearTimeout(prefetchTimeoutRef.current); prefetchTimeoutRef.current = undefined; }

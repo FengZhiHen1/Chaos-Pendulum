@@ -17,6 +17,7 @@ import { useSimulationControls } from "@/features/simulation";
 import { useSimulationStore } from "@/features/simulation/store";
 import { useExploreStore } from "@/features/explore/store";
 import { useAppStore } from "@/stores/useAppStore";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
 import type { PendulumMaterialType, EnvironmentPreset } from "../components/Scene3D";
 
@@ -132,6 +133,7 @@ export function ExplorePage() {
   const estimatedHistoryFrames = Math.floor(simulationTime * 60);
 
   const handleStartTimeReversal = useCallback(() => {
+    commandBus.emit({ type: "scheduler:pause" });
     useExploreStore.getState().setTimeReversalIntroOpen(true);
   }, []);
 
@@ -152,7 +154,10 @@ export function ExplorePage() {
         if (butterflyActive) {
           exitButterfly();
         }
-        useExploreStore.getState().setTimeReversalIntroOpen(false);
+        if (useExploreStore.getState().timeReversalIntroOpen) {
+          commandBus.emit({ type: "scheduler:resume" });
+          useExploreStore.getState().setTimeReversalIntroOpen(false);
+        }
       }
     };
 
