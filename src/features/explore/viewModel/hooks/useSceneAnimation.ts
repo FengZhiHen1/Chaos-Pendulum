@@ -213,6 +213,19 @@ export function useSceneAnimation(
       appendTrailPoint({ position: ball2Pos.clone(), velocity: p.L2 * Math.abs(omega2) }, p, sv);
     }
 
+    // 当 L 参数刚变更时，Worker 帧中的笛卡尔坐标还基于旧 L 值。
+    // 若检测到杆长与球位置不匹配，立即从当前角度+新 L 重新计算，避免球体脱离杆。
+    const arm1Dist = ball1Pos.length();
+    const arm2Dist = ball2Pos.clone().sub(ball1Pos).length();
+    if (Math.abs(arm1Dist - p.L1) > 0.001 || Math.abs(arm2Dist - p.L2) > 0.001) {
+      const sx1 = p.L1 * Math.sin(theta1);
+      const sy1 = -p.L1 * Math.cos(theta1);
+      const sx2 = sx1 + p.L2 * Math.sin(theta2);
+      const sy2 = sy1 - p.L2 * Math.cos(theta2);
+      ball1Pos = new Vector3(sx1, sy1, 0);
+      ball2Pos = new Vector3(sx2, sy2, 0);
+    }
+
     // 更新网格
     if (ball1Ref.current) ball1Ref.current.position.copy(ball1Pos);
     if (ball2Ref.current) ball2Ref.current.position.copy(ball2Pos);

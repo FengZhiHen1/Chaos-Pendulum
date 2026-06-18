@@ -425,11 +425,24 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
         ([k, v]) => k !== key && v.level === "error",
       );
 
+      // 当 L1/L2 变更时，立即从当前角度+新杆长重新计算笛卡尔坐标，
+      // 保持 store 数据一致性，避免 3D 渲染中球体脱离杆
+      let x1 = s.x1, y1 = s.y1, x2 = s.x2, y2 = s.y2;
+      if (key === "L1" || key === "L2") {
+        const L1 = key === "L1" ? value : s.params.L1;
+        const L2 = key === "L2" ? value : s.params.L2;
+        x1 = L1 * Math.sin(s.theta1);
+        y1 = -L1 * Math.cos(s.theta1);
+        x2 = x1 + L2 * Math.sin(s.theta2);
+        y2 = y1 - L2 * Math.cos(s.theta2);
+      }
+
       return {
         params: newParams,
         fieldErrors: newErrors,
         isSceneFrozen: hasOtherErrors,
         paramsDirty: true,
+        ...(key === "L1" || key === "L2" ? { x1, y1, x2, y2 } : {}),
       };
     });
   },
