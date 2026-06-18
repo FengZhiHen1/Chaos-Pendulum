@@ -17,6 +17,7 @@ import { PendulumGeometry } from "./scene/PendulumGeometry";
 import { TrailRenderer } from "./TrailRenderer";
 import { useButterflyStore } from "../../store";
 import { ForceArrows3D } from "@/features/lab/view/components/ForceArrows3D";
+import { ButterflySceneContent } from "./ButterflyScene";
 import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
 import { globalWatermarkRenderer } from "@/features/data/infrastructure/adapters/watermarkRendererSingleton";
 
@@ -28,6 +29,7 @@ export interface Scene3DProps {
   showGrid?: boolean;
   enableShadows?: boolean;
   className?: string;
+  butterflyActive?: boolean;
   butterflySide?: "A" | "B";
   ballColor?: string;
   canvasChildren?: React.ReactNode;
@@ -143,7 +145,7 @@ export function SceneContent({
 
 export function Scene3D({
   environment = "dark-lab", showGrid = true,
-  enableShadows = true, className = "w-full h-full", butterflySide, ballColor, canvasChildren,
+  enableShadows = true, className = "w-full h-full", butterflyActive, butterflySide, ballColor, canvasChildren,
 }: Scene3DProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const { webglSupported, webglLost, webglLostPermanent, nanToast, paramInvalid,
@@ -174,13 +176,21 @@ export function Scene3D({
       <Canvas shadows={effectiveEnableShadows} camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
         frameloop="always" style={{ background: envConfig.background }}
         onCreated={({ gl }) => { if (gl) { gl.shadowMap.type = THREE.PCFShadowMap; onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement }); } }}>
-        <SceneContent
-          environment={environment}
-          enableShadows={effectiveEnableShadows} showGrid={effectiveShowGrid}
-          sphereSegments={sphereSegments} cylinderSegments={cylinderSegments}
-          butterflySide={butterflySide} ballColor={ballColor}
-          onParamChange={setParamInvalid} onNanTrigger={handleNanToast}
-        />
+        {butterflyActive ? (
+          <ButterflySceneContent
+            environment={environment}
+            enableShadows={effectiveEnableShadows}
+            showGrid={effectiveShowGrid}
+          />
+        ) : (
+          <SceneContent
+            environment={environment}
+            enableShadows={effectiveEnableShadows} showGrid={effectiveShowGrid}
+            sphereSegments={sphereSegments} cylinderSegments={cylinderSegments}
+            butterflySide={butterflySide} ballColor={ballColor}
+            onParamChange={setParamInvalid} onNanTrigger={handleNanToast}
+          />
+        )}
         {canvasChildren}
       </Canvas>
       {paramInvalid && (

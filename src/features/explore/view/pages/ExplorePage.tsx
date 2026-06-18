@@ -131,8 +131,6 @@ export function ExplorePage() {
 
   /** 估算历史帧数（≈60fps），用于底部工具栏的禁用状态 */
   const estimatedHistoryFrames = Math.floor(simulationTime * 60);
-  /** 蝴蝶效应当前展示的摆侧 */
-  const [bfActiveSide, setBfActiveSide] = useState<"A" | "B">("A");
 
   const handleStartTimeReversal = useCallback(() => {
     commandBus.emit({ type: "scheduler:pause" });
@@ -206,7 +204,7 @@ export function ExplorePage() {
             environment={environment}
             showGrid
             enableShadows
-            butterflySide={butterflyActive ? bfActiveSide : undefined}
+            butterflyActive={butterflyActive}
             canvasChildren={<TimeReversalTrajectoryOverlay />}
           />
 
@@ -222,14 +220,10 @@ export function ExplorePage() {
           {/* 时间反演实验 — 组件自行管理显隐 */}
           <TimeReversal />
 
-          {/* 蝴蝶效应 overlay — 复用主 Canvas，仅渲染工具栏+警报 */}
+          {/* 蝴蝶效应 overlay — 工具栏+警报 */}
           {butterflyActive && (
             <div className="absolute inset-0 z-20 pointer-events-none">
-              <ButterflySplit
-                activeSide={bfActiveSide}
-                onSwitchSide={setBfActiveSide}
-                onExit={exitButterfly}
-              />
+              <ButterflySplit onExit={exitButterfly} />
             </div>
           )}
         </section>
