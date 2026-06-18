@@ -120,6 +120,8 @@ export function TimeReversalTrajectoryOverlay() {
     }
 
     line.visible = true;
+    // 重置不透明度，防止上一轮 fadeOut 残留
+    if (line.material) { (line.material as THREE.LineBasicMaterial).opacity = FWD_OPACITY; }
     const pts: number[] = [];
     for (const p of data.forwardPoints) {
       pts.push(p.x, p.y, p.z);
@@ -141,6 +143,8 @@ export function TimeReversalTrajectoryOverlay() {
     }
 
     line.visible = true;
+    // 重置不透明度，防止上一轮 fadeOut 残留
+    if (line.material) { (line.material as THREE.LineBasicMaterial).opacity = 1; }
     const pts: number[] = [];
     for (const p of data.reversalPoints) {
       pts.push(p.x, p.y, p.z);

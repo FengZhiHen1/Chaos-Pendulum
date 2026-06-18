@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, ChevronUp } from "lucide-react";
 import { Scene3D } from "../components/Scene3D";
 import { TimeReversal } from "../components/TimeReversal";
@@ -142,6 +142,9 @@ export function ExplorePage() {
   /** 估算历史帧数（≈60fps），用于底部工具栏的禁用状态 */
   const estimatedHistoryFrames = Math.floor(simulationTime * 60);
 
+  /** memo 化 TrajectoryOverlay，避免每次重渲染导致 R3F 卸载重建 */
+  const trajectoryOverlay = useMemo(() => <TimeReversalTrajectoryOverlay />, []);
+
   const handleStartTimeReversal = useCallback(() => {
     commandBus.emit({ type: "scheduler:pause" });
     useExploreStore.getState().setTimeReversalIntroOpen(true);
@@ -216,7 +219,7 @@ export function ExplorePage() {
             showGrid
             enableShadows
             butterflyActive={butterflyActive}
-            canvasChildren={<TimeReversalTrajectoryOverlay />}
+            canvasChildren={trajectoryOverlay}
           />
 
           <ExploreStageOverlay
