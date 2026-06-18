@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useRootStore } from "@/stores/rootStore";
@@ -37,20 +37,21 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
   const setButterflyDelta = useExploreStore((s) => s.setButterflyDelta);
   const simRef = useRef(getOrCreateSimulator());
 
-  // ═══ 暴力验证：注释掉所有初始化，隔离 Zustand 更新链 ═══
-  // const initializedRef = useRef(false);
-  // useEffect(() => {
-  //   if (initializedRef.current) return;
-  //   initializedRef.current = true;
-  //   try {
-  //     const simStore = useSimulationStore.getState();
-  //     useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
-  //     simRef.current.start(simStore.params, simStore.state, butterflyDelta);
-  //   } catch (err) {
-  //     console.error("ButterflyEffect: 初始化失败", err);
-  //     notificationPort.notify({...});
-  //   }
-  // }, [butterflyDelta]);
+  // ═══ 逐步验证：仅恢复 init()，不含 start/emitSide ═══
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    try {
+      const simStore = useSimulationStore.getState();
+      console.log("[DEBUG] 调用 init()...");
+      useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
+      console.log("[DEBUG] init() 完成, 不调用 start()");
+      // simRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    } catch (err) {
+      console.error("ButterflyEffect: 初始化失败", err);
+    }
+  }, [butterflyDelta]);
 
   // ═══ 暴力验证：注释掉 ═══
   // const prevDeltaRef = useRef(butterflyDelta);
