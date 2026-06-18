@@ -283,6 +283,7 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
       consumedFrameIndex: 0, energyCorrection: 0, lyapunovExponent: 0,
       _nanSkipCount: 0, _stoppedFrameCount: 0, isPendulumStopped: false,
       // 立即更新主摆位置，确保 3D 场景正确渲染
+      method: s.method,
       theta1: t1, theta1Dot: 0,
       theta2: t2, theta2Dot: 0,
       x1: nx1, y1: ny1, x2: nx2, y2: ny2,
@@ -663,6 +664,8 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
       isRunning: false,
       runPhase: "idle",
       resetTrigger: s.resetTrigger + 1,
+      // 显式保留当前 method，防止重置后回退到默认值
+      method: s.method,
       x1: nx1, y1: ny1, x2: nx2, y2: ny2,
       theta1: t1, theta1Dot: 0,
       theta2: t2, theta2Dot: 0,
