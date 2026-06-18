@@ -90,7 +90,6 @@ export function useReversalRunner(): ReversalRunnerAPI {
 
   const history = useSimulationHistory();
   const simTime = useSimulationStore((s) => s.t);
-  const params = useSimulationStore((s) => s.params);
   const engineError = useSimulationStore((s) => s.engineError);
   const resetTrigger = useSimulationStore((s) => s.resetTrigger);
 
@@ -103,6 +102,8 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const fwdSnapshotRef = useRef<ReturnType<typeof getSimulationHistory>>([]);
   const reversalTrailRef = useRef<THREE.Vector3[]>([]);
   const awaitingConfirmRef = useRef(false);
+  /** 反演启动时快照的杆长参数，保证整个反演期间位置计算一致 */
+  const reversalParamsRef = useRef<{ L1: number; L2: number }>({ L1: 1, L2: 1 });
 
   const [completedOpen, setCompletedOpen] = useState(false);
   const [exactCompletedOpen, setExactCompletedOpen] = useState(false);
@@ -154,7 +155,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     const sv = fwdArray[fwdArray.length - 1 - idx]!;
     commandBus.emit({ type: "simulation:overrideState", state: { theta1: sv.theta1, omega1: sv.omega1, theta2: sv.theta2, omega2: sv.omega2 } });
     useExploreStore.getState().appendDriftSample({ reversalTime: idx / REVERSAL_DEFAULTS.reversalFps, driftDistance: 0, forwardSimTime: startSimTimeRef.current - idx / REVERSAL_DEFAULTS.reversalFps });
-    const pos = ball2Position(sv, useSimulationStore.getState().params);
+    const pos = ball2Position(sv, reversalParamsRef.current);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
     exactFrameIdxRef.current++;
@@ -167,6 +168,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     if (fwdArray.length < minFrames) throw new InsufficientHistoryError(fwdArray.length, minFrames);
     reversalStartRef.current = { ...store.state };
     startSimTimeRef.current = store.t;
+    reversalParamsRef.current = { L1: store.params.L1, L2: store.params.L2 };
     clearDriftHistory(); resetAnnotation();
     reversalTrailRef.current = [];
     setStartTime(store.t); setActive(true);
@@ -174,7 +176,7 @@ export function useReversalRunner(): ReversalRunnerAPI {
     prevSimTimeRef.current = store.t;
     fwdSnapshotRef.current = getHistoryFnRef.current();
     clearTrajectoryData();
-    const fwdPts = fwdArray.map((sv) => { const p = ball2Position(sv, store.params); return new THREE.Vector3(p.x, p.y, p.z); });
+    const fwdPts = fwdArray.map((sv) => { const p = ball2Position(sv, reversalParamsRef.current); return new THREE.Vector3(p.x, p.y, p.z); });
     updateTrajectoryData({ forwardPoints: fwdPts, reversalPoints: [], reversalColor: mode === "exact" ? "#FFD700" : "#00FFFF", visible: true, fadeOutAt: null });
     if (mode === "exact") {
       setPhase("reversing"); exactFrameIdxRef.current = 0;
@@ -299,10 +301,10 @@ export function useReversalRunner(): ReversalRunnerAPI {
     let drift = 0;
     if (fwdIdx >= 0 && fwdIdx < fwdArray.length) drift = computeDrift(store.state, fwdArray[fwdIdx]!);
     useExploreStore.getState().appendDriftSample({ reversalTime: Math.max(0, reversalTime), driftDistance: drift, forwardSimTime: currentSimTime });
-    const pos = ball2Position(store.state, params);
+    const pos = ball2Position(store.state, reversalParamsRef.current);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
-  }, [mode, phase, simTime, params, stopReversal]);
+  }, [mode, phase, simTime, stopReversal]);
 
   useEffect(() => { if (phase === "reversing") { isReversingRef.current = true; prevSimTimeRef.current = useSimulationStore.getState().t; } }, [phase]);
 
