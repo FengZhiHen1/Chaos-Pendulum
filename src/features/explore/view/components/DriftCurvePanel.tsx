@@ -66,7 +66,9 @@ export function DriftCurvePanel({
       return;
     }
 
-    const maxDrift = Math.max(0.1, ...driftHistory.map((d) => d.driftDistance)) * 1.1;
+    const dataMax = Math.max(...driftHistory.map((d) => d.driftDistance));
+    // 下限 1e-6 防止除零；乘 1.2 留 20% 顶部呼吸空间
+    const maxDrift = Math.max(1e-6, dataMax) * 1.2;
     const maxTime = Math.max(1, maxReversalTime);
 
     const xS = (t: number) => pad.left + (t / maxTime) * pw;
