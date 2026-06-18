@@ -41,24 +41,22 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
   const trailBufB = useRef(new Float32Array(TRAIL_LEN * 3));
   const trailGeomInit = useRef(false);
 
-  useEffect(() => {
-    // OrbitControls 在 Canvas 内异步挂载，用单次 requestAnimationFrame
-    // 等待下一帧 ref 就绪后注入适配器，避免 setInterval 轮询的不可靠延迟
-    const raf = requestAnimationFrame(() => {
-      if (orbitRef.current && !injectedRef.current) {
-        globalOrbitControlsAdapter.injectControls(orbitRef.current);
-        injectedRef.current = true;
-      }
-    });
-    // 兜底：若 rAF 被跳过，100ms 后再次尝试
-    const fallback = setTimeout(() => {
-      if (orbitRef.current && !injectedRef.current) {
-        globalOrbitControlsAdapter.injectControls(orbitRef.current);
-        injectedRef.current = true;
-      }
-    }, 100);
-    return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
-  }, []);
+  // ═══ 暴力验证：禁用 globalOrbitControlsAdapter 注入 ═══
+  // useEffect(() => {
+  //   const raf = requestAnimationFrame(() => {
+  //     if (orbitRef.current && !injectedRef.current) {
+  //       globalOrbitControlsAdapter.injectControls(orbitRef.current);
+  //       injectedRef.current = true;
+  //     }
+  //   });
+  //   const fallback = setTimeout(() => {
+  //     if (orbitRef.current && !injectedRef.current) {
+  //       globalOrbitControlsAdapter.injectControls(orbitRef.current);
+  //       injectedRef.current = true;
+  //     }
+  //   }, 100);
+  //   return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
+  // }, []);
 
   const env = useMemo(() => ({
     "dark-lab": { amb: 0.12, spot: 10, spotPos: new Vector3(0, 6, 3), grid: "#1a1a2e" },
