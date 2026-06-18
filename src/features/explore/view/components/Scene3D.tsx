@@ -163,7 +163,7 @@ export function Scene3D({
   return (
     <div ref={stageRef} className={`relative ${className}`}>
       <Canvas shadows={effectiveEnableShadows} camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
-        style={{ background: envConfig.background }}
+        frameloop="always" style={{ background: envConfig.background }}
         onCreated={({ gl }) => { if (gl) { gl.shadowMap.type = THREE.PCFShadowMap; onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement }); } }}>
         <SceneContent
           pendulumMaterial={pendulumMaterial} environment={environment}

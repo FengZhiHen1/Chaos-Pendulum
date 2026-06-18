@@ -90,6 +90,16 @@ export function useSceneAnimation(
     gl.domElement.setAttribute("data-webgl", "active");
   };
 
+  // ── isRunning 变化 → 强制 R3F 刷新渲染循环 ──
+  const { invalidate } = useThree();
+  const prevIsRunningRef = useRef(isRunning);
+  useEffect(() => {
+    if (isRunning && !prevIsRunningRef.current) {
+      invalidate();
+    }
+    prevIsRunningRef.current = isRunning;
+  }, [isRunning, invalidate]);
+
   // ── viewPreset 变化 → 启动相机过渡 ──
   const prevViewPresetRef = useRef(viewPreset);
   useEffect(() => {
