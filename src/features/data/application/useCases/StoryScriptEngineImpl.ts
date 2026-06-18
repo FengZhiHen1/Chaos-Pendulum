@@ -50,9 +50,22 @@ export class StoryScriptEngineImpl extends StoryScriptEngineABC {
 
   // ── 公共入口 ──
 
-  /** 获取当前播放状态（无副作用）。 */
+  /** 获取当前播放状态——实时计算墙钟时间（含阶段内偏移，非阶段起始快照）。 */
   getCurrentState(): StoryPlaybackState {
-    return { ...this.state };
+    const base = { ...this.state };
+    // 播放中：阶段起始时间 + 已累积播放 + 当前墙钟偏移
+    if (base.isPlaying && this.stageStartWallClock > 0) {
+      const wallMs = Date.now() - this.stageStartWallClock;
+      const totalPlayedS = (this.elapsedInStage + wallMs) / 1000;
+      base.elapsedTime = Math.min(base.totalDuration, base.elapsedTime + totalPlayedS);
+      base.progress = base.elapsedTime / base.totalDuration;
+    } else if (!base.isPlaying && this.elapsedInStage > 0) {
+      // 暂停中：仅包含已累积的播放时间（不含暂停间隙）
+      const playedS = this.elapsedInStage / 1000;
+      base.elapsedTime = Math.min(base.totalDuration, base.elapsedTime + playedS);
+      base.progress = base.elapsedTime / base.totalDuration;
+    }
+    return base;
   }
 
   // ── 事件系统 ──
@@ -167,7 +180,8 @@ export class StoryScriptEngineImpl extends StoryScriptEngineABC {
       isInterrupted: false,
     };
 
-    // 重新进入当前阶段
+    // 重新进入当前阶段——先重置墙钟，确保 getCurrentState() 不包含暂停间隙
+    this.stageStartWallClock = Date.now();
     await this.enterStage(currentStage);
 
     // 恢复阶段内定时器（使用剩余时间）
