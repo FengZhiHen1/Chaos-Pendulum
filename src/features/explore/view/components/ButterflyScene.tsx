@@ -1,9 +1,5 @@
 /**
- * ButterflyScene — 单 Canvas 内同时渲染双摆对比。
- *
- * 摆 A（金色，左侧 x=-1.5）和摆 B（紫色，右侧 x=+1.5）独立渲染，
- * 各有独立尾迹。共用光源、网格、相机、OrbitControls。
- * 不创建独立 Canvas——嵌入主 Scene3D。
+ * ButterflyScene — 单 Canvas 双摆并排 3D 渲染。
  */
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -13,222 +9,146 @@ import { Vector3 } from "three";
 import { useButterflyStore } from "../../store";
 import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapters/orbitControlsAdapterSingleton";
 
-/** 两侧水平偏移量（世界坐标） */
-const X_OFFSET_A = -1.5;
-const X_OFFSET_B = 1.5;
-/** 尾迹最大点数 */
-const TRAIL_MAX = 300;
-/** 基础杆半径 */
-const BASE_RADIUS = 0.02;
-/** 默认圆柱高度 */
-const CYLINDER_HEIGHT = 1.0;
+const X_OFF = 1.6;
+const TRAIL_LEN = 400;
+const ROD_R = 0.025;
+const BALL_MIN = 0.07;
+const BALL_MAX = 0.18;
+const CYL_H = 1.0;
 
-const BALL_COLOR_A = "#FBBF24";
-const BALL_COLOR_B = "#A78BFA";
-const TRAIL_COLOR_A = "#FBBF24";
-const TRAIL_COLOR_B = "#A78BFA";
+const GOLD = "#FBBF24";
+const PURPLE = "#A78BFA";
+const ROD_C = "#C0C4CC";
 
-interface ButterflySceneContentProps {
-  environment: "dark-lab" | "white-teaching";
-  enableShadows: boolean;
-  showGrid: boolean;
-}
+interface Props { environment: "dark-lab" | "white-teaching"; enableShadows: boolean; showGrid: boolean; }
 
-export function ButterflySceneContent({
-  environment, enableShadows, showGrid,
-}: ButterflySceneContentProps) {
+export function ButterflySceneContent({ environment, enableShadows, showGrid }: Props) {
   const orbitRef = useRef<any>(null);
-  const orbitInjectedRef = useRef(false);
+  const injectedRef = useRef(false);
+  const lastM1 = useRef(0); const lastM2 = useRef(0);
 
-  // 摆臂和球 refs
-  const arm1ARef = useRef<THREE.Mesh>(null);
-  const arm2ARef = useRef<THREE.Mesh>(null);
-  const ball1ARef = useRef<THREE.Mesh>(null);
-  const ball2ARef = useRef<THREE.Mesh>(null);
-  const arm1BRef = useRef<THREE.Mesh>(null);
-  const arm2BRef = useRef<THREE.Mesh>(null);
-  const ball1BRef = useRef<THREE.Mesh>(null);
-  const ball2BRef = useRef<THREE.Mesh>(null);
+  // 摆 A
+  const aA1 = useRef<THREE.Mesh>(null); const aA2 = useRef<THREE.Mesh>(null);
+  const bA1 = useRef<THREE.Mesh>(null); const bA2 = useRef<THREE.Mesh>(null);
+  // 摆 B
+  const aB1 = useRef<THREE.Mesh>(null); const aB2 = useRef<THREE.Mesh>(null);
+  const bB1 = useRef<THREE.Mesh>(null); const bB2 = useRef<THREE.Mesh>(null);
+  // 尾迹
+  const tA = useRef<THREE.Line>(null); const tB = useRef<THREE.Line>(null);
+  const ptsA = useRef<THREE.Vector3[]>([]); const ptsB = useRef<THREE.Vector3[]>([]);
 
-  // 尾迹线 ref
-  const trailARef = useRef<THREE.Line>(null);
-  const trailBRef = useRef<THREE.Line>(null);
-
-  // 尾迹历史（模块级持久化）
-  const trailA = useRef<THREE.Vector3[]>([]);
-  const trailB = useRef<THREE.Vector3[]>([]);
-
-  // OrbitControls 注入（复用全局适配器）
   useEffect(() => {
-    let attempts = 0;
+    let n = 0;
     const id = setInterval(() => {
-      if (orbitInjectedRef.current) { clearInterval(id); return; }
-      if (orbitRef.current) {
-        globalOrbitControlsAdapter.injectControls(orbitRef.current);
-        orbitInjectedRef.current = true;
-        clearInterval(id);
-      }
-      if (++attempts >= 50) clearInterval(id);
+      if (injectedRef.current) { clearInterval(id); return; }
+      if (orbitRef.current) { globalOrbitControlsAdapter.injectControls(orbitRef.current); injectedRef.current = true; clearInterval(id); }
+      if (++n >= 50) clearInterval(id);
     }, 100);
     return () => clearInterval(id);
   }, []);
 
-  // 环境配置
-  const envConfig = useMemo(() => {
-    const configs: Record<string, { ambientIntensity: number; spotIntensity: number; spotPosition: Vector3; gridColor: string }> = {
-      "dark-lab": { ambientIntensity: 0.15, spotIntensity: 8, spotPosition: new Vector3(3, 5, 2), gridColor: "#1a1a2e" },
-      "white-teaching": { ambientIntensity: 1.0, spotIntensity: 0, spotPosition: new Vector3(0, 0, 0), gridColor: "#cccccc" },
-    };
-    return configs[environment] ?? configs["dark-lab"]!;
-  }, [environment]);
+  const env = useMemo(() => ({
+    "dark-lab": { amb: 0.12, spot: 10, spotPos: new Vector3(0, 6, 3), grid: "#1a1a2e" },
+    "white-teaching": { amb: 1, spot: 0, spotPos: new Vector3(0, 0, 0), grid: "#cccccc" },
+  }[environment] ?? { amb: 0.12, spot: 10, spotPos: new Vector3(0, 6, 3), grid: "#1a1a2e" }), [environment]);
 
-  /** 更新单侧摆臂+球位置 */
-  function updateSide(
-    xOff: number,
-    x1: number, y1: number, x2: number, y2: number,
-    arm1: THREE.Mesh | null, arm2: THREE.Mesh | null,
-    ball1: THREE.Mesh | null, ball2: THREE.Mesh | null,
-    L1: number, L2: number,
-  ) {
-    const b1Pos = new Vector3(x1 + xOff, y1, 0);
-    const b2Pos = new Vector3(x2 + xOff, y2, 0);
-    const pivot = new Vector3(xOff, 0, 0);
-
-    if (ball1) ball1.position.copy(b1Pos);
-    if (ball2) ball2.position.copy(b2Pos);
-
-    const updateArm = (mesh: THREE.Mesh | null, start: Vector3, end: Vector3, length: number) => {
-      if (!mesh) return;
-      const dir = end.clone().sub(start);
-      const dist = dir.length();
-      if (dist < 0.001) { mesh.visible = false; return; }
-      mesh.visible = true;
-      dir.normalize();
-      mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
-      mesh.scale.y = length / CYLINDER_HEIGHT;
-      mesh.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir));
-    };
-    updateArm(arm1, pivot, b1Pos, L1);
-    updateArm(arm2, b1Pos, b2Pos, L2);
-  }
-
-  /** 更新尾迹线几何 */
-  function updateTrail(line: THREE.Line | null, points: THREE.Vector3[]) {
-    if (!line || points.length < 2) { if (line) line.visible = false; return; }
-    line.visible = true;
-    const arr: number[] = [];
-    for (const p of points) { arr.push(p.x, p.y, p.z); }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
-    line.geometry.dispose();
-    line.geometry = geo;
-  }
+  function ballR(m: number) { return Math.max(BALL_MIN, Math.min(BALL_MAX, 0.08 * Math.pow(Math.max(m, 0.1), 1 / 3))); }
 
   useFrame(() => {
     const bf = useButterflyStore.getState();
-    const sA = bf.sideA;
-    const sB = bf.sideB;
+    const p = bf.sideA.params;
 
-    updateSide(X_OFFSET_A, sA.x1, sA.y1, sA.x2, sA.y2,
-      arm1ARef.current, arm2ARef.current, ball1ARef.current, ball2ARef.current,
-      sA.params.L1, sA.params.L2);
-    updateSide(X_OFFSET_B, sB.x1, sB.y1, sB.x2, sB.y2,
-      arm1BRef.current, arm2BRef.current, ball1BRef.current, ball2BRef.current,
-      sB.params.L1, sB.params.L2);
+    // 动态球半径
+    if (p.m1 !== lastM1.current || p.m2 !== lastM2.current) {
+      lastM1.current = p.m1; lastM2.current = p.m2;
+      const r1 = ballR(p.m1); const r2 = ballR(p.m2);
+      [bA1, bB1].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r1, 48, 48); } });
+      [bA2, bB2].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r2, 48, 48); } });
+    }
 
-    // 运行中才追加尾迹
+    updateSide(-X_OFF, bf.sideA, aA1.current, aA2.current, bA1.current, bA2.current);
+    updateSide( X_OFF, bf.sideB, aB1.current, aB2.current, bB1.current, bB2.current);
+
     if (bf.isRunning) {
-      trailA.current.push(new Vector3(sA.x2 + X_OFFSET_A, sA.y2, 0));
-      trailB.current.push(new Vector3(sB.x2 + X_OFFSET_B, sB.y2, 0));
-      if (trailA.current.length > TRAIL_MAX) trailA.current = trailA.current.slice(-TRAIL_MAX);
-      if (trailB.current.length > TRAIL_MAX) trailB.current = trailB.current.slice(-TRAIL_MAX);
+      ptsA.current.push(new Vector3(bf.sideA.x2 - X_OFF, bf.sideA.y2, 0));
+      ptsB.current.push(new Vector3(bf.sideB.x2 + X_OFF, bf.sideB.y2, 0));
+      if (ptsA.current.length > TRAIL_LEN) ptsA.current = ptsA.current.slice(-TRAIL_LEN);
+      if (ptsB.current.length > TRAIL_LEN) ptsB.current = ptsB.current.slice(-TRAIL_LEN);
     }
-    if (bf.trailClearSignal) {
-      trailA.current = [];
-      trailB.current = [];
-    }
-
-    updateTrail(trailARef.current, trailA.current);
-    updateTrail(trailBRef.current, trailB.current);
+    updTrail(tA.current, ptsA.current);
+    updTrail(tB.current, ptsB.current);
   });
 
   return (
     <>
-      <ambientLight intensity={envConfig.ambientIntensity} />
-      {envConfig.spotIntensity > 0 && (
-        <SpotLight position={[envConfig.spotPosition.x, envConfig.spotPosition.y, envConfig.spotPosition.z]}
-          intensity={envConfig.spotIntensity} castShadow={enableShadows}
-          shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
-      )}
-      {showGrid && (
-        <Grid position={[0, -3, 0]} args={[20, 20]} cellSize={0.5} cellThickness={0.5}
-          cellColor={envConfig.gridColor} fadeDistance={8} />
-      )}
+      <ambientLight intensity={env.amb} />
+      {env.spot > 0 && <SpotLight position={[env.spotPos.x, env.spotPos.y, env.spotPos.z]}
+        intensity={env.spot} castShadow={enableShadows}
+        shadow-mapSize-width={1024} shadow-mapSize-height={1024} />}
+      {showGrid && <Grid position={[0, -3, 0]} args={[24, 24]} cellSize={0.5} cellThickness={0.5}
+        cellColor={env.grid} fadeDistance={10} />}
 
-      {/* 摆 A — 金色 */}
-      <mesh ref={arm1ARef}>
-        <cylinderGeometry args={[BASE_RADIUS, BASE_RADIUS, CYLINDER_HEIGHT, 32]} />
-        <meshStandardMaterial color="#D4D9E0" metalness={0.9} roughness={0.12} />
-      </mesh>
-      <mesh ref={ball1ARef}>
-        <sphereGeometry args={[0.08, 64, 64]} />
-        <meshStandardMaterial color={BALL_COLOR_A} metalness={0.3} roughness={0.3} />
-      </mesh>
-      <mesh ref={arm2ARef}>
-        <cylinderGeometry args={[BASE_RADIUS, BASE_RADIUS, CYLINDER_HEIGHT, 32]} />
-        <meshStandardMaterial color="#D4D9E0" metalness={0.9} roughness={0.12} />
-      </mesh>
-      <mesh ref={ball2ARef}>
-        <sphereGeometry args={[0.08, 64, 64]} />
-        <meshStandardMaterial color={BALL_COLOR_A} metalness={0.3} roughness={0.3} />
-      </mesh>
-
-      {/* 摆 B — 紫色 */}
-      <mesh ref={arm1BRef}>
-        <cylinderGeometry args={[BASE_RADIUS, BASE_RADIUS, CYLINDER_HEIGHT, 32]} />
-        <meshStandardMaterial color="#D4D9E0" metalness={0.9} roughness={0.12} />
-      </mesh>
-      <mesh ref={ball1BRef}>
-        <sphereGeometry args={[0.08, 64, 64]} />
-        <meshStandardMaterial color={BALL_COLOR_B} metalness={0.3} roughness={0.3} />
-      </mesh>
-      <mesh ref={arm2BRef}>
-        <cylinderGeometry args={[BASE_RADIUS, BASE_RADIUS, CYLINDER_HEIGHT, 32]} />
-        <meshStandardMaterial color="#D4D9E0" metalness={0.9} roughness={0.12} />
-      </mesh>
-      <mesh ref={ball2BRef}>
-        <sphereGeometry args={[0.08, 64, 64]} />
-        <meshStandardMaterial color={BALL_COLOR_B} metalness={0.3} roughness={0.3} />
-      </mesh>
-
-      {/* 尾迹线 */}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <line ref={trailARef as any}>
-        <bufferGeometry />
-        <lineBasicMaterial color={TRAIL_COLOR_A} transparent opacity={0.7} depthTest />
-      </line>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <line ref={trailBRef as any}>
-        <bufferGeometry />
-        <lineBasicMaterial color={TRAIL_COLOR_B} transparent opacity={0.7} depthTest />
-      </line>
-
-      {/* 分隔竖线 */}
+      {/* 分隔线 */}
       <line>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[new Float32Array([0, -3, 0, 0, 2, 0]), 3]}
-            count={2}
-            itemSize={3}
-          />
+          <bufferAttribute attach="attributes-position"
+            args={[new Float32Array([0, -3.5, 0, 0, 2.2, 0]), 3]} count={2} itemSize={3} />
         </bufferGeometry>
-        <lineBasicMaterial color="#ffffff" transparent opacity={0.15} />
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.2} />
       </line>
 
+      {/* 支点标记 */}
+      <mesh position={[-X_OFF, 0, 0]}><sphereGeometry args={[0.06, 16, 16]} /><meshBasicMaterial color={GOLD} /></mesh>
+      <mesh position={[ X_OFF, 0, 0]}><sphereGeometry args={[0.06, 16, 16]} /><meshBasicMaterial color={PURPLE} /></mesh>
+
+      {/* 摆 A */}
+      <mesh ref={aA1}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
+      <mesh ref={bA1}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={GOLD} metalness={0.25} roughness={0.25} /></mesh>
+      <mesh ref={aA2}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
+      <mesh ref={bA2}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={GOLD} metalness={0.25} roughness={0.25} /></mesh>
+
+      {/* 摆 B */}
+      <mesh ref={aB1}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
+      <mesh ref={bB1}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={PURPLE} metalness={0.25} roughness={0.25} /></mesh>
+      <mesh ref={aB2}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
+      <mesh ref={bB2}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={PURPLE} metalness={0.25} roughness={0.25} /></mesh>
+
+      {/* 尾迹 */}
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <line ref={tA as any}><bufferGeometry /><lineBasicMaterial color={GOLD} transparent opacity={0.55} depthTest={false} /></line>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <line ref={tB as any}><bufferGeometry /><lineBasicMaterial color={PURPLE} transparent opacity={0.55} depthTest={false} /></line>
+
       <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08}
-        minDistance={2} maxDistance={12} maxPolarAngle={Math.PI}
-        target={[0, -1, 0]} />
+        minDistance={2} maxDistance={14} maxPolarAngle={Math.PI} target={[0, -1, 0]} />
     </>
   );
+}
+
+function updateSide(xOff: number, s: { x1: number; y1: number; x2: number; y2: number; params: { L1: number; L2: number } }, a1: THREE.Mesh | null, a2: THREE.Mesh | null, b1: THREE.Mesh | null, b2: THREE.Mesh | null) {
+  const p1 = new Vector3(s.x1 + xOff, s.y1, 0);
+  const p2 = new Vector3(s.x2 + xOff, s.y2, 0);
+  const piv = new Vector3(xOff, 0, 0);
+  if (b1) b1.position.copy(p1);
+  if (b2) b2.position.copy(p2);
+  updArm(a1, piv, p1, s.params.L1);
+  updArm(a2, p1, p2, s.params.L2);
+}
+
+function updArm(m: THREE.Mesh | null, s: Vector3, e: Vector3, len: number) {
+  if (!m) return; const d = e.clone().sub(s); const dist = d.length();
+  if (dist < 0.001) { m.visible = false; return; }
+  m.visible = true; d.normalize();
+  m.position.copy(s.clone().add(e).multiplyScalar(0.5));
+  m.scale.y = len / CYL_H;
+  m.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), d));
+}
+
+function updTrail(line: THREE.Line | null, pts: THREE.Vector3[]) {
+  if (!line || pts.length < 2) { if (line) line.visible = false; return; }
+  line.visible = true;
+  const a: number[] = []; for (const p of pts) a.push(p.x, p.y, p.z);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(a, 3));
+  line.geometry.dispose(); line.geometry = g;
 }
