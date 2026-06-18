@@ -131,6 +131,8 @@ export function ExplorePage() {
 
   /** 估算历史帧数（≈60fps），用于底部工具栏的禁用状态 */
   const estimatedHistoryFrames = Math.floor(simulationTime * 60);
+  /** 蝴蝶效应当前展示的摆侧 */
+  const [bfActiveSide, setBfActiveSide] = useState<"A" | "B">("A");
 
   const handleStartTimeReversal = useCallback(() => {
     commandBus.emit({ type: "scheduler:pause" });
@@ -172,24 +174,8 @@ export function ExplorePage() {
     setRunning(!isRunning);
   }, [isRunning, setRunning]);
 
-  // 蝴蝶效应分屏状态
-  if (butterflyActive) {
-    return (
-      <div className="w-full h-full relative">
-        <ButterflySplit className="w-full h-full" />
-        <button
-          type="button"
-          onClick={exitButterfly}
-          className="absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
-                     bg-separation-alert/15 text-separation-alert hover:bg-separation-alert/25
-                     border border-separation-alert/20 transition-all duration-200"
-        >
-          <X className="w-3.5 h-3.5" />
-          退出蝴蝶效应
-        </button>
-      </div>
-    );
-  }
+  // 蝴蝶效应分屏状态：overlay 到主布局上，不复用独立 Canvas
+  // 避免 WebGL context 迁移导致 Context Lost（Chrome 单 context 竞态）
 
   return (
     <div className="w-full h-full flex flex-col bg-surface">
@@ -220,6 +206,7 @@ export function ExplorePage() {
             environment={environment}
             showGrid
             enableShadows
+            butterflySide={butterflyActive ? bfActiveSide : undefined}
             canvasChildren={<TimeReversalTrajectoryOverlay />}
           />
 
@@ -234,6 +221,17 @@ export function ExplorePage() {
 
           {/* 时间反演实验 — 组件自行管理显隐 */}
           <TimeReversal />
+
+          {/* 蝴蝶效应 overlay — 复用主 Canvas，仅渲染工具栏+警报 */}
+          {butterflyActive && (
+            <div className="absolute inset-0 z-20 pointer-events-none">
+              <ButterflySplit
+                activeSide={bfActiveSide}
+                onSwitchSide={setBfActiveSide}
+                onExit={exitButterfly}
+              />
+            </div>
+          )}
         </section>
 
         {/* 右侧面板 (320px) — 桌面端 */}

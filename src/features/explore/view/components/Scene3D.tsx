@@ -169,20 +169,11 @@ export function Scene3D({
     );
   }
 
-  // 诊断: Canvas 挂载/卸载跟踪
-  useEffect(() => {
-    const label = butterflySide ? `BF-${butterflySide}` : "main";
-    console.log(`[WebGL] 挂载: ${label}, DOM canvas=${document.querySelectorAll("canvas").length}`);
-    return () => {
-      console.log(`[WebGL] 卸载: ${label}, DOM canvas=${document.querySelectorAll("canvas").length}`);
-    };
-  }, [butterflySide]);
-
   return (
     <div ref={stageRef} className={`relative ${className}`}>
       <Canvas shadows={effectiveEnableShadows} camera={{ fov: 45, position: [3.0, 0.6, 2.2] }}
         frameloop="always" style={{ background: envConfig.background }}
-        onCreated={({ gl }) => { if (gl) { gl.shadowMap.type = THREE.PCFShadowMap; onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement }); console.log(`[WebGL] renderer 创建: ${butterflySide ? `BF-${butterflySide}` : "main"}, canvas数=${document.querySelectorAll("canvas").length}`); }}}>
+        onCreated={({ gl }) => { if (gl) { gl.shadowMap.type = THREE.PCFShadowMap; onCanvasCreated(gl as unknown as { domElement: HTMLCanvasElement }); } }}>
         <SceneContent
           environment={environment}
           enableShadows={effectiveEnableShadows} showGrid={effectiveShowGrid}
