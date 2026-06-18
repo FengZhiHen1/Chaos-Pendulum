@@ -282,6 +282,9 @@ export function setupSimulationBridge(): () => void {
       if (state.isRunning) {
         s.start(state.params, state.initialConditions, state.method);
         needsInit = false;
+        if (!useRootStore.getState().hasSimulationInitialized) {
+          useRootStore.getState().setSimulationInitialized();
+        }
       }
     }
 
@@ -293,6 +296,9 @@ export function setupSimulationBridge(): () => void {
         if (needsInit) {
           s.start(state.params, state.initialConditions, state.method);
           needsInit = false;
+          if (!useRootStore.getState().hasSimulationInitialized) {
+            useRootStore.getState().setSimulationInitialized();
+          }
         } else {
           s.resume();
         }

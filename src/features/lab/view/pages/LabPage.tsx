@@ -149,6 +149,7 @@ export function LabPage() {
   const activeTemplate = useLabStore((s) => s.activeTemplate);
   const setUserCode = useLabStore((s) => s.setUserCode);
   const isWorkerReady = useSimulationStore((s) => s.isWorkerReady);
+  const hasSimulationInitialized = useSimulationStore((s) => s.hasSimulationInitialized);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -228,12 +229,16 @@ export function LabPage() {
               </p>
             </div>
 
-            {/* Worker 未就绪 */}
-            {!isWorkerReady && (
+            {/* Worker 未就绪 / 仿真未初始化 */}
+            {(!isWorkerReady || !hasSimulationInitialized) && (
               <div className="px-3 py-2.5 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 space-y-1">
-                <p className="text-[10px] text-amber-300/90 font-medium">仿真引擎未就绪</p>
+                <p className="text-[10px] text-amber-300/90 font-medium">
+                  {!isWorkerReady ? "仿真引擎未就绪" : "仿真尚未初始化"}
+                </p>
                 <p className="text-[9px] text-amber-300/60 leading-relaxed">
-                  请先切换到「探索模式」并点击播放按钮启动 Worker。
+                  {!isWorkerReady
+                    ? "请先切换到「探索模式」并点击播放按钮启动 Worker。"
+                    : "请先切换到「探索模式」点击播放按钮启动仿真，完成初始化后再返回此页面运行验证。"}
                 </p>
               </div>
             )}
@@ -256,12 +261,14 @@ export function LabPage() {
             <button
               type="button"
               onClick={handleRunValidation}
-              disabled={validationRunning}
+              disabled={validationRunning || !isWorkerReady || !hasSimulationInitialized}
               className={cn(
                 "flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 w-full",
                 validationRunning
                   ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-wait"
-                  : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98] shadow-sm shadow-primary/10",
+                  : (!isWorkerReady || !hasSimulationInitialized)
+                    ? "bg-surface-container text-on-surface-variant/40 border border-white/5 cursor-not-allowed"
+                    : "bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98] shadow-sm shadow-primary/10",
               )}
             >
               {validationRunning ? (

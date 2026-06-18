@@ -73,6 +73,8 @@ export interface SimulationSlice extends SimulationFrame {
   isRunning: boolean;
   /** Worker 是否已就绪（ready 消息已到达）。false 时参数面板应显示加载态。 */
   isWorkerReady: boolean;
+  /** 仿真是否已至少初始化过一次（scheduler.start() 已调用）。用于先验检测，防止未初始化时触发验证导致卡死。 */
+  hasSimulationInitialized: boolean;
   engineError: string | null;
   /** 引擎事件通知（供 toast UI 消费）。消费后应设为 null。 */
   engineEvent: { type: "recovered"; message: string } | null;
@@ -105,6 +107,7 @@ export interface SimulationSlice extends SimulationFrame {
   setParams: (patch: Partial<PendulumParams>) => void;
   setMethod: (method: IntegratorMethod) => void;
   setRunning: (running: boolean) => void;
+  setSimulationInitialized: () => void;
   setEngineError: (error: string | null) => void;
   consumeFrameFromBuffer: (buffer: Float64Array, frameIndex: number) => void;
   incrementResetTrigger: () => void;
@@ -221,6 +224,7 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
 
   isRunning: false,
   isWorkerReady: false,
+  hasSimulationInitialized: false,
   engineError: null,
   engineEvent: null,
   resetTrigger: 0,
@@ -304,6 +308,8 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
   setMethod: (method) => set({ method, paramsDirty: true }),
 
   setRunning: (isRunning) => set({ isRunning }),
+
+  setSimulationInitialized: () => set({ hasSimulationInitialized: true }),
 
   setRunPhase: (runPhase) => {
     const isRunning = runPhase === "running" || runPhase === "reversed";

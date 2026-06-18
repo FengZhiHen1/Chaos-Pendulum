@@ -21,6 +21,8 @@ const ALL_TESTS = ["smallAngle", "singlePendulum", "energy"] as const;
 
 const WORKER_NOT_READY_MSG =
   "仿真引擎未就绪。请先切换到「探索模式」点击播放按钮启动仿真，再返回此页面运行验证。";
+const SIMULATION_NOT_STARTED_MSG =
+  "仿真尚未启动。请先切换到「探索模式」点击播放按钮启动仿真，完成初始化后再运行验证。";
 
 export function useLabValidation(): UseLabValidationAPI {
   const validationResults = useLabStore((s) => s.validationResults);
@@ -42,11 +44,20 @@ export function useLabValidation(): UseLabValidationAPI {
   const handleRunValidation = useCallback(() => {
     console.log("[useLabValidation] handleRunValidation 被调用");
     const simStore = useSimulationStore.getState();
-    console.log(`[useLabValidation] isWorkerReady=${simStore.isWorkerReady}, isRunning=${simStore.isRunning}`);
+    console.log(`[useLabValidation] isWorkerReady=${simStore.isWorkerReady}, isRunning=${simStore.isRunning}, hasSimulationInitialized=${simStore.hasSimulationInitialized}`);
+    // 先验检测：Worker 必须已注入且仿真已至少启动过一次（init 已发送），
+    // 否则 Worker 内部 state/params 为 null，runValidation 会触发 error 响应导致卡死。
     if (!simStore.isWorkerReady) {
       console.warn("[useLabValidation] Worker 未就绪，中止验证");
       for (const test of ALL_TESTS) {
         setValidationDetail(test, WORKER_NOT_READY_MSG);
+      }
+      return;
+    }
+    if (!simStore.hasSimulationInitialized) {
+      console.warn("[useLabValidation] 仿真尚未初始化，中止验证");
+      for (const test of ALL_TESTS) {
+        setValidationDetail(test, SIMULATION_NOT_STARTED_MSG);
       }
       return;
     }

@@ -34,11 +34,14 @@ export function useForceAnalysis(): UseForceAnalysisAPI {
       const wasRunning = useSimulationStore.getState().isRunning;
       wasRunningRef.current = wasRunning;
       setForceActive(true);
-      getScheduler().setComputeForces(true);
       // 若仿真未运行则自动启动，确保力数据立即开始计算
+      // 注意：必须在 setComputeForces(true) 之前调用 setRunning(true)，
+      // 否则 scheduler.start() → sendInit() → resetWorkerState() 会将
+      // Worker 的 computeForces 重置为 false，导致力数据永远不产生。
       if (!wasRunning) {
         setRunning(true);
       }
+      getScheduler().setComputeForces(true);
     } else {
       // 退出受力分析模式：关闭力计算，恢复进入前的运行状态
       setForceActive(false);
