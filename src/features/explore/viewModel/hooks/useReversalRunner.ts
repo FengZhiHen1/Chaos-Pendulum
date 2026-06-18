@@ -128,14 +128,16 @@ export function useReversalRunner(): ReversalRunnerAPI {
 
   // ── 叙事阶段：根据漂移数据自动判定 ──
   const maxDrift = driftHistory.length > 0 ? Math.max(...driftHistory.map((d) => d.driftDistance)) : 0;
-  const separationSample = driftHistory.find((d) => d.driftDistance > REVERSAL_DEFAULTS.teachingThreshold);
+  /** 可观测分离阈值：漂移 > 0.001 视为出现可见偏离 */
+  const VISIBLE_THRESHOLD = 0.001;
+  const separationSample = driftHistory.find((d) => d.driftDistance > VISIBLE_THRESHOLD);
   /** 叙事阶段：coinciding(重合期) → separating(分离期) → diverging(发散期) */
   const narrativePhase: "coinciding" | "separating" | "diverging" =
     phase === "completed" ? "diverging"
-    : maxDrift < REVERSAL_DEFAULTS.teachingThreshold ? "coinciding"
-    : maxDrift < REVERSAL_DEFAULTS.teachingThreshold * 10 ? "separating"
+    : maxDrift < VISIBLE_THRESHOLD ? "coinciding"
+    : maxDrift < VISIBLE_THRESHOLD * 100 ? "separating"
     : "diverging";
-  /** 首次分离的反演时间（秒），null 表示尚未分离 */
+  /** 首次可观测分离的反演时间（秒），null 表示尚未分离 */
   const separationStartTime: number | null = separationSample?.reversalTime ?? null;
   /** 反演已进行的时间（秒） */
   const elapsedReversalTime = driftHistory.length > 0 ? driftHistory[driftHistory.length - 1]!.reversalTime : 0;
