@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -6,8 +6,11 @@ import { useSimulationStore } from "@/features/simulation";
 import { normalizeAngle } from "@/features/simulation";
 import { DEFAULT_ENERGY_LANDSCAPE_CONFIG } from "../../contracts";
 import {
+  computePotential,
+  generateContourTexture,
+} from "./EnergyLandscapeUtils";
+import {
   SURFACE,
-  SURFACE_CONTAINER_HIGH,
   ON_SURFACE_VARIANT,
   PRIMARY,
   LYAPUNOV_STABLE,
@@ -36,16 +39,6 @@ export function EnergyLandscape() {
   );
 }
 
-/** 势能函数 V(θ₁,θ₂) = -m₁·g·L₁·cos(θ₁) - m₂·g·(L₁·cos(θ₁) + L₂·cos(θ₂)) */
-function computePotential(
-  theta1: number,
-  theta2: number,
-  m1: number, m2: number, L1: number, L2: number, g: number,
-): number {
-  return -m1 * g * L1 * Math.cos(theta1)
-    - m2 * g * (L1 * Math.cos(theta1) + L2 * Math.cos(theta2));
-}
-
 function EnergyLandscapeScene() {
   const params = useSimulationStore((s) => s.params);
   const theta1 = useSimulationStore((s) => s.theta1);
@@ -58,7 +51,20 @@ function EnergyLandscapeScene() {
   const { resolution, thetaRange, opacity } = config;
   const [tMin, tMax] = thetaRange;
   const planeSize = tMax - tMin; // 2*Math.PI when [-π, π]
-  // 构建势能曲面几何
+
+  // ── 等高线 CanvasTexture ──────────────────────────
+  const contourTexture = useMemo(
+    () => generateContourTexture(params, config),
+    [params.m1, params.m2, params.L1, params.L2, params.g],
+  );
+  // 参数变化时释放旧纹理
+  useEffect(() => {
+    return () => {
+      contourTexture?.dispose();
+    };
+  }, [contourTexture]);
+
+  // ── 构建势能曲面几何
   const geometry = useMemo(() => {
     // 释放旧几何体 GPU 内存
     if (prevGeoRef.current) { prevGeoRef.current.dispose(); }
@@ -130,11 +136,15 @@ function EnergyLandscapeScene() {
           shininess={10}
         />
       </mesh>
-      {/* 底部等高线投影（半透明网格平面） */}
-      {config.showContours && (
+      {/* 底部等高线投影（CanvasTexture 精确等高线） */}
+      {config.showContours && contourTexture && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -5]}>
-          <planeGeometry args={[planeSize, planeSize, 20, 20]} />
-          <meshBasicMaterial color={SURFACE_CONTAINER_HIGH} transparent opacity={0.2} wireframe />
+          <planeGeometry args={[planeSize, planeSize]} />
+          <meshBasicMaterial
+            map={contourTexture}
+            transparent
+            depthWrite={false}
+          />
         </mesh>
       )}
       {/* 实时光点 */}
