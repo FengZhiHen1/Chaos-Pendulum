@@ -162,65 +162,23 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
   let frame = 0;
   ctx.batchEnergyCorrection = 0;
 
+  // 保存初始状态用于影子轨迹回放
+  const mainInitialState = new Float64Array(ctx.state);
+  const mainInitialTime = ctx.simTime;
+
   const stateBefore = new Float64Array(ctx.state);
 
+  // ═══ Phase 1: 主轨迹积分（无影子轨迹，快速回传） ═══
   for (; frame < FRAMES_PER_BATCH; frame++) {
     const varPrev = poincareConfig ? extractVariable(ctx.state, poincareConfig.variable) : null;
 
-    // 单步积分
     integratorStep(ctx.state, ctx.params, dt * ctx.direction, ctx.method);
-
     ctx.simTime += dt * ctx.direction;
 
-    // 能量投影（保守系统）
     if (ctx.projectionEnabled) {
       ctx.batchEnergyCorrection += projectEnergy(ctx.state, ctx.params, ctx.initialEnergy);
-
-      // ── Lyapunov 影子轨迹积分（保守系统下运行）──
-      const D0 = 1e-8;
-      const RENORM_INTERVAL = 60;
-
-      // 惰性初始化
-      if (!ctx.shadowState) {
-        ctx.shadowState = new Float64Array(ctx.state);
-        ctx.shadowState[0] = ctx.shadowState[0]! + D0;
-        ctx.lyapFrameCount = 0;
-      }
-
-      // 积分影子轨迹（同一积分器、同一 dt）
-      integratorStep(ctx.shadowState, ctx.params, dt * ctx.direction, ctx.method);
-      projectEnergy(ctx.shadowState, ctx.params, ctx.initialEnergy);
-      ctx.shadowState[0] = normalizeAngle(ctx.shadowState[0]!);
-      ctx.shadowState[2] = normalizeAngle(ctx.shadowState[2]!);
-      ctx.lyapFrameCount++;
-
-      // 重标定周期
-      if (ctx.lyapFrameCount >= RENORM_INTERVAL) {
-        ctx.lyapFrameCount = 0;
-        const s = ctx.state!;
-        const sh = ctx.shadowState;
-        const d0 = s[0]! - sh[0]!;
-        const d1 = s[1]! - sh[1]!;
-        const d2 = s[2]! - sh[2]!;
-        const d3 = s[3]! - sh[3]!;
-        const dist = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3);
-
-        if (dist > 0 && dist < 1e6) {
-          ctx.lyapAccum += Math.log(dist / D0);
-          ctx.lyapTime += RENORM_INTERVAL * Math.abs(dt);
-          ctx.lyapExponent = ctx.lyapAccum / Math.max(ctx.lyapTime, 1e-6);
-        }
-
-        // 重标定：影子 = 参考 + (D0/dist) * (影子 - 参考)
-        const scale = D0 / Math.max(dist, 1e-15);
-        sh[0] = s[0]! + scale * (sh[0]! - s[0]!);
-        sh[1] = s[1]! + scale * (sh[1]! - s[1]!);
-        sh[2] = s[2]! + scale * (sh[2]! - s[2]!);
-        sh[3] = s[3]! + scale * (sh[3]! - s[3]!);
-      }
     }
 
-    // NaN 检查（必须在能量投影之后）
     if (hasInvalidValue(ctx.state)) {
       ctx.phase = "error";
       transferBuffer(buffer, frame, ctx.simTime, poincarePoints, forceBuffer);
@@ -233,7 +191,6 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
       return;
     }
 
-    // 庞加莱截面穿越检测
     if (poincareConfig && varPrev !== null) {
       detectPoincareCrossing(
         stateBefore, ctx.state,
@@ -244,7 +201,6 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
 
     stateBefore.set(ctx.state);
 
-    // 反向积分回到 t=0 边界
     if (ctx.direction === -1 && ctx.simTime <= 0) {
       ctx.simTime = 0;
       const derived = computeDerived(ctx.state, ctx.params);
@@ -258,7 +214,6 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
       break;
     }
 
-    // 写入帧缓冲
     const derived = computeDerived(ctx.state, ctx.params);
     writeFrame(buffer, frame, ctx.simTime, ctx.state, derived);
 
@@ -268,18 +223,87 @@ function handleStep(cmd: { buffer: Float64Array; poincare?: PoincareSectionCondi
       updateForceExtrema(forces, ctx.simTime);
     }
 
-    // 角度归一化
     ctx.state[0] = normalizeAngle(ctx.state[0]!);
     ctx.state[2] = normalizeAngle(ctx.state[2]!);
   }
 
-  const elapsed = performance.now() - startTime;
-  if (elapsed > 50) {
-    console.warn(`[ode-worker] handleStep 耗时 ${elapsed.toFixed(1)}ms，接近帧预算`);
+  const mainEndState = new Float64Array(ctx.state);
+  const mainEndTime = ctx.simTime;
+  const mainFrameCount = frame;
+
+  const mainElapsed = performance.now() - startTime;
+  if (mainElapsed > 50) {
+    console.warn(`[ode-worker] 主轨迹耗时 ${mainElapsed.toFixed(1)}ms`);
   }
 
   ctx.phase = "idle";
-  transferBuffer(buffer, frame, ctx.simTime, poincarePoints, forceBuffer);
+
+  // ═══ 回传 Phase 1 结果（主线程立即消费） ═══
+  transferBuffer(buffer, mainFrameCount, ctx.simTime, poincarePoints, forceBuffer);
+
+  // ═══ Phase 2: 影子轨迹回放（Lyapunov 指数，后台计算） ═══
+  if (ctx.projectionEnabled) {
+    const D0 = 1e-8;
+    const RENORM_INTERVAL = 60;
+
+    // 恢复主轨迹初始状态用于确定性回放
+    ctx.state = new Float64Array(mainInitialState);
+    ctx.simTime = mainInitialTime;
+
+    if (!ctx.shadowState) {
+      ctx.shadowState = new Float64Array(ctx.state);
+      ctx.shadowState[0] = ctx.shadowState[0]! + D0;
+      ctx.lyapFrameCount = 0;
+      ctx.lyapAccum = 0;
+      ctx.lyapTime = 0;
+    }
+
+    for (let f = 0; f < mainFrameCount; f++) {
+      // 回放主轨迹
+      integratorStep(ctx.state, ctx.params, dt * ctx.direction, ctx.method);
+      ctx.simTime += dt * ctx.direction;
+      projectEnergy(ctx.state, ctx.params, ctx.initialEnergy);
+
+      // 积分影子轨迹
+      integratorStep(ctx.shadowState, ctx.params, dt * ctx.direction, ctx.method);
+      projectEnergy(ctx.shadowState, ctx.params, ctx.initialEnergy);
+      ctx.shadowState[0] = normalizeAngle(ctx.shadowState[0]!);
+      ctx.shadowState[2] = normalizeAngle(ctx.shadowState[2]!);
+      ctx.lyapFrameCount++;
+
+      ctx.state[0] = normalizeAngle(ctx.state[0]!);
+      ctx.state[2] = normalizeAngle(ctx.state[2]!);
+
+      if (ctx.lyapFrameCount >= RENORM_INTERVAL) {
+        ctx.lyapFrameCount = 0;
+        const s = ctx.state;
+        const sh = ctx.shadowState;
+        const d0 = s[0]! - sh[0]!;
+        const d1 = s[1]! - sh[1]!;
+        const d2 = s[2]! - sh[2]!;
+        const d3 = s[3]! - sh[3]!;
+        const dist = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3);
+
+        if (dist > 0 && dist < 1e6) {
+          ctx.lyapAccum += Math.log(dist / D0);
+          ctx.lyapTime += RENORM_INTERVAL * Math.abs(dt);
+          ctx.lyapExponent = ctx.lyapAccum / Math.max(ctx.lyapTime, 1e-6);
+        }
+
+        const scale = D0 / Math.max(dist, 1e-15);
+        sh[0] = s[0]! + scale * (sh[0]! - s[0]!);
+        sh[1] = s[1]! + scale * (sh[1]! - s[1]!);
+        sh[2] = s[2]! + scale * (sh[2]! - s[2]!);
+        sh[3] = s[3]! + scale * (sh[3]! - s[3]!);
+      }
+    }
+
+    // 恢复主轨迹终态
+    ctx.state = mainEndState;
+    ctx.simTime = mainEndTime;
+
+    postLyapunovUpdate();
+  }
 }
 
 // ─── 庞加莱截面穿越检测 ──────────────────────────
@@ -531,13 +555,18 @@ function transferBuffer(
     forceData: forceBuffer ?? undefined,
     forceExtrema: ctx.computeForces ? (ctx.forceExtrema ?? undefined) : undefined,
     energyCorrection: ctx.batchEnergyCorrection,
-    lyapunovExponent: ctx.projectionEnabled ? ctx.lyapExponent : undefined,
+    // Lyapunov 指数由 Phase 2 异步计算后单独回传
   };
   const transfers: Transferable[] = [buffer.buffer as ArrayBuffer];
   if (forceBuffer) {
     transfers.push(forceBuffer.buffer as ArrayBuffer);
   }
   (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(resp, transfers);
+}
+
+/** 回传 Lyapunov 指数（影子轨迹异步计算完成后调用） */
+function postLyapunovUpdate(): void {
+  postResponse({ type: "lyapunovUpdate", lyapunovExponent: ctx.lyapExponent });
 }
 
 function postResponse(resp: WorkerResponse): void {

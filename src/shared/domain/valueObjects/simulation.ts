@@ -204,7 +204,14 @@ export interface WorkerErrorResponse {
   simTime: number;
 }
 
+export interface WorkerLyapunovUpdateResponse {
+  type: "lyapunovUpdate";
+  /** 实时 Lyapunov 指数估计（影子轨迹异步计算完成后回传） */
+  lyapunovExponent: number;
+}
+
 export type WorkerResponse =
   | WorkerReadyResponse
   | WorkerBatchReadyResponse
-  | WorkerErrorResponse;
+  | WorkerErrorResponse
+  | WorkerLyapunovUpdateResponse;

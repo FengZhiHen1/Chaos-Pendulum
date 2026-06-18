@@ -205,8 +205,12 @@ export function setupSimulationBridge(): () => void {
   // 启用外部 tick 模式：数据消费由 Scene3D 的 useFrame 驱动，与渲染严格同步
   sched.enableExternalTick();
 
-  // Worker ready → 清空待发送队列
-  sched.onReady(() => setWorkerReady());
+  // Worker ready → 清空待发送队列 + 预计算首批帧
+  sched.onReady(() => {
+    setWorkerReady();
+    // 预计算首批帧覆盖在启动画面期间，首次点击启动时帧已就绪
+    if (!sched.isRunning) sched.prefetchBatch(() => {});
+  });
 
   // 庞加莱截面点到达 → 写入分析 store（保留回调以兼容 scheduler 内部的双缓冲延迟转发）
   const unsubPoincare = sched.onPoincarePoints((pts) => {
