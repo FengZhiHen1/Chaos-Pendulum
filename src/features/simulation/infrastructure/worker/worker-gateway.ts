@@ -99,6 +99,7 @@ export class WorkerGateway implements IWorkerGateway {
       console.warn(`[WorkerGateway] Worker 未注入，丢弃消息 type=${msg.type as string}`);
       return;
     }
+    console.log(`[WorkerGateway] 发送消息 type=${msg.type as string}, worker=${!!this.worker}`);
     if (transferable?.length) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- postMessage transfer 参数类型
       (this.worker.postMessage as (msg: unknown, transfer: ArrayBuffer[]) => void)(msg, transferable);
