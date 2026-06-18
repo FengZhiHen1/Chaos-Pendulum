@@ -206,7 +206,7 @@ export const createButterflySlice: StateCreator<ButterflySlice, [], [], Butterfl
 
   setDelta: (deltaDeg) => {
     const clamped = Math.max(
-      0,
+      BUTTERFLY_DEFAULTS.minDeltaDeg,
       Math.min(BUTTERFLY_DEFAULTS.maxDeltaDeg, deltaDeg),
     );
     set({ deltaDeg: clamped });

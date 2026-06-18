@@ -131,10 +131,10 @@ describe("ButterflySimStore", () => {
     expect(useButterflyStore.getState().deltaDeg).toBe(10.0);
   });
 
-  it("setDelta clamp 到 0° 下限", () => {
+  it("setDelta clamp 到 1e-6° 下限", () => {
     const store = useButterflyStore.getState();
     store.setDelta(-5.0);
-    expect(useButterflyStore.getState().deltaDeg).toBe(0);
+    expect(useButterflyStore.getState().deltaDeg).toBe(1e-6);
   });
 
   // ── reset ──

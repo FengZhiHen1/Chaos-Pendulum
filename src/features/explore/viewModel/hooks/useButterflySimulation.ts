@@ -3,6 +3,7 @@ import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useRootStore } from "@/stores/rootStore";
 import { ButterflyScheduler } from "../../butterfly-scheduler";
+import { BUTTERFLY_DEFAULTS } from "../../contracts";
 
 // ─── 全局单例管理 ──────────────────────────────
 
@@ -48,16 +49,12 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
     schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
   }, [butterflyDelta]);
 
-  // Delta 变化时重建
+  // Delta 变化时平滑更新（仅 reset 摆 B 的初始条件，不销毁 Worker）
   const prevDeltaRef = useRef(butterflyDelta);
   useEffect(() => {
     if (prevDeltaRef.current === butterflyDelta) return;
     prevDeltaRef.current = butterflyDelta;
-
-    const simStore = useSimulationStore.getState();
-    useRootStore.getState().reset();
-    schedulerRef.current.reset();
-    schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    schedulerRef.current.setDelta(butterflyDelta);
   }, [butterflyDelta]);
 
   // 卸载清理
@@ -79,7 +76,10 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
 
   const handleDeltaChange = useCallback(
     (deltaDeg: number) => {
-      const clamped = Math.max(0, Math.min(10.0, deltaDeg));
+      const clamped = Math.max(
+        BUTTERFLY_DEFAULTS.minDeltaDeg,
+        Math.min(BUTTERFLY_DEFAULTS.maxDeltaDeg, deltaDeg),
+      );
       setButterflyDelta(clamped);
     },
     [setButterflyDelta],

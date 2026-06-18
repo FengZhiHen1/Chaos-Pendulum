@@ -122,9 +122,9 @@ export function DeltaPanel({
         <span className="text-on-surface-variant">δ:</span>
         <input
           type="number"
-          min={0}
+          min={1e-6}
           max={10}
-          step={0.1}
+          step={0.000001}
           value={deltaDeg}
           onChange={(e) => onDeltaChange(parseFloat(e.target.value) || 0)}
           className="w-16 h-6 px-1 rounded bg-surface-container-high border border-outline-variant/30 text-on-surface text-[11px] focus-visible:outline-none focus-visible:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary-focus-glow"

@@ -73,7 +73,8 @@ export const createExploreSlice: StateCreator<ExploreSlice, [], [], ExploreSlice
   setTrailLength: (trailLength) => set({ trailLength }),
   setMaxTrailLength: (maxTrailLength) => set({ maxTrailLength }),
   setSonificationEnabled: (sonificationEnabled) => set({ sonificationEnabled }),
-  setButterflyDelta: (butterflyDelta) => set({ butterflyDelta }),
+  setButterflyDelta: (butterflyDelta) =>
+    set({ butterflyDelta: Math.max(1e-6, Math.min(10, butterflyDelta)) }),
   setTimeReversalMode: (timeReversalMode) => set({ timeReversalMode }),
 
   setTimeReversalActive: (timeReversalActive) => set({ timeReversalActive }),
