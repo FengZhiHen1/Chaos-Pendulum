@@ -5,6 +5,14 @@ import { usePyodide } from "../../hooks/usePyodide";
 import { useLabStore } from "../../store";
 import { useSimulationStore } from "@/features/simulation/store";
 import { SANDBOX_TEMPLATES, SANDBOX_DEFAULTS } from "../../contracts";
+import type { SandboxTemplateId } from "../../contracts";
+
+/** 各模板所需的基础参数之外的额外参数默认值 */
+const TEMPLATE_EXTRA_PARAMS: Record<SandboxTemplateId, number[]> = {
+  spring: [10],        // k (劲度系数)
+  driven: [1, 2],      // drive_amp, drive_freq
+  magnetic: [1, 1],    // charge, B_field
+};
 import { Button } from "@/shared/view/components/ui/button";
 import { Badge } from "@/shared/view/components/ui/badge";
 import { Play, Pause, RotateCcw, Loader2, AlertCircle, CheckCircle, SkipForward } from "lucide-react";
@@ -73,9 +81,12 @@ export function SandboxPanel() {
       return;
     }
 
-    // 2. 获取当前仿真状态作为初始条件
+    // 2. 获取当前仿真状态作为初始条件，按模板拼接额外参数
     const sim = useSimulationStore.getState();
-    const params = [sim.params.m1, sim.params.m2, sim.params.L1, sim.params.L2, sim.params.g, sim.params.damping];
+    const templateId = useLabStore.getState().activeTemplate as SandboxTemplateId | null;
+    const baseParams = [sim.params.m1, sim.params.m2, sim.params.L1, sim.params.L2, sim.params.g, sim.params.damping];
+    const extra = templateId ? (TEMPLATE_EXTRA_PARAMS[templateId] ?? []) : [];
+    const params = [...baseParams, ...extra];
     const initState = { theta1: sim.theta1, omega1: sim.theta1Dot, theta2: sim.theta2, omega2: sim.theta2Dot };
 
     // 3. 用用户方程计算轨迹（10 秒，30s 超时）
