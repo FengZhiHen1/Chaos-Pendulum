@@ -6,7 +6,7 @@
  */
 import type { PendulumParams, StateVector } from "@/shared/domain/valueObjects";
 import { integratorStep } from "@/features/simulation/domain/services/integrators";
-import { computeDerived, normalizeAngle } from "@/features/simulation/domain/services/stateVector";
+import { computeDerived, normalizeAngle, hasInvalidValue } from "@/features/simulation/domain/services/stateVector";
 import { useRootStore } from "@/stores/rootStore";
 import { BUTTERFLY_DEFAULTS } from "./contracts";
 
@@ -104,24 +104,37 @@ export class ButterflySimulator {
   private loop(): void {
     if (!this.running || !this.stateA || !this.stateB || !this.params) return;
 
-    // 积分摆 A
-    integratorStep(this.stateA, this.params, DT, "RKF45");
-    this.stateA[0] = normalizeAngle(this.stateA[0]!);
-    this.stateA[2] = normalizeAngle(this.stateA[2]!);
+    try {
+      // NaN/Infinity 检测：若状态已损坏，立即停止避免 RKF45 自适应步长无限循环
+      if (hasInvalidValue(this.stateA) || hasInvalidValue(this.stateB)) {
+        console.error("[ButterflySimulator] 检测到 NaN/Infinity，自动停止");
+        this.pause();
+        return;
+      }
 
-    // 积分摆 B
-    integratorStep(this.stateB, this.params, DT, "RKF45");
-    this.stateB[0] = normalizeAngle(this.stateB[0]!);
-    this.stateB[2] = normalizeAngle(this.stateB[2]!);
+      // 积分摆 A
+      integratorStep(this.stateA, this.params, DT, "RKF45");
+      this.stateA[0] = normalizeAngle(this.stateA[0]!);
+      this.stateA[2] = normalizeAngle(this.stateA[2]!);
 
-    this.simTime += DT;
+      // 积分摆 B
+      integratorStep(this.stateB, this.params, DT, "RKF45");
+      this.stateB[0] = normalizeAngle(this.stateB[0]!);
+      this.stateB[2] = normalizeAngle(this.stateB[2]!);
 
-    // 发射帧
-    this.emitSide("A");
-    this.emitSide("B");
+      this.simTime += DT;
 
-    // Lyapunov 影子轨迹
-    this.stepLyapunov();
+      // 发射帧
+      this.emitSide("A");
+      this.emitSide("B");
+
+      // Lyapunov 影子轨迹
+      this.stepLyapunov();
+    } catch (err) {
+      console.error("[ButterflySimulator] 积分异常，自动停止", err);
+      this.pause();
+      return;
+    }
 
     this.rafId = requestAnimationFrame(() => this.loop());
   }

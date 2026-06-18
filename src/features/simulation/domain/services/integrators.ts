@@ -124,11 +124,29 @@ export class RKF45Integrator implements IIntegrator {
     let remaining = Math.abs(dt);
     let h = remaining;
 
-    while (remaining > 1e-14) {
+    // 迭代上限防止 NaN/Infinity 导致无限循环
+    const MAX_ITER = Math.ceil(Math.abs(dt) / 1e-10) + 100;
+    let iter = 0;
+
+    while (remaining > 1e-14 && iter < MAX_ITER) {
+      iter++;
+      if (!Number.isFinite(h) || h <= 0) {
+        // 步长被 NaN/Infinity 污染，Euler 回退并退出
+        eulerStep(state, p, 1e-10 * dir);
+        break;
+      }
+
       h = Math.min(h, remaining);
       this.save.set(state);
 
       const err = this.rkf45Substep(state, p, h * dir);
+
+      // NaN 防护：误差为 NaN 时立即回退 Euler 退出
+      if (!Number.isFinite(err)) {
+        state.set(this.save);
+        eulerStep(state, p, 1e-10 * dir);
+        break;
+      }
 
       if (err < this.tol) {
         remaining -= h;
