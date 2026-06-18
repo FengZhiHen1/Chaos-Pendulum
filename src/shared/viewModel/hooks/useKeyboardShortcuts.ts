@@ -22,7 +22,7 @@ export function useKeyboardShortcuts() {
     (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-      if (DISABLED_KEYS.has(e.key)) return;
+      if ((DISABLED_KEYS as Set<string>).has(e.key)) return;
       const mode = SHORTCUT_MAP[e.key];
       if (mode) setMode(mode);
     },
