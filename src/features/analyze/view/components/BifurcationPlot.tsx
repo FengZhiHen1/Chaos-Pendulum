@@ -10,6 +10,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
 import { useSimulationStore } from "@/features/simulation";
+import { useAppStore } from "@/stores/useAppStore";
 import { Button } from "@/shared/view/components/ui/button";
 import type { BifurcationHoverData, BifurcationCursor } from "../../types";
 import { resolveStoreParam } from "../../types";
@@ -84,6 +85,7 @@ export function BifurcationPlot({ dataPath, pointRadius = 1.8 }: Props) {
       simInjectParams({ [resolved.storeKey]: resolved.storeValue } as Record<string, number>, {});
     }
     simSetRunning(true);
+    useAppStore.getState().setMode("explore");
     setDialogOpen(false);
     setDialogParamValue(null);
   }, [dialogParamValue, data, simInjectParams, simSetRunning]);

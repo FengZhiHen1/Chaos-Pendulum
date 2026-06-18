@@ -11,6 +11,7 @@ import type React from "react";
 import type { ScaleLinear } from "d3-scale";
 import type { ZoomTransform } from "d3-zoom";
 import { useSimulationStore } from "@/features/simulation";
+import { useAppStore } from "@/stores/useAppStore";
 import type { BifurcationData, BifurcationCursor, BifurcationHoverData } from "../../types";
 import { classifyRegime, resolveStoreParam } from "../../types";
 import {
@@ -191,6 +192,7 @@ export function useBifurcationInteraction({
     }
     lastSyncedValueRef.current = val;
     simSetRunning(true);
+    useAppStore.getState().setMode("explore");
   }, [data, isDraggingCursorRef, lastSyncedValueRef, simInjectParams, simSetRunning]);
 
   // ── 全局鼠标事件 ─────────────────────────────────

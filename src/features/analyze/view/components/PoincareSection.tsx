@@ -4,9 +4,11 @@
  * 边界: 本文件仅保留状态声明、用户交互处理与 JSX 渲染。
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnalyzeStore } from "../../store";
 import { useContainerSize } from "@/shared/viewModel/hooks/useContainerSize";
+import { useSimulationStore } from "@/features/simulation";
+import { commandBus } from "@/shared/infrastructure/commandBus";
 import { Button } from "@/shared/view/components/ui/button";
 import { Input } from "@/shared/view/components/ui/input";
 import { Label } from "@/shared/view/components/ui/label";
@@ -43,6 +45,36 @@ export function PoincareSection() {
   );
 
   usePoincareRendering({ canvasRef, size, clampWarning, setClampWarning });
+
+  // ── 采集激活时驱动 Worker tick ──────────────────
+  // 庞加莱截面数据来自 Worker 实时检测。切换至分析模式后 Scene3D 被卸载，
+  // 原有的 tick 来源（useSceneAnimation）断流。此处用独立 rAF 回路接管。
+  useEffect(() => {
+    if (!poincare.isActive) return;
+
+    // 自动启动仿真（若尚未运行）
+    const simStore = useSimulationStore.getState();
+    if (!simStore.isRunning) {
+      simStore.setRunning(true);
+    }
+
+    let lastTime = performance.now();
+    let rafId: number;
+
+    const tick = () => {
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) / 1000, 0.1); // 上限 100ms 防螺旋
+      lastTime = now;
+      commandBus.emit({ type: "scheduler:requestTick", delta });
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [poincare.isActive]);
 
   const handleToggleActive = () => setIsActive(!poincare.isActive);
 
