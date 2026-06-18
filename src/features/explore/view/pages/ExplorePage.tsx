@@ -19,7 +19,7 @@ import { useExploreStore } from "@/features/explore/store";
 import { useAppStore } from "@/stores/useAppStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/view/components/ui/tabs";
-import type { PendulumMaterialType, EnvironmentPreset } from "../components/Scene3D";
+import type { EnvironmentPreset } from "../components/Scene3D";
 
 /** 平板/手机底部可展开面板 —— Tab 切换参数/能量/相空间 */
 function TabletBottomPanel() {
@@ -137,8 +137,7 @@ export function ExplorePage() {
     useExploreStore.getState().setTimeReversalIntroOpen(true);
   }, []);
 
-  // GUI 视觉状态：摆体材质、环境
-  const [pendulumMaterial, setPendulumMaterial] = useState<PendulumMaterialType>("metal");
+  // GUI 视觉状态：环境
   const [environment, setEnvironment] = useState<EnvironmentPreset>("dark-lab");
 
   // 键盘快捷键：空格切换受力分析，Esc 关闭受力/蝴蝶/反演面板
@@ -208,9 +207,7 @@ export function ExplorePage() {
             </div>
             <div className="shrink-0 p-3 border-t border-white/5">
               <TrailControls
-                material={pendulumMaterial}
                 environment={environment}
-                onMaterialChange={setPendulumMaterial}
                 onEnvironmentChange={setEnvironment}
               />
             </div>
@@ -220,7 +217,6 @@ export function ExplorePage() {
         {/* 中部 3D 舞台 — 唯一明亮区域 */}
         <section data-stage-container className="flex-1 relative overflow-hidden rounded-lg bg-stage">
           <Scene3D
-            pendulumMaterial={pendulumMaterial}
             environment={environment}
             showGrid
             enableShadows

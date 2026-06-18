@@ -16,6 +16,8 @@ const MAX_TRAIL_POINTS = 6000;
 const CAP_SEGMENTS = 8;
 const MAX_VERTICES = 2 * MAX_TRAIL_POINTS + 2 * CAP_SEGMENTS;
 const MAX_INDICES = 6 * (MAX_TRAIL_POINTS - 1) + 6 * CAP_SEGMENTS * 2;
+/** 最小线宽相对于 1px 的倍率 */
+const MIN_WIDTH_MULTIPLIER = 1.5;
 
 export interface RoundCapTrailMeshProps {
   points: TrailPoint[];
@@ -28,7 +30,7 @@ export interface RoundCapTrailMeshProps {
 
 export function RoundCapTrailMesh({
   points, colorMode = "velocity", solidColor = "#f0c040",
-  opacity = 0.9, maxWidth = 3, colorGradient,
+  opacity = 0.9, maxWidth = 6, colorGradient,
 }: RoundCapTrailMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const pointsRef = useRef(points);
@@ -59,7 +61,7 @@ export function RoundCapTrailMesh({
     const { viewport, size } = state;
     const pixelToWorld = size.height > 0 ? viewport.height / size.height : 0.01;
     const targetWorldW = targetPixelW * pixelToWorld;
-    const minWorldW = pixelToWorld;
+    const minWorldW = pixelToWorld * MIN_WIDTH_MULTIPLIER;
 
     let v = 0;
     for (let i = 0; i < n; i++) {
@@ -76,7 +78,8 @@ export function RoundCapTrailMesh({
         else { const ux=dx1/len1+dx2/len2, uy=dy1/len1+dy2/len2, ulen=Math.sqrt(ux*ux+uy*uy); tx=ulen<1e-6?dx1/len1:ux/ulen; ty=ulen<1e-6?dy1/len1:uy/ulen; }
       }
       const nx=-ty, ny=tx;
-      const width=Math.max(minWorldW,Math.min(targetWorldW,targetWorldW*(pt.velocity/velRef.current))), hw=width*0.5;
+      const velocityRatio=Math.min(pt.velocity/velRef.current,1);
+      const width=minWorldW+(targetWorldW-minWorldW)*Math.sqrt(velocityRatio), hw=width*0.5;
       let cr:number,cg:number,cb:number;
       if (mode==="velocity") { const c=velocityToColor(pt.velocity,grad,velRef); cr=c.r; cg=c.g; cb=c.b; }
       else { cr=solid.r; cg=solid.g; cb=solid.b; }

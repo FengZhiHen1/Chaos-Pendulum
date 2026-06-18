@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
@@ -48,20 +48,11 @@ const ARROWS: ArrowMeta[] = [
   { key: "Fi2_n", idx: 2, kind: "inertial", label: "下摆法向惯性力 (Fi₂_n)" },
 ];
 
-// ─── 共享几何体 + 材质池（预分配、帧间复用，禁止每帧 new）─────────
+// ─── 共享几何体（预分配，所有箭头复用几何体）─────────
 
 const shaftGeo = new THREE.CylinderGeometry(SHAFT_R, SHAFT_R, 1, 8);
 const headGeo = new THREE.ConeGeometry(HEAD_R, HEAD_L, 8);
 const hoverGeo = new THREE.CylinderGeometry(HOVER_R, HOVER_R, 1, 8);
-
-// 预分配 8 个箭头各 3 个材质（杆身 + 箭头 + 虚线杆身）。总计 8×3=24 个材质
-const materialPool: THREE.MeshStandardMaterial[] = [];
-for (let i = 0; i < 24; i++) {
-  materialPool.push(new THREE.MeshStandardMaterial({ depthTest: false }));
-}
-let matIdx = 0;
-function acquireMaterial(): THREE.MeshStandardMaterial { return materialPool[matIdx++ % materialPool.length]!; }
-function resetMatPool(): void { matIdx = 0; }
 
 // ─── 力方向计算 ──────────────────────────────
 
@@ -83,11 +74,46 @@ interface SingleArrowProps {
   meta: ArrowMeta;
 }
 
+/** 每个箭头实例的材质池最大容量（杆身段 + 箭头） */
+const PER_ARROW_POOL_SIZE = 16;
+
 function SingleArrow({ meta }: SingleArrowProps) {
   const groupRef = useRef<THREE.Group>(null);
   const visGroupRef = useRef<THREE.Group>(null);
   const hoverRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+
+  // ── 实例级材质池（不与其他箭头共享，避免颜色串扰）──
+  const matPoolRef = useRef<THREE.MeshStandardMaterial[] | null>(null);
+  const matIdxRef = useRef(0);
+
+  /** 获取实例私有的材质池 */
+  function getMatPool(): THREE.MeshStandardMaterial[] {
+    if (!matPoolRef.current) {
+      matPoolRef.current = Array.from(
+        { length: PER_ARROW_POOL_SIZE },
+        () => new THREE.MeshStandardMaterial({ depthTest: false }),
+      );
+    }
+    return matPoolRef.current;
+  }
+
+  /** 从实例私有池取一个材质 */
+  function acquireMaterial(): THREE.MeshStandardMaterial {
+    const pool = getMatPool();
+    return pool[matIdxRef.current++ % pool.length]!;
+  }
+
+  /** 重置实例私有池游标 */
+  function resetMatPool(): void { matIdxRef.current = 0; }
+
+  useEffect(() => {
+    return () => {
+      matPoolRef.current?.forEach((m) => m.dispose());
+      matPoolRef.current = null;
+    };
+  }, []);
+
   const [tooltipData, setTooltipData] = useState<{
     label: string; magnitude: number; directionDeg: number;
     c1: number; c2: number; c1Label: string; c2Label: string;

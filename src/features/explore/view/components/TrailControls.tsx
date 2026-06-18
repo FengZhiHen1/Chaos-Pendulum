@@ -10,14 +10,12 @@ import {
 } from "@/shared/view/components/ui/select";
 import { useExploreStore } from "../../store";
 import type { ViewPreset } from "../../contracts";
-import type { PendulumMaterialType, EnvironmentPreset } from "./Scene3D";
+import type { EnvironmentPreset } from "./Scene3D";
 
 type TrailLength = 50 | 200 | 1000 | 0 | -1;
 
 interface TrailControlsProps {
-  material: PendulumMaterialType;
   environment: EnvironmentPreset;
-  onMaterialChange: (material: PendulumMaterialType) => void;
   onEnvironmentChange: (environment: EnvironmentPreset) => void;
 }
 
@@ -25,12 +23,6 @@ const VIEW_OPTIONS: { value: ViewPreset; label: string; icon: React.ElementType 
   { value: "side", label: "侧视", icon: Maximize2 },
   { value: "top", label: "俯视", icon: Map },
   { value: "chaos", label: "跟随", icon: Target },
-];
-
-const MATERIAL_OPTIONS: { value: PendulumMaterialType; label: string }[] = [
-  { value: "metal", label: "金属" },
-  { value: "wood", label: "木质" },
-  { value: "glass", label: "玻璃" },
 ];
 
 const ENVIRONMENT_OPTIONS: { value: EnvironmentPreset; label: string }[] = [
@@ -49,12 +41,10 @@ const TRAIL_OPTIONS: { value: TrailLength; label: string; hint: string }[] = [
 /**
  * 尾迹与视图控制 —— 可折叠面板。
  *
- * 包含：3D 视角预设、摆体材质、环境背景、尾迹持久度。
+ * 包含：3D 视角预设、环境背景、尾迹持久度。
  */
 export function TrailControls({
-  material,
   environment,
-  onMaterialChange,
   onEnvironmentChange,
 }: TrailControlsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -112,29 +102,9 @@ export function TrailControls({
             </div>
           </div>
 
-          {/* 材质 & 环境 */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <span className="text-[10px] text-on-surface-variant/70">摆体材质</span>
-              <Select
-                value={material}
-                onValueChange={(v) => onMaterialChange(v as PendulumMaterialType)}
-              >
-                <SelectTrigger className="h-7 text-[10px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MATERIAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-[10px]">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[10px] text-on-surface-variant/70">环境背景</span>
+          {/* 环境背景 */}
+          <div className="space-y-1">
+            <span className="text-[10px] text-on-surface-variant/70">环境背景</span>
               <Select
                 value={environment}
                 onValueChange={(v) => onEnvironmentChange(v as EnvironmentPreset)}
@@ -150,7 +120,6 @@ export function TrailControls({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
           </div>
 
           {/* 尾迹持久度 */}

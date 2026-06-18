@@ -11,8 +11,6 @@ export interface PendulumGeometryProps {
   cylinderSegments: number;
   /** 球体段数 */
   sphereSegments: number;
-  /** 材质类型 */
-  pendulumMaterial: "metal" | "wood" | "glass";
   /** 材质颜色 */
   ballColor: string;
   /** 材质配置 */
@@ -45,7 +43,6 @@ const BASE_RADIUS = 0.02;
 export function PendulumGeometry({
   cylinderSegments,
   sphereSegments,
-  pendulumMaterial,
   ballColor,
   materialConfig,
   isPreviewActive,
@@ -58,18 +55,7 @@ export function PendulumGeometry({
   ball1Ref,
   ball2Ref,
 }: PendulumGeometryProps) {
-  const isGlass = pendulumMaterial === "glass";
-
-  const ballMaterial = isGlass ? (
-    <meshPhysicalMaterial
-      color={ballColor}
-      metalness={materialConfig.metalness}
-      roughness={materialConfig.roughness}
-      transparent
-      opacity={materialConfig.opacity}
-      transmission={0.9}
-    />
-  ) : (
+  const ballMaterial = (
     <meshStandardMaterial
       color={ballColor}
       metalness={materialConfig.metalness}
