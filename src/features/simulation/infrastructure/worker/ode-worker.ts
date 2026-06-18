@@ -381,8 +381,8 @@ function handleReset(cmd: { initialConditions: { theta1: number; theta1Dot: numb
 // ─── 参数校验 ───────────────────────────────────
 
 function validateParams(p: PendulumParams): string | null {
-  if (p.m1 <= 0 || !isFinite(p.m1)) return `参数 m1 非法: ${p.m1}`;
-  if (p.m2 <= 0 || !isFinite(p.m2)) return `参数 m2 非法: ${p.m2}`;
+  if (p.m1 < 0 || !isFinite(p.m1)) return `参数 m1 非法: ${p.m1}`;
+  if (p.m2 < 0 || !isFinite(p.m2)) return `参数 m2 非法: ${p.m2}`;
   if (p.L1 <= 0 || !isFinite(p.L1)) return `参数 L1 非法: ${p.L1}`;
   if (p.L2 <= 0 || !isFinite(p.L2)) return `参数 L2 非法: ${p.L2}`;
   if (p.g < 0 || !isFinite(p.g)) return `参数 g 非法: ${p.g}`;
