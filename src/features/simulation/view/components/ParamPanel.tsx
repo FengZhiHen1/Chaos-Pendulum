@@ -68,11 +68,11 @@ export function ParamPanel({ hideGlobalControls = false }: ParamPanelProps) {
 
   return (
     <div className="flex flex-col h-full bg-surface-container-low">
-      {/* Worker 未就绪引导提示 */}
+      {/* Worker 初始化加载态 */}
       {!isWorkerReady && (
         <div className="shrink-0 px-3 py-2.5 bg-primary/[0.04] border-b border-primary/10">
           <p className="text-xs text-on-surface-variant/70 leading-relaxed">
-            点击 <span className="text-primary font-semibold">▶ 启动</span> 以初始化仿真引擎
+            仿真引擎正在初始化…
           </p>
         </div>
       )}
