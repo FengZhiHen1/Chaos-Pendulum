@@ -82,8 +82,8 @@ export const DEFAULT_METHOD: IntegratorMethod = "RKF45";
 // ─── 参数元数据表 ───────────────────────────────
 
 export const PARAM_META: ParamFieldMeta[] = [
-  { key: "m1",    label: "上摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 1 },
-  { key: "m2",    label: "下摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 2 },
+  { key: "m1",    label: "上摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 1 },
+  { key: "m2",    label: "下摆质量",   unit: "kg",    hardMin: 1e-6, hardMax: null, sliderMin: 0.01, sliderMax: 10.0,        sliderStep: 0.1,  decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 2 },
   { key: "L1",    label: "上摆杆长",   unit: "m",     hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 3.0,         sliderStep: 0.05, decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 3 },
   { key: "L2",    label: "下摆杆长",   unit: "m",     hardMin: 1e-6, hardMax: null, sliderMin: 0.1, sliderMax: 3.0,         sliderStep: 0.05, decimalPlaces: 3, defaultValue: 1.0,        group: "system",      order: 4 },
   { key: "g",     label: "重力加速度", unit: "m/s²",  hardMin: 0,    hardMax: null, sliderMin: 0.0, sliderMax: 20.0,        sliderStep: 0.1,  decimalPlaces: 2, defaultValue: 9.81,       group: "environment", order: 9 },
@@ -106,22 +106,21 @@ export const PRESETS: ParamPreset[] = [
   {
     id: "small-angle",
     label: "小角度线性化",
-    description: "将两摆设为 3° 以内，验证线性近似",
+    description: "对称小角度（≈2.86°），验证线性近似行为",
     params: {},
-    initialConditions: { theta1: 0.052, theta1Dot: 0, theta2: 0.034, theta2Dot: 0 },
-    method: "RKF45",
+    initialConditions: { theta1: 0.05, theta1Dot: 0, theta2: 0.05, theta2Dot: 0 },
   },
   {
     id: "single-pendulum",
     label: "单摆退化",
-    description: "将 m₂ 设为零，退化为单摆",
-    params: { m2: 1e-6 },
+    description: "将 m₂ 降至极小，退化为单摆",
+    params: { m2: 0.001 },
     initialConditions: {},
   },
   {
     id: "energy-conservation",
     label: "能量守恒检验",
-    description: "关闭阻尼，长时间运行检验能量漂移",
+    description: "关闭阻尼并切换 Velocity Verlet 辛积分器，长时间检验能量守恒",
     params: { damping: 0 },
     initialConditions: {},
     method: "VelocityVerlet",

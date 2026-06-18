@@ -504,6 +504,16 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
       return firstErr?.message ?? "预设校验失败";
     }
 
+    // 从新参数 + 新初始条件立即计算笛卡尔坐标，确保 3D 场景同步更新
+    const t1 = newIC.theta1;
+    const t2 = newIC.theta2;
+    const L1 = newParams.L1;
+    const L2 = newParams.L2;
+    const nx1 = L1 * Math.sin(t1);
+    const ny1 = -L1 * Math.cos(t1);
+    const nx2 = nx1 + L2 * Math.sin(t2);
+    const ny2 = ny1 - L2 * Math.cos(t2);
+
     set({
       params: newParams,
       initialConditions: newIC,
@@ -512,6 +522,21 @@ export const createSimulationSlice: StateCreator<SimulationSlice, [], [], Simula
       isSceneFrozen: false,
       paramsDirty: false,
       resetTrigger: s.resetTrigger + 1,
+      energyInitial: null, energyDrift: 0, driftExceeded: false,
+      energyMin: 0, energyMax: 0, isSimulationActive: false,
+      consumedFrameIndex: 0, energyCorrection: 0, lyapunovExponent: 0,
+      _nanSkipCount: 0, _stoppedFrameCount: 0, isPendulumStopped: false,
+      isRunning: false, runPhase: "idle",
+      // 立即更新主摆位置
+      x1: nx1, y1: ny1, x2: nx2, y2: ny2,
+      theta1: t1, theta1Dot: newIC.theta1Dot,
+      theta2: t2, theta2Dot: newIC.theta2Dot,
+      kineticEnergy: 0, potentialEnergy: 0, totalEnergy: 0,
+      alpha1: 0, alpha2: 0,
+      state: {
+        theta1: t1, omega1: newIC.theta1Dot,
+        theta2: t2, omega2: newIC.theta2Dot,
+      },
     });
     return null;
   },
