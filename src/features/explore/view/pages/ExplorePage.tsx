@@ -139,7 +139,7 @@ export function ExplorePage() {
 
   // GUI 视觉状态：摆体材质、环境
   const [pendulumMaterial, setPendulumMaterial] = useState<PendulumMaterialType>("metal");
-  const [environment, setEnvironment] = useState<EnvironmentPreset>("bright-stage");
+  const [environment, setEnvironment] = useState<EnvironmentPreset>("dark-lab");
 
   // 键盘快捷键：空格切换受力分析，Esc 关闭受力/蝴蝶/反演面板
   useEffect(() => {

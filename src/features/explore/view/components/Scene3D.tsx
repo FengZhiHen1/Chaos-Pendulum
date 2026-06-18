@@ -21,7 +21,7 @@ import { globalOrbitControlsAdapter } from "@/features/data/infrastructure/adapt
 import { globalWatermarkRenderer } from "@/features/data/infrastructure/adapters/watermarkRendererSingleton";
 
 export type PendulumMaterialType = "metal" | "wood" | "glass";
-export type EnvironmentPreset = "dark-lab" | "white-teaching" | "bright-stage";
+export type EnvironmentPreset = "dark-lab" | "white-teaching";
 
 export interface Scene3DProps {
   pendulumMaterial?: PendulumMaterialType;
@@ -35,15 +35,14 @@ export interface Scene3DProps {
 }
 
 const MATERIAL_CONFIGS: Record<PendulumMaterialType, { color: string; metalness: number; roughness: number; opacity: number }> = {
-  metal: { color: "#C0C0C0", metalness: 0.8, roughness: 0.2, opacity: 1.0 },
-  wood: { color: "#8B5E3C", metalness: 0.0, roughness: 0.7, opacity: 1.0 },
-  glass: { color: "#E8F0F8", metalness: 0.1, roughness: 0.1, opacity: 0.6 },
+  metal: { color: "#D4D9E0", metalness: 0.95, roughness: 0.12, opacity: 1.0 },
+  wood: { color: "#A0724A", metalness: 0.0, roughness: 0.65, opacity: 1.0 },
+  glass: { color: "#D6EAF8", metalness: 0.05, roughness: 0.02, opacity: 0.75 },
 };
 
 const ENVIRONMENT_CONFIGS: Record<EnvironmentPreset, { background: string; ambientIntensity: number; spotIntensity: number; spotPosition: Vector3; gridColor: string }> = {
   "dark-lab": { background: "#1A1D22", ambientIntensity: 0.15, spotIntensity: 8, spotPosition: new Vector3(3, 5, 2), gridColor: "#1a1a2e" },
   "white-teaching": { background: "#EAECEF", ambientIntensity: 1.0, spotIntensity: 0, spotPosition: new Vector3(0, 0, 0), gridColor: "#cccccc" },
-  "bright-stage": { background: "#EAECEF", ambientIntensity: 0.7, spotIntensity: 4, spotPosition: new Vector3(3, 5, 2), gridColor: "#d1d5db" },
 };
 
 // ─── Canvas 内子组件 ────────────────────────

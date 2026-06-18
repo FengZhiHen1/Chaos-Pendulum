@@ -88,7 +88,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
               <Scene3D
                 pendulumMaterial="metal"
                 ballColor={BALL_COLOR_A}
-                environment="bright-stage"
+                environment="dark-lab"
                 showGrid
                 enableShadows
                 className="w-full h-full"
@@ -112,7 +112,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
               <Scene3D
                 pendulumMaterial="metal"
                 ballColor={BALL_COLOR_B}
-                environment="bright-stage"
+                environment="dark-lab"
                 showGrid
                 enableShadows
                 className="w-full h-full"
@@ -151,7 +151,7 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
             <Scene3D
               pendulumMaterial="metal"
               ballColor={activeSide === "A" ? BALL_COLOR_A : BALL_COLOR_B}
-              environment="bright-stage"
+              environment="dark-lab"
               showGrid
               enableShadows
               className="w-full h-full"

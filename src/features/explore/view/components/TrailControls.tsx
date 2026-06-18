@@ -36,7 +36,6 @@ const MATERIAL_OPTIONS: { value: PendulumMaterialType; label: string }[] = [
 const ENVIRONMENT_OPTIONS: { value: EnvironmentPreset; label: string }[] = [
   { value: "dark-lab", label: "暗室聚光" },
   { value: "white-teaching", label: "纯白教学" },
-  { value: "bright-stage", label: "明亮舞台" },
 ];
 
 const TRAIL_OPTIONS: { value: TrailLength; label: string; hint: string }[] = [
