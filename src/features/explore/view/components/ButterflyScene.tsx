@@ -67,88 +67,17 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
 
   function ballR(m: number) { return Math.max(BALL_MIN, Math.min(BALL_MAX, 0.08 * Math.pow(Math.max(m, 0.1), 1 / 3))); }
 
-  const initializedRef = useRef(false);
+  // ═══ 暴力验证：useFrame 最小化 ═══
   useFrame(() => {
     const bf = useButterflyStore.getState();
-
-    // ── 哨兵：等待 butterfly store 通过 init() 写入真实数据 ──
     if (!bf.bfInitialized) return;
-
-    // ── 首次初始化：几何体等一次性设置 ──
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      // 球半径首次设置（走 useFrame 确保 mesh ref 已挂载）
-      const p = bf.sideA.params;
-      lastM1.current = p.m1; lastM2.current = p.m2;
-      const r1 = ballR(p.m1); const r2 = ballR(p.m2);
-      [bA1, bB1].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r1, 48, 48); } });
-      [bA2, bB2].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r2, 48, 48); } });
-    }
-
-    const p = bf.sideA.params;
-
-    // 质量变化时重建球几何体（罕见，走 useEffect 更好但此处保持兼容）
-    if (p.m1 !== lastM1.current || p.m2 !== lastM2.current) {
-      lastM1.current = p.m1; lastM2.current = p.m2;
-      const r1 = ballR(p.m1); const r2 = ballR(p.m2);
-      [bA1, bB1].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r1, 48, 48); } });
-      [bA2, bB2].forEach(r => { if (r.current) { r.current.geometry?.dispose(); r.current.geometry = new THREE.SphereGeometry(r2, 48, 48); } });
-    }
-
-    updateSide(-X_OFF, bf.sideA, aA1.current, aA2.current, bA1.current, bA2.current);
-    updateSide( X_OFF, bf.sideB, aB1.current, aB2.current, bB1.current, bB2.current);
-
-    if (bf.isRunning) {
-      ptsA.current.push(new Vector3(bf.sideA.x2 - X_OFF, bf.sideA.y2, 0));
-      ptsB.current.push(new Vector3(bf.sideB.x2 + X_OFF, bf.sideB.y2, 0));
-      if (ptsA.current.length > TRAIL_LEN) ptsA.current = ptsA.current.slice(-TRAIL_LEN);
-      if (ptsB.current.length > TRAIL_LEN) ptsB.current = ptsB.current.slice(-TRAIL_LEN);
-      updTrailBuf(tA.current, trailBufA.current, ptsA.current, !trailGeomInit.current);
-      updTrailBuf(tB.current, trailBufB.current, ptsB.current, !trailGeomInit.current);
-      trailGeomInit.current = true;
-    }
+    // 不做任何 3D 操作，仅验证是否能进入蝴蝶模式而不卡死
   });
 
+  // ═══ 暴力验证：最简场景，隔离 Three.js 几何体创建 ═══
   return (
     <>
-      <ambientLight intensity={env.amb} />
-      {env.spot > 0 && <SpotLight position={[env.spotPos.x, env.spotPos.y, env.spotPos.z]}
-        intensity={env.spot} castShadow={enableShadows}
-        shadow-mapSize-width={1024} shadow-mapSize-height={1024} />}
-      {showGrid && <Grid position={[0, -3, 0]} args={[24, 24]} cellSize={0.5} cellThickness={0.5}
-        cellColor={env.grid} fadeDistance={10} />}
-
-      {/* 分隔线 */}
-      <line>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position"
-            args={[new Float32Array([0, -3.5, 0, 0, 2.2, 0]), 3]} count={2} itemSize={3} />
-        </bufferGeometry>
-        <lineBasicMaterial color="#ffffff" transparent opacity={0.2} />
-      </line>
-
-      {/* 支点标记 */}
-      <mesh position={[-X_OFF, 0, 0]}><sphereGeometry args={[0.06, 16, 16]} /><meshBasicMaterial color={GOLD} /></mesh>
-      <mesh position={[ X_OFF, 0, 0]}><sphereGeometry args={[0.06, 16, 16]} /><meshBasicMaterial color={PURPLE} /></mesh>
-
-      {/* 摆 A */}
-      <mesh ref={aA1}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
-      <mesh ref={bA1}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={GOLD} metalness={0.25} roughness={0.25} /></mesh>
-      <mesh ref={aA2}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
-      <mesh ref={bA2}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={GOLD} metalness={0.25} roughness={0.25} /></mesh>
-
-      {/* 摆 B */}
-      <mesh ref={aB1}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
-      <mesh ref={bB1}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={PURPLE} metalness={0.25} roughness={0.25} /></mesh>
-      <mesh ref={aB2}><cylinderGeometry args={[ROD_R, ROD_R, CYL_H, 32]} /><meshStandardMaterial color={ROD_C} metalness={0.9} roughness={0.12} /></mesh>
-      <mesh ref={bB2}><sphereGeometry args={[ballR(1), 48, 48]} /><meshStandardMaterial color={PURPLE} metalness={0.25} roughness={0.25} /></mesh>
-
-      {/* 尾迹 */}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <line ref={tA as any}><bufferGeometry /><lineBasicMaterial color={GOLD} transparent opacity={0.55} depthTest={false} /></line>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <line ref={tB as any}><bufferGeometry /><lineBasicMaterial color={PURPLE} transparent opacity={0.55} depthTest={false} /></line>
-
+      <ambientLight intensity={0.5} />
       <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08}
         minDistance={2} maxDistance={14} maxPolarAngle={Math.PI} target={[0, -1, 0]} />
     </>
