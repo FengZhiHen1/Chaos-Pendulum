@@ -259,8 +259,8 @@ export function useReversalRunner(): ReversalRunnerAPI {
     isReversingRef.current = false;
     clearTrajectoryData(); clearDriftHistory();
   }, [setPhase, setActive, clearDriftHistory, setIntroOpen]);
-  const handleRestoreState = useCallback(() => { setCompletedOpen(false); const start = reversalStartRef.current; if (start) { useSimulationStore.setState({ initialConditions: { theta1: start.theta1, theta1Dot: start.omega1, theta2: start.theta2, theta2Dot: start.omega2 } }); useSimulationStore.getState().applyCurrentSettings(); startTrajectoryFadeOut(); } }, []);
-  const handleResetAfterComplete = useCallback(() => { setCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); }, []);
+  const handleRestoreState = useCallback(() => { setCompletedOpen(false); const start = reversalStartRef.current; if (start) { useSimulationStore.setState({ initialConditions: { theta1: start.theta1, theta1Dot: start.omega1, theta2: start.theta2, theta2Dot: start.omega2 } }); useSimulationStore.getState().applyCurrentSettings(); startTrajectoryFadeOut(); } useExploreStore.getState().resetReversalState(); }, []);
+  const handleResetAfterComplete = useCallback(() => { setCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); useExploreStore.getState().resetReversalState(); }, []);
 
   const handleExactRestoreState = useCallback(() => {
     setExactCompletedOpen(false);
@@ -270,9 +270,10 @@ export function useReversalRunner(): ReversalRunnerAPI {
       commandBus.emit({ type: "scheduler:resume" });
       startTrajectoryFadeOut();
     }
+    useExploreStore.getState().resetReversalState();
   }, []);
 
-  const handleExactResetAfterComplete = useCallback(() => { setExactCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); }, []);
+  const handleExactResetAfterComplete = useCallback(() => { setExactCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); useExploreStore.getState().resetReversalState(); }, []);
 
   // 数值反演逐帧漂移检测
   useEffect(() => {

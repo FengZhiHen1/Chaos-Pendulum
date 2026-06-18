@@ -303,17 +303,19 @@ export function TimeReversal() {
         )}
       </Dialog>
 
-      {/* ── ③ 运行中：顶部控制条 + 叙事提示 + 漂移曲线 ── */}
+      {/* ── ③ 运行中：顶部控制条（仅 running/paused）+ 叙事提示 + 漂移曲线 ── */}
+      {isRunning && (
+        <ControlBar
+          isPaused={isPaused}
+          onPause={r.pauseReversal}
+          onResume={r.resumeReversal}
+          onStop={r.stopReversal}
+          elapsed={r.elapsedReversalTime}
+          mode={r.mode}
+        />
+      )}
       {(isRunning || (hasCompleted && r.driftHistory.length > 0 && !r.completedOpen && !r.exactCompletedOpen)) && (
         <>
-          <ControlBar
-            isPaused={isPaused}
-            onPause={r.pauseReversal}
-            onResume={r.resumeReversal}
-            onStop={r.stopReversal}
-            elapsed={r.elapsedReversalTime}
-            mode={r.mode}
-          />
           <Narrative
             narrativePhase={r.narrativePhase}
             separationStartTime={r.separationStartTime}
