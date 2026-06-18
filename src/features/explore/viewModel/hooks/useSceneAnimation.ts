@@ -162,8 +162,8 @@ export function useSceneAnimation(
     const sv = bfSide?.state ?? store.state;
     const effectiveRunning = bfStore?.isRunning ?? store.isRunning;
 
-    // 参数合法性
-    const isInvalid = p.L1 <= 0.001 || p.L2 <= 0.001 || p.m1 <= 0 || p.m2 <= 0;
+    // 参数合法性（m₂=0 为单摆退化态，合法）
+    const isInvalid = p.L1 <= 0.001 || p.L2 <= 0.001 || p.m1 <= 0 || p.m2 < 0;
     paramInvalidRef.current = isInvalid;
     if (isInvalid) return;
 
