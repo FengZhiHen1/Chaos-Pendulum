@@ -284,11 +284,14 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const handleExactResetAfterComplete = useCallback(() => { setExactCompletedOpen(false); clearTrajectoryData(); useSimulationStore.getState().applyCurrentSettings(); useExploreStore.getState().resetReversalState(); }, []);
 
   // 数值反演逐帧漂移检测
+  const sampleCountRef = useRef(0);
   useEffect(() => {
     if (mode !== "numerical" || phase !== "reversing" || !isReversingRef.current) return;
     const store = useSimulationStore.getState();
     const currentSimTime = store.t;
-    if (prevSimTimeRef.current > 0 && currentSimTime >= prevSimTimeRef.current) { prevSimTimeRef.current = currentSimTime; return; }
+    // 仅在 simTime 确实变化时采样（避免同一帧重复采样）
+    if (prevSimTimeRef.current === currentSimTime) return;
+    const prevSimTime = prevSimTimeRef.current;
     prevSimTimeRef.current = currentSimTime;
     if (currentSimTime <= 0.001) { stopReversal(); return; }
     if (store.engineError) {
@@ -302,6 +305,12 @@ export function useReversalRunner(): ReversalRunnerAPI {
     const fwdIdx = rawIdx < 0 ? 0 : rawIdx >= fwdArray.length ? fwdArray.length - 1 : rawIdx;
     const drift = fwdArray.length > 0 ? computeDrift(store.state, fwdArray[fwdIdx]!) : 0;
     useExploreStore.getState().appendDriftSample({ reversalTime: Math.max(0, reversalTime), driftDistance: drift, forwardSimTime: currentSimTime });
+    // 诊断：记录采样频率和 simTime 跳变幅度
+    sampleCountRef.current++;
+    if (sampleCountRef.current % 10 === 1) {
+      const dt = prevSimTime > 0 ? Math.abs(currentSimTime - prevSimTime).toFixed(4) : "init";
+      console.log(`[drift] 样本#${sampleCountRef.current} simTime=${currentSimTime.toFixed(3)} dt=${dt}s drift=${drift.toFixed(4)} fwdIdx=${fwdIdx}/${fwdArray.length}`);
+    }
     const pos = ball2Position(store.state, reversalParamsRef.current);
     reversalTrailRef.current.push(new THREE.Vector3(pos.x, pos.y, pos.z));
     updateTrajectoryData({ reversalPoints: [...reversalTrailRef.current] });
