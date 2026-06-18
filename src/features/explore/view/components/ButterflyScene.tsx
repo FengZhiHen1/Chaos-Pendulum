@@ -41,22 +41,21 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
   const trailBufB = useRef(new Float32Array(TRAIL_LEN * 3));
   const trailGeomInit = useRef(false);
 
-  // ═══ 暴力验证：禁用 globalOrbitControlsAdapter 注入 ═══
-  // useEffect(() => {
-  //   const raf = requestAnimationFrame(() => {
-  //     if (orbitRef.current && !injectedRef.current) {
-  //       globalOrbitControlsAdapter.injectControls(orbitRef.current);
-  //       injectedRef.current = true;
-  //     }
-  //   });
-  //   const fallback = setTimeout(() => {
-  //     if (orbitRef.current && !injectedRef.current) {
-  //       globalOrbitControlsAdapter.injectControls(orbitRef.current);
-  //       injectedRef.current = true;
-  //     }
-  //   }, 100);
-  //   return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
-  // }, []);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      if (orbitRef.current && !injectedRef.current) {
+        globalOrbitControlsAdapter.injectControls(orbitRef.current);
+        injectedRef.current = true;
+      }
+    });
+    const fallback = setTimeout(() => {
+      if (orbitRef.current && !injectedRef.current) {
+        globalOrbitControlsAdapter.injectControls(orbitRef.current);
+        injectedRef.current = true;
+      }
+    }, 100);
+    return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
+  }, []);
 
   const env = useMemo(() => ({
     "dark-lab": { amb: 0.12, spot: 10, spotPos: new Vector3(0, 6, 3), grid: "#1a1a2e" },
@@ -148,6 +147,7 @@ export function ButterflySceneContent({ environment, enableShadows, showGrid }: 
       <line ref={tB as any}><bufferGeometry /><lineBasicMaterial color={PURPLE} transparent opacity={0.55} depthTest={false} /></line>
 
       <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08}
+        enableRotate={false} enableZoom={false} enablePan={false}
         minDistance={2} maxDistance={14} maxPolarAngle={Math.PI} target={[0, -1, 0]} />
     </>
   );
