@@ -40,6 +40,10 @@ export interface StoryViewModelActions {
   stop: () => Promise<void>;
   /** 清除错误 */
   clearError: () => void;
+  /** 注册故事事件回调 */
+  onEvent: (cb: (event: string, data?: unknown) => void) => void;
+  /** 移除故事事件回调 */
+  offEvent: (cb: (event: string, data?: unknown) => void) => void;
 }
 
 export type StoryViewModel = StoryViewModelState & StoryViewModelActions;
@@ -114,6 +118,14 @@ export function useStoryViewModel(): StoryViewModel {
     }
   }, []);
 
+  const onEvent = useCallback((cb: (event: string, data?: unknown) => void) => {
+    storyEngine.onEvent(cb);
+  }, []);
+
+  const offEvent = useCallback((cb: (event: string, data?: unknown) => void) => {
+    storyEngine.offEvent(cb);
+  }, []);
+
   return {
     playback,
     isLoading,
@@ -123,5 +135,7 @@ export function useStoryViewModel(): StoryViewModel {
     resume,
     stop,
     clearError,
+    onEvent,
+    offEvent,
   };
 }
