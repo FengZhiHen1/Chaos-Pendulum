@@ -148,7 +148,7 @@ export function SandboxPanel() {
       {/* 左右分栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 左：编辑器 */}
-        <div className="w-[360px] shrink-0 flex flex-col overflow-hidden border-r border-white/5">
+        <div className="w-[440px] shrink-0 flex flex-col overflow-hidden border-r border-white/5">
           <div className="flex-1 overflow-hidden">
             <CodeEditor value={userCode} onChange={setUserCode}
               errorLine={errorLine} height={SANDBOX_DEFAULTS.editorHeight} />
