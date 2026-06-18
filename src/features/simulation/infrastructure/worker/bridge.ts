@@ -1,4 +1,4 @@
-import type { PendulumParams, InitialConditions, IntegratorMethod } from "@/shared/domain/valueObjects";
+import type { PendulumParams, InitialConditions } from "@/shared/domain/valueObjects";
 import { PARAM_META } from "@/shared/domain/valueObjects";
 import { useRootStore } from "@/stores/rootStore";
 import { commandBus } from "@/shared/infrastructure/commandBus";
@@ -58,8 +58,6 @@ function flushPending(): void {
       sched.updateParams(c.data as Partial<PendulumParams>);
     } else if (c.type === "reset") {
       sched.reset(c.data as InitialConditions);
-    } else if (c.type === "setMethod") {
-      sched.setMethod(c.data as IntegratorMethod);
     }
   }
   pendingCommands.length = 0;
@@ -275,16 +273,6 @@ export function setupSimulationBridge(): () => void {
           enqueue("reset", ic);
         }
       }, 100);
-    }
-
-    // ── method 变更 ──
-    // paramsDirty 时跳过即时同步
-    if (state.method !== prevState.method && !state.paramsDirty) {
-      if (workerReady) {
-        getScheduler().setMethod(state.method);
-      } else {
-        enqueue("setMethod", state.method);
-      }
     }
 
     // ── resetTrigger 递增 → 完整重启仿真 ──
