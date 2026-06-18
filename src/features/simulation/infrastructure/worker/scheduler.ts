@@ -91,6 +91,10 @@ export class SimulationScheduler extends ISimulationScheduler {
     if (this._running) return;
     this._running = true;
     if (!this.externalTick) this.rafId = requestAnimationFrame(() => this.loop());
+    // 首次恢复时无活跃批次，主动请求，避免等待 consumeOneFrame 被动触发
+    if (!this.activeBuffer && !this.pendingBatch) {
+      this.requestNextBatch();
+    }
   }
 
   override destroy(): void {
