@@ -200,14 +200,6 @@ export function useTrailBuffer(): TrailBufferAPI {
       rb.push(point);
       lastAppendParamsRef.current = { L1: params.L1, L2: params.L2 };
 
-      // 调试：每 60 帧打印一次
-      if (rb.length % 60 === 1) {
-        console.log("[useTrailBuffer] pushed point:",
-          "pos=", point.position.x.toFixed(3), point.position.y.toFixed(3),
-          "vel=", point.velocity.toFixed(3),
-          "rb.length=", rb.length);
-      }
-
       // 无限模式下容量警告（仅首次）
       if (
         currentPersistence === 0 &&
