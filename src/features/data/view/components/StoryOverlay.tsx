@@ -129,6 +129,24 @@ export function StoryOverlay() {
     return () => { offEvent(handleStoryEvent); };
   }, [onEvent, offEvent, handleStoryEvent]);
 
+  // 仿真健康看门狗——故事播放中若仿真意外停止（如 RKF45 数值发散），自动恢复
+  useEffect(() => {
+    if (!playback.isPlaying) return;
+    const interval = setInterval(() => {
+      const sim = useSimulationStore.getState();
+      if (!sim.isRunning && !sim.isPendulumStopped) {
+        sim.resetToDefaults();
+        // resetToDefaults 触发 bridge 的 reset + resetTrigger 递增；
+        // store 内 isRunning 被设为 false，等待 reset 完成后重新启动
+        setTimeout(() => {
+          const s = useSimulationStore.getState();
+          if (!s.isRunning) s.setRunning(true);
+        }, 150);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [playback.isPlaying]);
+
   if (!visible) return null;
 
   const isPlaying = playback.isPlaying;
