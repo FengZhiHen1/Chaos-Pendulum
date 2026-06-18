@@ -55,8 +55,6 @@ export interface ReversalRunnerAPI {
   showAnnotation: boolean;
   annotationDismissed: boolean;
   dismissAnnotation: () => void;
-  confirmOpen: boolean;
-  dialogPhase: "loading" | "ready";
   completedOpen: boolean;
   exactCompletedOpen: boolean;
   engineError: string | null;
@@ -64,7 +62,6 @@ export interface ReversalRunnerAPI {
   stopReversal: () => void;
   pauseReversal: () => void;
   resumeReversal: () => void;
-  handleConfirmReversal: () => void;
   handleCancelReversal: () => void;
   handleRestoreState: () => void;
   handleResetAfterComplete: () => void;
@@ -107,8 +104,6 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const reversalTrailRef = useRef<THREE.Vector3[]>([]);
   const awaitingConfirmRef = useRef(false);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [dialogPhase, setDialogPhase] = useState<"loading" | "ready">("loading");
   const [completedOpen, setCompletedOpen] = useState(false);
   const [exactCompletedOpen, setExactCompletedOpen] = useState(false);
 
@@ -191,9 +186,15 @@ export function useReversalRunner(): ReversalRunnerAPI {
       commandBus.emit({ type: "scheduler:pause" });
       commandBus.emit({ type: "scheduler:reset", initialConditions: { theta1: store.state.theta1, theta1Dot: store.state.omega1, theta2: store.state.theta2, theta2Dot: store.state.omega2 }, simTime: store.t });
       commandBus.emit({ type: "scheduler:setDirection", direction: -1 });
-      setDialogPhase("loading"); setConfirmOpen(true);
       commandBus.emit({ type: "scheduler:prefetchBatch" });
-      void commandBus.once("scheduler:prefetchReady", () => { if (!awaitingConfirmRef.current) return; awaitingConfirmRef.current = false; setDialogPhase("ready"); });
+      // Worker 预取完成后自动启动反演（无需二次确认弹窗）
+      void commandBus.once("scheduler:prefetchReady", () => {
+        if (!awaitingConfirmRef.current) return;
+        awaitingConfirmRef.current = false;
+        setIntroOpen(false);
+        setPhase("reversing");
+        commandBus.emit({ type: "scheduler:resume" });
+      });
       // 预取超时保护：10 秒后 Worker 仍未响应则自动取消
       prefetchTimeoutRef.current = setTimeout(() => {
         if (!awaitingConfirmRef.current) return;
@@ -246,11 +247,9 @@ export function useReversalRunner(): ReversalRunnerAPI {
   const openIntro = useCallback(() => { setIntroOpen(true); }, [setIntroOpen]);
   const closeIntro = useCallback(() => { setIntroOpen(false); }, [setIntroOpen]);
 
-  const handleConfirmReversal = useCallback(() => { setIntroOpen(false); setConfirmOpen(false); setPhase("reversing"); commandBus.emit({ type: "scheduler:resume" }); }, [setPhase, setIntroOpen]);
   const handleCancelReversal = useCallback(() => {
     if (prefetchTimeoutRef.current) { clearTimeout(prefetchTimeoutRef.current); prefetchTimeoutRef.current = undefined; }
     awaitingConfirmRef.current = false;
-    setConfirmOpen(false);
     setIntroOpen(false);
     commandBus.emit({ type: "scheduler:setDirection", direction: 1 });
     commandBus.emit({ type: "scheduler:resume" });
@@ -317,9 +316,9 @@ export function useReversalRunner(): ReversalRunnerAPI {
     tooltipText, hintText, introOpen, openIntro, closeIntro,
     narrativePhase, maxDrift, separationStartTime, elapsedReversalTime,
     showAnnotation, annotationDismissed, dismissAnnotation,
-    confirmOpen, dialogPhase, completedOpen, exactCompletedOpen, engineError,
+    completedOpen, exactCompletedOpen, engineError,
     startReversal, stopReversal, pauseReversal, resumeReversal,
-    handleConfirmReversal, handleCancelReversal,
+    handleCancelReversal,
     handleRestoreState, handleResetAfterComplete,
     handleExactRestoreState, handleExactResetAfterComplete,
     history,

@@ -11,7 +11,6 @@
 import { useState, useCallback } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/view/components/ui/button";
-import { Dialog } from "@/shared/view/components/ui/dialog";
 import { useReversalRunner } from "../../viewModel/hooks/useReversalRunner";
 import { DriftCurvePanel } from "./DriftCurvePanel";
 
@@ -281,27 +280,16 @@ export function TimeReversal() {
         />
       )}
 
-      {/* ── ② 数值反演确认弹窗（Worker 预取） ── */}
-      <Dialog open={r.confirmOpen} onClose={r.handleCancelReversal}
-        title={r.dialogPhase === "loading" ? "准备反演数据…" : "开始反演？"}
-        description={r.dialogPhase === "loading"
-          ? "正在请求反向积分批次，请稍候…（10 秒超时）"
-          : "反向积分数据已就绪。确认后将开始数值反演。"}>
-        {r.dialogPhase === "loading" ? (
-          <div className="flex flex-col items-center justify-center py-4 gap-3">
-            <div className="flex items-center">
-              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="ml-3 text-xs text-on-surface-variant">等待 Worker 反向积分…</span>
-            </div>
-            <Button variant="tertiary" size="sm" onClick={r.handleCancelReversal}>取消</Button>
+      {/* ── ② Worker 预取过渡指示器（数值反演自动等待 Worker 就绪）── */}
+      {r.phase === "awaitingConfirm" && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <div className="px-5 py-3 rounded-xl bg-surface-container-high/90 backdrop-blur border border-white/10
+            text-xs text-on-surface-variant flex items-center gap-3">
+            <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+            准备反向积分数据…
           </div>
-        ) : (
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="tertiary" size="sm" onClick={r.handleCancelReversal}>取消</Button>
-            <Button variant="primary" size="sm" onClick={r.handleConfirmReversal}>开始反演</Button>
-          </div>
-        )}
-      </Dialog>
+        </div>
+      )}
 
       {/* ── ③ 运行中：顶部控制条（仅 running/paused）+ 叙事提示 + 漂移曲线 ── */}
       {isRunning && (
