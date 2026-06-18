@@ -66,6 +66,14 @@ export interface IWorkerGateway {
   /** 发送 config 命令——配置可选功能（力计算等） */
   sendConfig(computeForces?: boolean): void;
 
+  /** 发送 runValidation 命令——在 Worker 中独立运行验证场景 */
+  sendRunValidation(
+    scenarioId: "smallAngle" | "singlePendulum" | "energy",
+    params: PendulumParams,
+    ic: InitialConditions,
+    simDuration: number,
+  ): void;
+
   /** 注册 Worker 响应处理器 */
   onMessage(handler: (response: WorkerResponse) => void): void;
 

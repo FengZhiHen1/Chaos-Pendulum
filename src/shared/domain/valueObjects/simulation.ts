@@ -160,6 +160,14 @@ export interface WorkerConfigCommand {
   computeForces?: boolean;
 }
 
+export interface WorkerRunValidationCommand {
+  type: "runValidation";
+  scenarioId: "smallAngle" | "singlePendulum" | "energy";
+  params: PendulumParams;
+  initialConditions: InitialConditions;
+  simDuration: number;
+}
+
 export type WorkerCommand =
   | WorkerInitCommand
   | WorkerStepCommand
@@ -167,7 +175,8 @@ export type WorkerCommand =
   | WorkerResetCommand
   | WorkerSetDirectionCommand
   | WorkerSetMethodCommand
-  | WorkerConfigCommand;
+  | WorkerConfigCommand
+  | WorkerRunValidationCommand;
 
 // ─── 消息协议：Worker → 主线程 ────────────────────
 
@@ -210,8 +219,24 @@ export interface WorkerLyapunovUpdateResponse {
   lyapunovExponent: number;
 }
 
+export interface WorkerValidationResultResponse {
+  type: "validationResult";
+  scenarioId: "smallAngle" | "singlePendulum" | "energy";
+  /** theta1 轨迹采样（每帧一个值） */
+  theta1Samples: number[];
+  /** 能量采样（每 10 帧一次） */
+  energySamples: number[];
+  /** 初始能量 */
+  energyInitial: number;
+  /** 仿真时长 (s) */
+  simDuration: number;
+  /** 若积分发散，记录发散时间 */
+  divergedAt?: number;
+}
+
 export type WorkerResponse =
   | WorkerReadyResponse
   | WorkerBatchReadyResponse
   | WorkerErrorResponse
-  | WorkerLyapunovUpdateResponse;
+  | WorkerLyapunovUpdateResponse
+  | WorkerValidationResultResponse;

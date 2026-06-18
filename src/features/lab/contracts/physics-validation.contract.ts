@@ -3,19 +3,18 @@
  * 职责: 定义物理验证套件的契约边界——三项标准验证实验、四态结果机、失败诊断提示。
  *       LAB-02 的核心职责：一键运行三个标准物理验证实验，提供"物理正确性背书"。
  * 数据来源:
- *   - integratorStep (simulation/domain/services/integrators): MUST — 三项验证均使用纯积分函数
- *   - PendulumParams (shared/domain/valueObjects): MUST — 物理参数类型
+ *   - Worker (simulation/infrastructure/worker): MUST — 三项验证的 ODE 积分必须在 Worker 中执行
+ *   - getScheduler().runValidation(): MUST — 通过调度器异步运行验证场景并收集轨迹数据
  * 边界:
- *   - 依赖: simulation/domain/services/integrators, shared/domain/valueObjects
+ *   - 依赖: simulation/infrastructure/worker (Scheduler + Worker), shared/domain/valueObjects
  *   - 被依赖: hooks/useLabValidation, LabPage
  * 禁止行为:
- *   - 禁止验证期间使用 Worker——在主线程直接调用 integratorStep 同步运行
+ *   - 禁止在主线程直接调用 integratorStep（架构铁律：所有物理计算必须走 Worker 路径）
+ *   - 禁止不缓存/恢复仿真状态（验证前后必须保存并恢复 params / IC / isRunning）
  *   - 禁止验证覆盖所有参数组合（三项是标准场景，不证明"所有参数下都正确"）
  *   - 禁止作为后台持续监控——仅手动触发的一次性实验
  *   - 禁止使用二元判定——使用四态结果机（idle→running→passed|failed）
  */
-
-import type { IntegratorMethod } from "@/shared/domain/valueObjects";
 
 // ───────────────────────────────────────────────
 // @contract ValidationTestKey — 验证实验标识
@@ -107,26 +106,25 @@ export const VALIDATION_DEFAULTS = {
 // ───────────────────────────────────────────────
 
 /**
- * 物理验证运行器——在主线程中同步运行三项标准验证实验。
+ * 物理验证运行器——通过 Worker 异步运行三项标准验证实验。
  *
- * 前置: 未在 Worker 积分循环中（验证使用主线程 CPU）
- * 后置: 返回三项验证的完整结果
+ * 前置: Worker 已初始化（仿真引擎已启动）
+ * 后置: 返回三项验证的完整结果；仿真状态恢复至验证前
  * 输入约束:
- *   - method: 已注册的积分方法
  *   - onProgress: 可选回调，每完成一项触发一次
  * 输出约束:
- *   - 返回 3 个 ValidationResult，顺序为 smallAngle → singlePendulum → energy
+ *   - 返回 Promise<3 个 ValidationResult>，顺序为 smallAngle → singlePendulum → energy
  *   - 全部通过时 LabPage 显示绿色徽章
- * 异常: 无——验证失败通过 passed=false 表达，不抛异常
- * Side Effects: 调用 integratorStep 消耗 CPU（约 5-10 秒×3 项）；
- *   不修改任何全局状态；不访问 Worker、DOM、或网络
+ * 异常: Worker 超时/崩溃通过 passed=false 表达，不抛异常
+ * Side Effects:
+ *   - 通过 Worker 执行 ODE 积分（约 1-3 秒×3 项）
+ *   - 验证前后保存并恢复仿真 params / IC / isRunning
  */
 export interface IValidationRunner {
-  /** 运行全部三项验证 */
+  /** 在 Worker 中异步运行全部三项验证 */
   runAll(
-    method: IntegratorMethod,
     onProgress?: (test: ValidationTestKey, result: IValidationResult) => void,
-  ): readonly IValidationResult[];
+  ): Promise<readonly IValidationResult[]>;
 }
 
 // ───────────────────────────────────────────────
@@ -156,8 +154,8 @@ export interface IValidationController {
   /** 三项验证的详细信息 */
   readonly details: Record<ValidationTestKey, string>;
 
-  /** 启动一轮完整验证 */
-  startValidation(method: IntegratorMethod): Promise<void>;
+  /** 启动一轮完整验证（通过 Worker 异步执行） */
+  startValidation(): Promise<void>;
 
   /** 重置所有验证状态 */
   reset(): void;

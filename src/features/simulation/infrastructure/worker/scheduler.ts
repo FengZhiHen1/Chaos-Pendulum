@@ -1,5 +1,6 @@
 import type {
   WorkerResponse,
+  WorkerValidationResultResponse,
   PendulumParams,
   InitialConditions,
   IntegratorMethod,
@@ -64,6 +65,9 @@ export class SimulationScheduler extends ISimulationScheduler {
 
   /** Worker 已通过 createOdeWorker 预初始化注入（标志 ready 消息已被消费） */
   private _workerInjected = false;
+
+  /** 验证运行 Promise resolver——runValidation 的请求-响应配对 */
+  private validationResolver: ((result: WorkerValidationResultResponse) => void) | null = null;
 
   // 插值快照
   private prevSnapshot: InterpSnapshot | null = null;
@@ -243,6 +247,27 @@ export class SimulationScheduler extends ISimulationScheduler {
     this.workerGateway.sendConfig(active);
   }
 
+  /** 在 Worker 中独立运行物理验证场景，返回验证原始数据 */
+  runValidation(
+    scenarioId: "smallAngle" | "singlePendulum" | "energy",
+    params: PendulumParams,
+    ic: InitialConditions,
+    simDuration: number,
+  ): Promise<WorkerValidationResultResponse> {
+    return new Promise((resolve, reject) => {
+      this.validationResolver = resolve;
+      this.workerGateway.sendRunValidation(scenarioId, params, ic, simDuration);
+
+      // 超时保护：最长等待 30 秒
+      setTimeout(() => {
+        if (this.validationResolver) {
+          this.validationResolver = null;
+          reject(new Error(`验证 ${scenarioId} 超时 (${simDuration}s 仿真)`));
+        }
+      }, 30000);
+    });
+  }
+
   /** 暂停态下预取一批数据，完成后回调 onDone */
   prefetchBatch(onDone: () => void): void {
     this.releaseBuffers();
@@ -363,6 +388,13 @@ export class SimulationScheduler extends ISimulationScheduler {
         }
         commandBus.emit({ type: "worker:error", code: resp.code, message: resp.message, simTime: resp.simTime });
         if (resp.code === "DIVERGED") this._running = false;
+        break;
+      }
+      case "validationResult": {
+        if (this.validationResolver) {
+          this.validationResolver(resp);
+          this.validationResolver = null;
+        }
         break;
       }
     }

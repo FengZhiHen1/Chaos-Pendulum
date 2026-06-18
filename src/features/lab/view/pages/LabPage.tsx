@@ -1,4 +1,4 @@
-import { FlaskConical, CheckCircle, XCircle, Circle, FileText, Code, Play, AlertTriangle } from "lucide-react";
+import { FlaskConical, CheckCircle, XCircle, Circle, Code, Play, AlertTriangle } from "lucide-react";
 import { useLabStore } from "../../store";
 import { useLabValidation } from "../../hooks/useLabValidation";
 import { SandboxPanel } from "../components/SandboxPanel";
@@ -206,26 +206,6 @@ export function LabPage() {
             </div>
           </div>
 
-          {/* 报告生成器 */}
-          <div className="mt-auto p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center">
-                <FileText className="w-3 h-3 text-on-surface-variant" />
-              </div>
-              <h4 className="text-xs font-semibold text-on-surface">实验报告</h4>
-            </div>
-            <button
-              type="button"
-              disabled
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium bg-surface-container text-on-surface-variant/50 border border-white/5 cursor-not-allowed transition-all"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              生成 A4 PDF 报告
-            </button>
-            <p className="text-[10px] text-on-surface-variant/40 mt-2 text-center">
-              参数表 + 关键帧截图 + 数据图表 + 物理结论
-            </p>
-          </div>
         </div>
       </div>
     </div>

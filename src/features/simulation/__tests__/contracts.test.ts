@@ -279,6 +279,12 @@ class MockWorkerGateway implements IWorkerGateway {
   sendDirection(_direction: 1 | -1): void {}
   sendMethod(_method: IntegratorMethod): void {}
   sendConfig(_computeForces?: boolean): void {}
+  sendRunValidation(
+    _scenarioId: "smallAngle" | "singlePendulum" | "energy",
+    _params: PendulumParams,
+    _ic: InitialConditions,
+    _simDuration: number,
+  ): void {}
   onMessage(handler: (response: WorkerResponse) => void): void {
     this.messageHandlers.push(handler);
   }

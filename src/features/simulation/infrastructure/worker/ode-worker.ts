@@ -84,6 +84,9 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     case "config":
       handleConfig(cmd);
       break;
+    case "runValidation":
+      handleRunValidation(cmd);
+      break;
     default:
       console.warn(`[ode-worker] 未识别的消息类型: ${(cmd as { type: string }).type}`);
   }
@@ -389,6 +392,83 @@ function handleConfig(cmd: { computeForces?: boolean }): void {
       ctx.forceExtrema = null;
     }
   }
+}
+
+// ─── 验证运行 ──────────────────────────────────
+
+const VALIDATION_DT = 1 / 60;
+const ENERGY_SAMPLE_INTERVAL = 10;
+
+function handleRunValidation(cmd: {
+  scenarioId: "smallAngle" | "singlePendulum" | "energy";
+  params: PendulumParams;
+  initialConditions: { theta1: number; theta1Dot: number; theta2: number; theta2Dot: number };
+  simDuration: number;
+}): void {
+  if (!ctx.state || !ctx.params) {
+    postResponse({ type: "error", code: "INVALID_STATE", message: "Worker 未初始化", simTime: -1 });
+    return;
+  }
+
+  // 保存当前 Worker 状态
+  const savedState = new Float64Array(ctx.state);
+  const savedParams: PendulumParams = { ...ctx.params };
+  const savedMethod = ctx.method;
+  const savedSimTime = ctx.simTime;
+  const savedDirection = ctx.direction;
+
+  // 设置验证场景
+  ctx.params = { ...cmd.params };
+  const ic = cmd.initialConditions;
+  ctx.state = new Float64Array([ic.theta1, ic.theta1Dot, ic.theta2, ic.theta2Dot]);
+  ctx.state[0] = normalizeAngle(ctx.state[0]!);
+  ctx.state[2] = normalizeAngle(ctx.state[2]!);
+  ctx.direction = 1;
+  ctx.simTime = 0;
+
+  const totalFrames = Math.ceil(cmd.simDuration / VALIDATION_DT);
+  const theta1Samples: number[] = new Array(totalFrames);
+  const energySamples: number[] = [];
+  let energyInitial = 0;
+  let divergedAt: number | undefined;
+
+  for (let i = 0; i < totalFrames; i++) {
+    integratorStep(ctx.state, ctx.params, VALIDATION_DT, savedMethod);
+
+    if (hasInvalidValue(ctx.state)) {
+      divergedAt = ctx.simTime;
+      break;
+    }
+
+    ctx.simTime += VALIDATION_DT;
+    ctx.state[0] = normalizeAngle(ctx.state[0]!);
+    ctx.state[2] = normalizeAngle(ctx.state[2]!);
+
+    theta1Samples[i] = ctx.state[0]!;
+
+    if (i % ENERGY_SAMPLE_INTERVAL === 0) {
+      const derived = computeDerived(ctx.state, ctx.params);
+      if (i === 0) energyInitial = derived.totalEnergy;
+      energySamples.push(derived.totalEnergy);
+    }
+  }
+
+  // 恢复原始 Worker 状态
+  ctx.state = savedState;
+  ctx.params = savedParams;
+  ctx.method = savedMethod;
+  ctx.simTime = savedSimTime;
+  ctx.direction = savedDirection;
+
+  postResponse({
+    type: "validationResult",
+    scenarioId: cmd.scenarioId,
+    theta1Samples,
+    energySamples,
+    energyInitial,
+    simDuration: cmd.simDuration,
+    divergedAt,
+  });
 }
 
 // ─── 重置 ──────────────────────────────────────

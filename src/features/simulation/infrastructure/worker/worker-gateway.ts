@@ -71,6 +71,16 @@ export class WorkerGateway implements IWorkerGateway {
     this.post({ type: "config", computeForces });
   }
 
+  /** 发送 runValidation 命令——在 Worker 中独立运行验证场景 */
+  sendRunValidation(
+    scenarioId: "smallAngle" | "singlePendulum" | "energy",
+    params: PendulumParams,
+    ic: InitialConditions,
+    simDuration: number,
+  ): void {
+    this.post({ type: "runValidation", scenarioId, params, initialConditions: ic, simDuration });
+  }
+
   /** 销毁 Worker 实例 */
   destroy(): void {
     if (this.worker) {
