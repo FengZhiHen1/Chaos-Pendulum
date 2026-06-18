@@ -22,7 +22,7 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string }[] = [
 /** 分辨率选项 */
 const RESOLUTION_OPTIONS = [1, 2, 4] as const;
 
-export function ExportPanel({ viewModel }: ExportPanelProps) {
+export function ExportPanel({ viewModel, onExport }: ExportPanelProps & { onExport?: (format: ExportFormat) => void }) {
   const {
     selectedFormat,
     isExporting,
@@ -116,7 +116,7 @@ export function ExportPanel({ viewModel }: ExportPanelProps) {
         <button
           type="button"
           disabled={isExporting}
-          onClick={() => {/* 由父组件 DataPage 注入具体导出逻辑 */}}
+          onClick={() => onExport?.(selectedFormat)}
           className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold
                      text-on-surface transition-all hover:bg-primary-hover
                      disabled:opacity-50 disabled:cursor-not-allowed"

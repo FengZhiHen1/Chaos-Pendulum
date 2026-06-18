@@ -10,6 +10,7 @@
  * 禁止: import application/domain/infrastructure
  */
 
+import { useCallback } from "react";
 import { useStoryViewModel } from "../../viewModel/hooks/useStoryViewModel";
 import { useSnapshotViewModel } from "../../viewModel/hooks/useSnapshotViewModel";
 import { useExportViewModel } from "../../viewModel/hooks/useExportViewModel";
@@ -21,6 +22,8 @@ import { ExportPanel } from "../components/ExportPanel";
 import { HistoryTimeline } from "../components/HistoryTimeline";
 import { DemoModeIndicator } from "../components/DemoModeIndicator";
 import { useAppStore } from "@/stores/useAppStore";
+import { useSimulationStore } from "@/features/simulation";
+import type { ExportFormat } from "../../contracts";
 
 export function DataPage() {
   const deviceType = useAppStore((s) => s.deviceType);
@@ -33,6 +36,39 @@ export function DataPage() {
   const demoVM = useDemoModeViewModel();
   const historyVM = useHistoryPlaybackViewModel();
 
+  // ── 导出回调：构造配置数据并调用 viewModel ───────
+  const handleExport = useCallback(async (format: ExportFormat) => {
+    const sim = useSimulationStore.getState();
+    const now = new Date().toISOString().replace(/[:.]/g, "-");
+
+    if (format === "csv") {
+      const row = [sim.t, sim.theta1, sim.theta1Dot, sim.theta2, sim.theta2Dot,
+        sim.x1, sim.y1, sim.x2, sim.y2,
+        sim.kineticEnergy, sim.potentialEnergy, sim.totalEnergy,
+        sim.alpha1, sim.alpha2];
+      await exportVM.exportCSV({
+        headers: ["t", "theta1", "omega1", "theta2", "omega2", "x1", "y1", "x2", "y2", "kineticEnergy", "potentialEnergy", "totalEnergy", "alpha1", "alpha2"],
+        rows: [row],
+        filename: `双摆数据-${now}`,
+      });
+    } else if (format === "json") {
+      const st = sim.state;
+      await exportVM.exportJSON({
+        params: sim.params,
+        trajectory: [{ theta1: st.theta1, omega1: st.omega1, theta2: st.theta2, omega2: st.omega2 }],
+        metadata: { exportedAt: new Date().toISOString(), version: "1.0.0", simTime: sim.t },
+        filename: `双摆场景-${now}`,
+      });
+    } else if (format === "png") {
+      const canvas = document.querySelector("canvas");
+      if (!canvas) {
+        alert("未找到 3D 画布——请先在探索模式中运行仿真");
+        return;
+      }
+      await exportVM.exportPNG({ canvas, filename: `双摆截图-${now}`, resolution: 2 });
+    }
+  }, [exportVM]);
+
   // 移动端使用垂直堆叠布局
   if (isMobile) {
     return (
@@ -41,7 +77,7 @@ export function DataPage() {
         <div className="space-y-4">
           <StoryPlayer viewModel={storyVM} />
           <SnapshotManager viewModel={snapshotVM} />
-          <ExportPanel viewModel={exportVM} />
+          <ExportPanel viewModel={exportVM} onExport={handleExport} />
           <HistoryTimeline viewModel={historyVM} />
         </div>
       </div>
@@ -68,7 +104,7 @@ export function DataPage() {
         {/* 左栏：故事 + 导出 */}
         <div className="space-y-6">
           <StoryPlayer viewModel={storyVM} />
-          <ExportPanel viewModel={exportVM} />
+          <ExportPanel viewModel={exportVM} onExport={handleExport} />
         </div>
 
         {/* 右栏：快照 + 时间轴 */}
