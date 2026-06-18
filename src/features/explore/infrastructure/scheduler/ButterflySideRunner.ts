@@ -45,12 +45,23 @@ export class ButterflySideRunner {
 
   create(ic: InitialConditions, params: PendulumParams): void {
     this.destroy();
-    const worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
-    this.sw = { worker, pool: new Float64Pool(POOL_COUNT, POOL_SIZE), pendingBatch: false, crashCount: 0, initRetries: 0, currentSimTime: 0, initTimeoutId: null };
-    worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
-    worker.onerror = (event) => this.handleCrash(event, ic, params);
-    worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
-    this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+    try {
+      const worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
+      this.sw = { worker, pool: new Float64Pool(POOL_COUNT, POOL_SIZE), pendingBatch: false, crashCount: 0, initRetries: 0, currentSimTime: 0, initTimeoutId: null };
+      worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
+      worker.onerror = (event) => this.handleCrash(event, ic, params);
+      worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
+      this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+    } catch (err) {
+      console.error(`ButterflySideRunner ${this.side}: Worker 创建失败`, err);
+      this.onReady?.(this.side, false);
+      notificationPort.notify({
+        title: `摆 ${this.side} 仿真引擎创建失败`,
+        description: err instanceof Error ? err.message : "请检查浏览器是否支持 Web Worker",
+        variant: "error",
+        durationMs: 8000,
+      });
+    }
   }
 
   postCommand(cmd: Record<string, unknown>): void { this.sw?.worker.postMessage(cmd); }
@@ -103,14 +114,26 @@ export class ButterflySideRunner {
 
   private onInitTimeout(ic: InitialConditions, params: PendulumParams): void {
     if (!this.sw) return;
-    if (this.sw.initRetries >= 1) { this.onReady?.(this.side, false); notificationPort.notify({ title: `摆 ${this.side} 仿真引擎启动失败`, description: "请刷新页面后重试", variant: "error", durationMs: 8000 }); return; }
+    if (this.sw.initRetries >= 1) {
+      this.onReady?.(this.side, false);
+      notificationPort.notify({ title: `摆 ${this.side} 仿真引擎启动失败`, description: "请刷新页面后重试", variant: "error", durationMs: 8000 });
+      return;
+    }
     this.sw.initRetries++;
     this.sw.worker.terminate();
-    const worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
-    this.sw.worker = worker;
-    worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
-    worker.onerror = (event) => this.handleCrash(event, ic, params);
-    worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
+    try {
+      const worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
+      this.sw.worker = worker;
+      worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
+      worker.onerror = (event) => this.handleCrash(event, ic, params);
+      worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
+      // 重试也设超时，防止永久挂起
+      this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+    } catch (err) {
+      console.error(`ButterflySideRunner ${this.side}: 重试 Worker 创建失败`, err);
+      this.onReady?.(this.side, false);
+      notificationPort.notify({ title: `摆 ${this.side} 仿真引擎创建失败`, description: "请检查浏览器是否支持 Web Worker", variant: "error", durationMs: 8000 });
+    }
   }
 
   private handleCrash(_event: ErrorEvent, ic: InitialConditions, params: PendulumParams): void {
@@ -120,10 +143,16 @@ export class ButterflySideRunner {
     this.sw.crashCount++;
     if (this.sw.initTimeoutId) { clearTimeout(this.sw.initTimeoutId); this.sw.initTimeoutId = null; }
     this.sw.worker.terminate();
-    this.sw.worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
-    this.sw.worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
-    this.sw.worker.onerror = (event) => this.handleCrash(event, ic, params);
-    this.sw.pendingBatch = false;
-    this.sw.worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
+    try {
+      this.sw.worker = new Worker(new URL("@/features/simulation/infrastructure/worker/ode-worker.ts", import.meta.url), { type: "module" });
+      this.sw.worker.onmessage = (e: MessageEvent<WorkerResponse>) => this.handleMessage(e.data);
+      this.sw.worker.onerror = (event) => this.handleCrash(event, ic, params);
+      this.sw.pendingBatch = false;
+      this.sw.worker.postMessage({ type: "init", params, initialConditions: ic, method: "RKF45" });
+      this.sw.initTimeoutId = setTimeout(() => this.onInitTimeout(ic, params), INIT_TIMEOUT_MS);
+    } catch (err) {
+      console.error(`ButterflySideRunner ${this.side}: crash 后重建 Worker 失败`, err);
+      this.onReady?.(this.side, false);
+    }
   }
 }

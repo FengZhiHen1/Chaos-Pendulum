@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useSimulationStore } from "@/features/simulation";
 import { useExploreStore } from "@/features/explore";
 import { useRootStore } from "@/stores/rootStore";
@@ -32,12 +32,15 @@ export interface UseButterflySimulationAPI {
   handlePause: () => void;
   handleReset: () => void;
   handleDeltaChange: (deltaDeg: number) => void;
+  /** Worker 初始化是否失败 */
+  initError: boolean;
 }
 
 export function useButterflySimulation(): UseButterflySimulationAPI {
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
   const setButterflyDelta = useExploreStore((s) => s.setButterflyDelta);
   const schedulerRef = useRef(getOrCreateScheduler());
+  const [initError, setInitError] = useState(false);
 
   // 初始化
   const initializedRef = useRef(false);
@@ -45,9 +48,20 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    const simStore = useSimulationStore.getState();
-    useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
-    schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    try {
+      const simStore = useSimulationStore.getState();
+      useRootStore.getState().init(simStore.params, simStore.state, butterflyDelta);
+      schedulerRef.current.start(simStore.params, simStore.state, butterflyDelta);
+    } catch (err) {
+      console.error("ButterflyEffect: 初始化失败", err);
+      setInitError(true);
+      notificationPort.notify({
+        title: "蝴蝶效应初始化失败",
+        description: err instanceof Error ? err.message : "仿真引擎启动异常，请重试",
+        variant: "error",
+        durationMs: 5000,
+      });
+    }
   }, [butterflyDelta]);
 
   // Delta 变化时平滑更新（仅 reset 摆 B 的初始条件，不销毁 Worker）
@@ -112,5 +126,6 @@ export function useButterflySimulation(): UseButterflySimulationAPI {
     handlePause,
     handleReset,
     handleDeltaChange,
+    initError,
   };
 }

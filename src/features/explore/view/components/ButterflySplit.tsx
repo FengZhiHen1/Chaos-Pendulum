@@ -26,12 +26,18 @@ interface ButterflySplitProps {
 export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitProps) {
   const deviceType = useAppStore((s) => s.deviceType);
   const butterflyDelta = useExploreStore((s) => s.butterflyDelta);
-  const store = useButterflyStore();
-  const { handlePlay, handlePause, handleReset, handleDeltaChange } = useButterflySimulation();
+  // 使用精确选择器，避免每帧 store 更新触发整个组件树重渲染
+  const isBfRunning = useButterflyStore((s) => s.isRunning);
+  const isFullyDecoupled = useButterflyStore((s) => s.separation.isFullyDecoupled);
+  const separationRad = useButterflyStore((s) => s.separation.currentSeparation);
+  const sideAWorkerReady = useButterflyStore((s) => s.sideA.workerReady);
+  const sideBWorkerReady = useButterflyStore((s) => s.sideB.workerReady);
+  const editMode = useButterflyStore((s) => s.editMode);
+  const bfSetEditMode = useButterflyStore((s) => s.setEditMode);
+  const { handlePlay, handlePause, handleReset, handleDeltaChange, initError } = useButterflySimulation();
 
   const isDesktop = deviceType === "desktop";
-  const isFullyDecoupled = store.separation.isFullyDecoupled;
-  const workersReady = store.sideA.workerReady && store.sideB.workerReady;
+  const workersReady = sideAWorkerReady && sideBWorkerReady;
 
   const [activeSide, setActiveSide] = useState<"A" | "B">("A");
   const switchToA = useCallback(() => setActiveSide("A"), []);
@@ -45,18 +51,18 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
           <Button
             variant="primary"
             size="sm"
-            disabled={!workersReady}
-            onClick={store.isRunning ? handlePause : handlePlay}
-            title={!workersReady ? "仿真引擎初始化中…" : undefined}
+            disabled={!workersReady && !initError}
+            onClick={isBfRunning ? handlePause : handlePlay}
+            title={initError ? "仿真引擎启动失败" : !workersReady ? "仿真引擎初始化中…" : undefined}
           >
             {!workersReady ? (
               <span className="h-3.5 w-3.5 mr-1 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : store.isRunning ? (
+            ) : isBfRunning ? (
               <Pause className="h-3.5 w-3.5 mr-1" />
             ) : (
               <Play className="h-3.5 w-3.5 mr-1" />
             )}
-            {!workersReady ? "初始化…" : store.isRunning ? "暂停" : "播放"}
+            {initError ? "启动失败" : !workersReady ? "初始化…" : isBfRunning ? "暂停" : "播放"}
           </Button>
           <Button
             variant="tertiary"
@@ -69,8 +75,8 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
         </div>
 
         <DeltaPanel
-          editMode={store.editMode}
-          onEditModeChange={store.setEditMode}
+          editMode={editMode}
+          onEditModeChange={bfSetEditMode}
           onDeltaChange={handleDeltaChange}
           deltaDeg={butterflyDelta}
         />
@@ -167,8 +173,8 @@ export function ButterflySplit({ className = "w-full h-full" }: ButterflySplitPr
 
         {/* 分离警报 */}
         <SeparationAlert
-          triggered={store.separation.isFullyDecoupled}
-          separationRad={store.separation.currentSeparation}
+          triggered={isFullyDecoupled}
+          separationRad={separationRad}
         />
       </div>
     </div>
